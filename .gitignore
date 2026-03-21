@@ -86,6 +86,8 @@ StyleCopReport.xml
 *_h.h
 *.ilk
 *.meta
+*.dll
+*.exe
 *.obj
 *.idb
 *.iobj
@@ -194,6 +196,7 @@ DocProject/Help/html
 
 # Click-Once directory
 publish/
+publish_fixed/
 
 # Publish Web Output
 *.[Pp]ublish.xml
@@ -416,3 +419,123 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# =========================
+# React / Frontend
+# =========================
+
+# Node dependencies
+node_modules/
+
+# Production build output
+build/
+dist/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache
+.cache/
+.eslintcache
+.stylelintcache
+
+# Coverage reports
+coverage/
+
+# Parcel / Vite cache
+.parcel-cache/
+.vite/
+
+# Next.js
+.next/
+out/
+
+# Nuxt
+.nuxt/
+
+# Storybook
+storybook-static/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+
+# =========================
+# React Native
+# =========================
+
+# Metro bundler cache
+.metro-health-check*
+.metro-cache/
+
+# React Native logs
+react-native.log*
+
+# Expo
+.expo/
+.expo-shared/
+expo-env.d.ts
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/app/debug/
+android/local.properties
+android/captures/
+android/*.iml
+
+# iOS
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcuserstate
+ios/*.xcuserdata/
+ios/.xcode.env.local
+
+# Hermes
+*.hbc
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Detox
+.detox/
+
+# Flipper
+.flipper/
+
+# Temporary files
+*.tmp
+*.swp
+*.lock
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+Desktop.ini
+mobile/
+
+
+# Property Uploads
+PropCRM/wwwroot/uploads/**
+wwwroot/uploads/**
+[Uu]ploads/
