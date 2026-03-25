@@ -49,10 +49,12 @@ interface MasterPageProps {
     defaultValue?: any;
     options?: { label: string; value: any }[];
     endpoint?: string;
+    visibleIf?: (formData: any) => boolean;
   }[];
+  renderToolbar?: () => React.ReactNode;
 }
 
-export default function MasterDataPage({ title, subtitle, endpoint, columns, formFields }: MasterPageProps) {
+export default function MasterDataPage({ title, subtitle, endpoint, columns, formFields, renderToolbar }: MasterPageProps) {
   const { masters, loading, error, fetchMasters, addMaster, updateMaster, removeMaster } = useMasters(endpoint);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,11 +81,20 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Scrub hidden fields
+    const scrubbedData = { ...formData };
+    formFields.forEach(field => {
+      if (field.visibleIf && !field.visibleIf(formData)) {
+        scrubbedData[field.name] = field.defaultValue ?? (field.type === 'checkbox' ? false : '');
+      }
+    });
+
     let success = false;
     if (editingMaster) {
-      success = await updateMaster(editingMaster.id, formData);
+      success = await updateMaster(editingMaster.id, scrubbedData);
     } else {
-      success = await addMaster(formData);
+      success = await addMaster(scrubbedData);
     }
     if (success) setIsModalOpen(false);
   };
@@ -106,13 +117,16 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{title} Management</h1>
           <p className="text-slate-500 text-sm">{subtitle}</p>
         </div>
-        <button 
-          onClick={handleOpenAddModal}
-          className="btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add New {title}
-        </button>
+        <div className="flex gap-2">
+          {renderToolbar?.()}
+          <button 
+            onClick={handleOpenAddModal}
+            className="btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add New {title}
+          </button>
+        </div>
       </div>
 
       <div className="relative group max-w-lg">
@@ -201,38 +215,43 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
         title={editingMaster ? `Update ${title}` : `Create ${title}`}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          {formFields.map(field => (
-            <div key={field.name}>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">{field.label}</label>
-              {field.type === 'checkbox' ? (
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    id={field.name}
-                    checked={formData[field.name]}
-                    onChange={(e) => setFormData({...formData, [field.name]: e.target.checked})}
-                    className="h-4 w-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+          {formFields.map(field => {
+            const isVisible = field.visibleIf ? field.visibleIf(formData) : true;
+            if (!isVisible) return null;
+
+            return (
+              <div key={field.name} className="space-y-1">
+                <label className="block text-sm font-semibold text-slate-700">{field.label}</label>
+                {field.type === 'checkbox' ? (
+                  <div className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id={field.name}
+                      checked={formData[field.name]}
+                      onChange={(e) => setFormData({...formData, [field.name]: e.target.checked})}
+                      className="h-4 w-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
+                    />
+                    <label htmlFor={field.name} className="ml-2 block text-sm text-slate-600 font-medium">{field.label}</label>
+                  </div>
+                ) : field.type === 'select' ? (
+                  <SelectField 
+                    field={field} 
+                    value={formData[field.name]} 
+                    onChange={(val) => setFormData({...formData, [field.name]: val})} 
                   />
-                  <label htmlFor={field.name} className="ml-2 block text-sm text-slate-600 font-medium">{field.label}</label>
-                </div>
-              ) : field.type === 'select' ? (
-                <SelectField 
-                  field={field} 
-                  value={formData[field.name]} 
-                  onChange={(val) => setFormData({...formData, [field.name]: val})} 
-                />
-              ) : (
-                <input 
-                  type={field.type}
-                  required={field.required}
-                  value={formData[field.name]}
-                  onChange={(e) => setFormData({...formData, [field.name]: e.target.value})}
-                  className="form-input"
-                  placeholder={`Enter ${field.label.toLowerCase()}...`}
-                />
-              )}
-            </div>
-          ))}
+                ) : (
+                  <input 
+                    type={field.type}
+                    required={field.required}
+                    value={formData[field.name]}
+                    onChange={(e) => setFormData({...formData, [field.name]: e.target.value})}
+                    className="form-input"
+                    placeholder={`Enter ${field.label.toLowerCase()}...`}
+                  />
+                )}
+              </div>
+            );
+          })}
           <div className="pt-4">
             <button 
               type="submit" 

@@ -23,11 +23,7 @@ public class Student : BaseEntity
     public string? Pincode { get; set; }
 
     // 3. Academic Information
-    public Guid? ClassId { get; set; }
-    public Guid? SectionId { get; set; }
-    public string? RollNumber { get; set; }
     public DateTime AdmissionDate { get; set; }
-    public string? AcademicYear { get; set; }
     public string? PreviousSchool { get; set; }
 
     // 5. Guardian / Parent Management
@@ -61,11 +57,10 @@ public class Student : BaseEntity
     public string MaskedMobile => string.IsNullOrEmpty(MobileNumber) ? "" : $"******{MobileNumber.Substring(Math.Max(0, MobileNumber.Length - 4))}";
     public string MaskedEmail => string.IsNullOrEmpty(Email) ? "" : $"{Email.Substring(0, Math.Min(2, Email.Length))}***@{Email.Split('@').LastOrDefault()}";
 
-    [System.ComponentModel.DataAnnotations.Schema.ForeignKey("ClassId")]
-    public virtual AcademicClass StudentClass { get; set; } = null!;
-    // 4. Parallel Course
+    // Parallel Course
     public virtual ICollection<StudentCourse> EnrolledCourses { get; set; } = new List<StudentCourse>();
 
+    public virtual ICollection<StudentAcademic> AcademicRecords { get; set; } = new List<StudentAcademic>();
     public virtual ICollection<StudentDocument> Documents { get; set; } = new List<StudentDocument>();
     public virtual ICollection<StudentAttendance> Attendances { get; set; } = new List<StudentAttendance>();
     public virtual ICollection<StudentExamResult> ExamResults { get; set; } = new List<StudentExamResult>();

@@ -8,7 +8,7 @@ export interface PromoteStudentDto {
 
 export interface BulkPromotionRequestDto {
   targetClassId: string;
-  targetSectionId: string;
+  targetSectionId?: string;
   targetAcademicYear: string;
   students: PromoteStudentDto[];
 }

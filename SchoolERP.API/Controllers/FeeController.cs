@@ -70,6 +70,13 @@ public class FeeController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("structures/copy")]
+    public async Task<IActionResult> CopyStructures(CopyFeeStructureRequest request)
+    {
+        await _feeService.CopyFeeStructureAsync(request);
+        return Ok();
+    }
+
     [HttpGet("student-account/{studentId}")]
     public async Task<IActionResult> GetStudentFeeAccount(Guid studentId)
     {
@@ -86,21 +93,34 @@ public class FeeController : ControllerBase
     [HttpPost("process-payment")]
     public async Task<IActionResult> ProcessPayment(ProcessPaymentRequest request)
     {
+        if (!ModelState.IsValid)
+        {
+            var errors = string.Join(", ", ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage));
+            Console.WriteLine($"ProcessPayment Model Invalid: {errors}");
+            return BadRequest($"Validation failed: {errors}");
+        }
+
         try
         {
+            Console.WriteLine($"Processing Fee Payment: Student={request.StudentId}, Year={request.AcademicYearId}, Amount={request.Amount}");
             await _feeService.ProcessPaymentAsync(request);
             return Ok();
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            var inner = ex;
+            while (inner.InnerException != null) inner = inner.InnerException;
+            Console.WriteLine($"ProcessPayment Failed: {inner.Message}");
+            return BadRequest($"Database error: {inner.Message}");
         }
     }
 
     [HttpPost("generate-charges")]
     public async Task<IActionResult> GenerateMonthlyCharges(GenerateChargesRequest request)
     {
-        await _feeService.GenerateMonthlyChargesAsync(request.ClassIds, request.Month, request.FeeHeadIds);
+        await _feeService.GenerateMonthlyChargesAsync(request.ClassIds, request.Month, request.FeeHeadIds, request.AcademicYearId);
         return Ok();
     }
 

@@ -88,12 +88,17 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
       setFeeHeads(heads.filter((h: any) => h.isSelective));
       setAvailableDiscounts(discs);
       setAcademicYears(years);
+      
+      const currentYear = years.find((y: any) => y.isCurrent);
+      if (currentYear && !initialData) {
+        setFormData(prev => ({ ...prev, academicYear: currentYear.name }));
+      }
     } catch {
       // silently fail, selects remain empty
     } finally {
       setLoadingMasters(false);
     }
-  }, []);
+  }, [initialData]);
 
   useEffect(() => {
     if (isOpen) {
@@ -162,14 +167,14 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.mobileNumber.trim()) newErrors.mobileNumber = 'Mobile number is required';
     if (!formData.classId) newErrors.classId = 'Class is required';
-    if (!formData.sectionId) newErrors.sectionId = 'Section is required';
+    if (!formData.academicYear) newErrors.academicYear = 'Academic Year is required';
     if (!formData.fatherName?.trim() && !formData.motherName?.trim() && !formData.guardianName?.trim()) {
       newErrors.guardianInfo = "At least one Parent/Guardian name is required (Father, Mother, or Guardian)";
     }
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       if (newErrors.firstName || newErrors.lastName || newErrors.mobileNumber || newErrors.gender) setActiveTab('personal');
-      else if (newErrors.classId || newErrors.sectionId) setActiveTab('academic');
+      else if (newErrors.classId || newErrors.academicYear) setActiveTab('academic');
       else if (newErrors.guardianInfo) setActiveTab('parent');
     }
     return Object.keys(newErrors).length === 0;
@@ -325,9 +330,19 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
             placeholder="e.g. 42" className={inputCls('rollNumber')} />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Academic Year</label>
-          <input name="academicYear" value={formData.academicYear} onChange={handleChange}
-            placeholder="e.g. 2024-25" className={inputCls('academicYear')} />
+          <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Academic Year *</label>
+          <select 
+            name="academicYear" 
+            value={formData.academicYear} 
+            onChange={handleChange} 
+            className={inputCls('academicYear')}
+          >
+            <option value="">Select Year</option>
+            {academicYears.map(year => (
+              <option key={year.id} value={year.name}>{year.name}</option>
+            ))}
+          </select>
+          {errors.academicYear && <p className="text-xs text-red-500">{errors.academicYear}</p>}
         </div>
       </div>
 

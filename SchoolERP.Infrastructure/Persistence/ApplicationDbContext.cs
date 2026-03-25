@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<PendingRegistration> PendingRegistrations { get; set; } = null!;
     public DbSet<Student> Students { get; set; } = null!;
+    public DbSet<StudentAcademic> StudentAcademics { get; set; } = null!;
     public DbSet<Course> Courses { get; set; } = null!;
     public DbSet<StudentCourse> StudentCourses { get; set; } = null!;
     public DbSet<FeeStructure> FeeStructures { get; set; } = null!;
@@ -90,6 +91,7 @@ public class ApplicationDbContext : DbContext
         // Apply Global Query Filters for Organization isolation
         builder.Entity<User>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Student>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentAcademic>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Course>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<StudentCourse>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<FeeStructure>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
@@ -141,6 +143,7 @@ public class ApplicationDbContext : DbContext
         // Configure indexes on OrganizationId for performance
         builder.Entity<User>().HasIndex(e => e.OrganizationId);
         builder.Entity<Student>().HasIndex(e => e.OrganizationId);
+        builder.Entity<StudentAcademic>().HasIndex(e => e.OrganizationId);
         builder.Entity<Course>().HasIndex(e => e.OrganizationId);
         builder.Entity<StudentCourse>().HasIndex(e => e.OrganizationId);
         builder.Entity<FeeStructure>().HasIndex(e => e.OrganizationId);
@@ -161,6 +164,12 @@ public class ApplicationDbContext : DbContext
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
 
         // Student relationships for new collections
+        builder.Entity<StudentAcademic>()
+            .HasOne(sa => sa.Student)
+            .WithMany(s => s.AcademicRecords)
+            .HasForeignKey(sa => sa.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Entity<StudentDocument>()
             .HasOne(sd => sd.Student)
             .WithMany(s => s.Documents)

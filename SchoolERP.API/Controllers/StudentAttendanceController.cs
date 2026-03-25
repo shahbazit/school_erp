@@ -27,10 +27,11 @@ public class StudentAttendanceController : ControllerBase
     {
         var orgId = _organizationService.GetOrganizationId();
 
-        // Get all active students in this class + section
-        var students = await _context.Students
-            .Where(s => s.ClassId == classId && s.SectionId == sectionId && s.IsActive)
-            .OrderBy(s => s.FirstName)
+        // Get all active students in this class + section from academic mapping
+        var academics = await _context.StudentAcademics
+            .Include(sa => sa.Student)
+            .Where(sa => sa.ClassId == classId && sa.SectionId == sectionId && sa.IsCurrent && sa.Student.IsActive)
+            .OrderBy(sa => sa.Student.FirstName)
             .ToListAsync();
 
         // Get existing attendance
@@ -38,15 +39,16 @@ public class StudentAttendanceController : ControllerBase
             .Where(a => a.ClassId == classId && a.SectionId == sectionId && a.AttendanceDate.Date == date.Date)
             .ToDictionaryAsync(a => a.StudentId);
 
-        var result = students.Select(s =>
+        var result = academics.Select(sa =>
         {
-            var hasAttendance = existingAttendance.TryGetValue(s.Id, out var att);
+            var student = sa.Student;
+            var hasAttendance = existingAttendance.TryGetValue(student.Id, out var att);
             return new StudentAttendanceDto
             {
-                StudentId = s.Id,
-                StudentName = $"{s.FirstName} {s.LastName}",
-                AdmissionNo = s.AdmissionNo,
-                RollNumber = s.RollNumber ?? string.Empty,
+                StudentId = student.Id,
+                StudentName = $"{student.FirstName} {student.LastName}",
+                AdmissionNo = student.AdmissionNo,
+                RollNumber = sa.RollNumber ?? string.Empty,
                 Status = hasAttendance ? att!.Status : "Present", // defaults to present
                 Remarks = hasAttendance ? att!.Remarks : string.Empty
             };

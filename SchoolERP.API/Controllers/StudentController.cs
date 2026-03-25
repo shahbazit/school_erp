@@ -34,43 +34,54 @@ public class StudentController : ControllerBase
         [FromQuery] Guid? sectionId = null,
         [FromQuery] Guid? courseId = null,
         [FromQuery] bool? isActive = null,
+        [FromQuery] string? academicYear = null,
         [FromQuery] string sortBy = "Name" // Name, AdmissionNo
     )
     {
-        var query = _unitOfWork.Repository<Student>().GetQueryable()
-            .Include(s => s.EnrolledCourses)
+        var academicQuery = _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+            .Include(sa => sa.Student)
+            .ThenInclude(s => s.EnrolledCourses)
             .ThenInclude(ec => ec.Course)
             .AsQueryable();
 
-        // Search
+        // Filters applied to academic mapping
+        if (classId.HasValue) academicQuery = academicQuery.Where(sa => sa.ClassId == classId.Value);
+        if (sectionId.HasValue) academicQuery = academicQuery.Where(sa => sa.SectionId == sectionId.Value);
+        if (!string.IsNullOrWhiteSpace(academicYear)) academicQuery = academicQuery.Where(sa => sa.AcademicYear == academicYear);
+
+        // Search applied to Student info
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(s => 
-                (s.FirstName + " " + s.LastName).Contains(search) || 
-                s.AdmissionNo.Contains(search) || 
-                s.MobileNumber.Contains(search));
+            academicQuery = academicQuery.Where(sa => 
+                (sa.Student.FirstName + " " + sa.Student.LastName).Contains(search) || 
+                sa.Student.AdmissionNo.Contains(search) || 
+                sa.Student.MobileNumber.Contains(search));
         }
 
-        // Filters
-        if (classId.HasValue) query = query.Where(s => s.ClassId == classId.Value);
-        if (sectionId.HasValue) query = query.Where(s => s.SectionId == sectionId.Value);
-        if (isActive.HasValue) query = query.Where(s => s.IsActive == isActive.Value);
-        if (courseId.HasValue) query = query.Where(s => s.EnrolledCourses.Any(ec => ec.CourseId == courseId.Value));
+        if (isActive.HasValue) academicQuery = academicQuery.Where(sa => sa.Student.IsActive == isActive.Value);
 
-        // Sorting
-        query = sortBy.ToLower() switch
+        // Sort by Student Name or AdmissionNo
+        academicQuery = sortBy.ToLower() switch
         {
-            "admissionno" => query.OrderBy(s => s.AdmissionNo),
-            _ => query.OrderBy(s => s.FirstName).ThenBy(s => s.LastName)
+            "admissionno" => academicQuery.OrderBy(sa => sa.Student.AdmissionNo),
+            _ => academicQuery.OrderBy(sa => sa.Student.FirstName).ThenBy(sa => sa.Student.LastName)
         };
 
-        var totalRecords = await query.CountAsync();
-        var students = await query
+        var totalRecords = await academicQuery.CountAsync();
+        var records = await academicQuery
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        var dtos = students.Select(MapToDto).ToList();
+        var dtos = records.Select(sa => {
+            var dto = MapToDto(sa.Student);
+            // Overwrite basic academic fields from the specific session record
+            dto.ClassId = sa.ClassId;
+            dto.SectionId = sa.SectionId;
+            dto.AcademicYear = sa.AcademicYear;
+            dto.RollNumber = sa.RollNumber;
+            return dto;
+        }).ToList();
 
         return Ok(new { data = dtos, totalRecords, pageNumber, pageSize });
     }
@@ -81,11 +92,22 @@ public class StudentController : ControllerBase
         var student = await _unitOfWork.Repository<Student>().GetQueryable()
             .Include(s => s.EnrolledCourses)
             .ThenInclude(ec => ec.Course)
+            .Include(s => s.AcademicRecords)
             .FirstOrDefaultAsync(s => s.Id == id);
             
         if (student == null) return NotFound();
 
+        var currentRecord = student.AcademicRecords.FirstOrDefault(ar => ar.IsCurrent) 
+                           ?? student.AcademicRecords.OrderByDescending(ar => ar.CreatedAt).FirstOrDefault();
+
         var dto = MapToDto(student);
+        if (currentRecord != null)
+        {
+            dto.ClassId = currentRecord.ClassId;
+            dto.SectionId = currentRecord.SectionId;
+            dto.AcademicYear = currentRecord.AcademicYear;
+            dto.RollNumber = currentRecord.RollNumber;
+        }
 
         // Fetch Fee Info
         var subs = await _feeService.GetStudentSubscriptionsAsync(id);
@@ -125,6 +147,20 @@ public class StudentController : ControllerBase
         }
         var student = MapFromDto(dto);
         await _unitOfWork.Repository<Student>().AddAsync(student);
+        
+        // Add Academic Mapping
+        var academic = new StudentAcademic
+        {
+            StudentId = student.Id,
+            ClassId = Guid.TryParse(dto.ClassId, out var cid) ? cid : Guid.Empty,
+            SectionId = Guid.TryParse(dto.SectionId, out var sid) ? sid : null,
+            AcademicYear = dto.AcademicYear ?? string.Empty,
+            RollNumber = dto.RollNumber,
+            IsCurrent = true,
+            Status = "Active"
+        };
+        await _unitOfWork.Repository<StudentAcademic>().AddAsync(academic);
+
         await _unitOfWork.CompleteAsync();
 
         // 1. Assign Selective Fee Subscriptions
@@ -177,6 +213,26 @@ public class StudentController : ControllerBase
         {
             await _unitOfWork.Repository<Student>().AddAsync(student);
         }
+        await _unitOfWork.CompleteAsync();
+
+        // Add Academic Mappings in bulk
+        var index = 0;
+        var dtosList = dtos.ToList();
+        foreach (var student in students)
+        {
+            var dto = dtosList[index++];
+            var academic = new StudentAcademic
+            {
+                StudentId = student.Id,
+                ClassId = Guid.TryParse(dto.ClassId, out var cid) ? cid : Guid.Empty,
+                SectionId = Guid.TryParse(dto.SectionId, out var sid) ? sid : null,
+                AcademicYear = dto.AcademicYear ?? string.Empty,
+                RollNumber = dto.RollNumber,
+                IsCurrent = true,
+                Status = "Active"
+            };
+            await _unitOfWork.Repository<StudentAcademic>().AddAsync(academic);
+        }
         
         await _unitOfWork.CompleteAsync();
 
@@ -201,11 +257,7 @@ public class StudentController : ControllerBase
             City = dto.City,
             State = dto.State,
             Pincode = dto.Pincode,
-            ClassId = Guid.TryParse(dto.ClassId, out var cid) ? cid : null,
-            SectionId = Guid.TryParse(dto.SectionId, out var sid) ? sid : null,
-            RollNumber = dto.RollNumber,
             AdmissionDate = dto.AdmissionDate,
-            AcademicYear = dto.AcademicYear,
             PreviousSchool = dto.PreviousSchool,
             FatherName = dto.FatherName,
             FatherMobile = dto.FatherMobile,
@@ -246,6 +298,7 @@ public class StudentController : ControllerBase
     {
         var student = await _unitOfWork.Repository<Student>().GetQueryable()
             .Include(s => s.EnrolledCourses)
+            .Include(s => s.AcademicRecords)
             .FirstOrDefaultAsync(s => s.Id == id);
 
         if (student == null) return NotFound();
@@ -263,10 +316,6 @@ public class StudentController : ControllerBase
         student.City = dto.City;
         student.State = dto.State;
         student.Pincode = dto.Pincode;
-        student.ClassId = Guid.TryParse(dto.ClassId, out var cidUpd) ? cidUpd : null;
-        student.SectionId = Guid.TryParse(dto.SectionId, out var sidUpd) ? sidUpd : null;
-        student.RollNumber = dto.RollNumber;
-        student.AcademicYear = dto.AcademicYear;
         student.PreviousSchool = dto.PreviousSchool;
         student.FatherName = dto.FatherName;
         student.FatherMobile = dto.FatherMobile;
@@ -284,6 +333,30 @@ public class StudentController : ControllerBase
         student.EmergencyContactNumber = dto.EmergencyContactNumber;
         student.EmergencyContactRelation = dto.EmergencyContactRelation;
         student.IsActive = dto.IsActive;
+
+        // Update CURRENT academic record
+        var currentAcademic = student.AcademicRecords.FirstOrDefault(sa => sa.IsCurrent);
+        if (currentAcademic != null)
+        {
+            currentAcademic.ClassId = Guid.TryParse(dto.ClassId, out var cidUpd) ? cidUpd : currentAcademic.ClassId;
+            currentAcademic.SectionId = Guid.TryParse(dto.SectionId, out var sidUpd) ? sidUpd : currentAcademic.SectionId;
+            currentAcademic.AcademicYear = dto.AcademicYear ?? currentAcademic.AcademicYear;
+            currentAcademic.RollNumber = dto.RollNumber ?? currentAcademic.RollNumber;
+            _unitOfWork.Repository<StudentAcademic>().Update(currentAcademic);
+        }
+        else if (!string.IsNullOrEmpty(dto.ClassId) && !string.IsNullOrEmpty(dto.AcademicYear)) 
+        {
+             var newAcademic = new StudentAcademic {
+                 StudentId = student.Id,
+                 ClassId = Guid.Parse(dto.ClassId),
+                 SectionId = Guid.TryParse(dto.SectionId, out var sidN) ? sidN : null,
+                 AcademicYear = dto.AcademicYear,
+                 RollNumber = dto.RollNumber,
+                 IsCurrent = true,
+                 Status = "Active"
+             };
+             await _unitOfWork.Repository<StudentAcademic>().AddAsync(newAcademic);
+        }
 
         // Soft sync courses
         student.EnrolledCourses.Clear();
@@ -415,11 +488,7 @@ public class StudentController : ControllerBase
             City = student.City,
             State = student.State,
             Pincode = student.Pincode,
-            ClassId = student.ClassId,
-            SectionId = student.SectionId,
-            RollNumber = student.RollNumber,
             AdmissionDate = student.AdmissionDate,
-            AcademicYear = student.AcademicYear,
             PreviousSchool = student.PreviousSchool,
             FatherName = student.FatherName,
             FatherMobile = student.FatherMobile,

@@ -336,6 +336,7 @@ export default function StudentAccount() {
           studentId={account.studentId} 
           studentName={account.studentName}
           balance={account.currentBalance}
+          academicYears={academicYears}
           onClose={() => setIsPayModalOpen(false)}
           onSuccess={() => {
             setIsPayModalOpen(false);
@@ -594,18 +595,32 @@ function SubscriptionModal({ studentId, selectiveHeads, existingSubscriptions, o
 }
 
 // Sub-component for Payment
-function PayFeeModal({ studentId, studentName, balance, onClose, onSuccess }: any) {
+function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, onSuccess }: any) {
+  const currentYear = academicYears.find((y: any) => y.isCurrent);
+  
   const [formData, setFormData] = useState({
     amount: balance,
     discount: 0,
+    academicYearId: currentYear?.id || '',
     paymentMethod: 'Cash',
     referenceNumber: '',
     remarks: ''
   });
   const [loading, setLoading] = useState(false);
 
+  // Sync state if currentYear loads after modal opens
+  useEffect(() => {
+    if (currentYear && !formData.academicYearId) {
+      setFormData(prev => ({ ...prev, academicYearId: currentYear.id }));
+    }
+  }, [currentYear]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.academicYearId) {
+      alert('Please select an Academic Year');
+      return;
+    }
     setLoading(true);
     try {
       await masterApi.create('fee/process-payment', {
@@ -621,19 +636,35 @@ function PayFeeModal({ studentId, studentName, balance, onClose, onSuccess }: an
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex justify-end">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-      <div className="relative bg-white shadow-2xl w-full lg:w-[60%] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
-        <div className="bg-primary-600 p-6 text-white text-center">
-          <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-80" />
-          <h2 className="text-xl font-bold">Collect Fee Payment</h2>
-          <p className="text-primary-100 text-sm opacity-80">For {studentName}</p>
+    <div className="fixed inset-0 z-[9999] flex justify-end">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
+      <div className="relative bg-white shadow-2xl w-full sm:w-[450px] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 border-l border-slate-200">
+        <div className="bg-primary-600 p-8 text-white text-center shrink-0">
+          <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-90 animate-pulse" />
+          <h2 className="text-2xl font-black tracking-tight">Collect Payment</h2>
+          <p className="text-primary-100 text-sm font-medium mt-1">Student: {studentName}</p>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar pb-24">
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center mb-6">
             <span className="text-sm font-semibold text-slate-500">Net Outstanding</span>
             <span className="text-xl font-black text-slate-800">₹{balance.toLocaleString()}</span>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Payment Academic Year</label>
+            <select 
+              className="form-input"
+              required
+              value={formData.academicYearId}
+              onChange={(e) => setFormData({...formData, academicYearId: e.target.value})}
+            >
+               <option value="">Select Session...</option>
+               {academicYears.map((y: any) => (
+                  <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Current)' : ''}</option>
+               ))}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1 italic">Tying payments to academic sessions is essential for yearly accounting.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

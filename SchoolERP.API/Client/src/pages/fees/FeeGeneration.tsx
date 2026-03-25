@@ -15,12 +15,10 @@ import { feeApi } from '../../api/feeApi';
 
 export default function FeeGeneration() {
   const [classes, setClasses] = useState<any[]>([]);
-  const [feeHeads, setFeeHeads] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [classHistory, setClassHistory] = useState<any[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [selectedHeads, setSelectedHeads] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
     return `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
@@ -31,7 +29,6 @@ export default function FeeGeneration() {
 
   useEffect(() => {
     masterApi.getAll('classes').then(setClasses).catch(console.error);
-    feeApi.getHeads().then(setFeeHeads).catch(console.error);
     masterApi.getAll('academic-years').then(years => {
       setAcademicYears(years);
       const current = years.find((y: any) => y.isCurrent);
@@ -53,11 +50,7 @@ export default function FeeGeneration() {
     );
   };
 
-  const toggleHead = (id: string) => {
-    setSelectedHeads(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
+
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +59,7 @@ export default function FeeGeneration() {
     setStatus('LOADING');
     setError(null);
     try {
-      await feeApi.generateMonthlyCharges(selectedClasses, selectedMonth, selectedHeads.length > 0 ? selectedHeads : undefined);
+      await feeApi.generateMonthlyCharges(selectedClasses, selectedMonth, undefined, selectedYear);
       setStatus('SUCCESS');
       fetchHistory();
     } catch (err: any) {
@@ -154,39 +147,7 @@ export default function FeeGeneration() {
                   </div>
                </div>
 
-               <div className="space-y-4">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5" /> Select Fee Categories to Post
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-inner">
-                    {feeHeads.length === 0 ? (
-                      <p className="col-span-full text-center py-4 text-xs text-slate-400 font-medium italic">No fee heads found in system.</p>
-                    ) : (
-                      feeHeads.map(head => {
-                        return (
-                          <div key={head.id} className="group/item">
-                            <label className={`flex flex-col gap-1 p-3 rounded-xl border transition-all cursor-pointer ${
-                              selectedHeads.includes(head.id) 
-                                ? 'bg-primary-50 border-primary-200 text-primary-900 shadow-sm' 
-                                : 'bg-slate-50/50 border-transparent hover:border-slate-200 text-slate-600 hover:bg-white'
-                            }`}>
-                              <div className="flex items-center gap-2.5">
-                                <input 
-                                  type="checkbox" 
-                                  className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer"
-                                  checked={selectedHeads.includes(head.id)}
-                                  onChange={() => toggleHead(head.id)}
-                                />
-                                <span className="text-xs font-bold leading-none select-none">{head.name}</span>
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                  <p className="text-[10px] text-slate-400 italic ml-1">* If none selected, all active fees for the class will be posted.</p>
-               </div>
+
 
                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 flex items-start gap-4">
                   <div className="p-2 bg-indigo-100 rounded-xl text-indigo-600">

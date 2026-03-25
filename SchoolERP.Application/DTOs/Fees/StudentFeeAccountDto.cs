@@ -26,6 +26,7 @@ public class StudentFeeAccountDto
 public class ProcessPaymentRequest
 {
     public Guid StudentId { get; set; }
+    public Guid AcademicYearId { get; set; }
     public decimal Amount { get; set; }
     public decimal Discount { get; set; }
     public string? PaymentMethod { get; set; }

@@ -14,6 +14,7 @@ export default function StudentPromotion() {
   // Masters
   const [classesList, setClassesList] = useState<any[]>([]);
   const [sectionsList, setSectionsList] = useState<any[]>([]);
+  const [academicYearsList, setAcademicYearsList] = useState<any[]>([]);
 
   // Source Filters
   const [sourceClassId, setSourceClassId] = useState('');
@@ -32,10 +33,20 @@ export default function StudentPromotion() {
   useEffect(() => {
     Promise.all([
       masterApi.getAll('classes'),
-      masterApi.getAll('sections')
-    ]).then(([cls, sec]) => {
+      masterApi.getAll('sections'),
+      masterApi.getAll('academic-years')
+    ]).then(([cls, sec, years]) => {
       setClassesList(cls);
       setSectionsList(sec);
+      setAcademicYearsList(years);
+      
+      const current = years.find((y: any) => y.isCurrent);
+      if (current) {
+        setSourceYear(current.name);
+        // Find next year for target
+        const next = years.find((y: any) => !y.isCurrent && y.name > current.name);
+        if (next) setTargetYear(next.name);
+      }
     }).catch(err => {
       console.error(err);
       setError('Failed to load master data.');
@@ -43,8 +54,8 @@ export default function StudentPromotion() {
   }, []);
 
   const handleFetchStudents = async () => {
-    if (!sourceClassId || !sourceSectionId || !sourceYear) {
-      setError('Please select Source Class, Section, and Academic Year.');
+    if (!sourceClassId || !sourceYear) {
+      setError('Please select Source Class and Academic Year.');
       return;
     }
 
@@ -54,16 +65,13 @@ export default function StudentPromotion() {
     try {
       const response = await studentApi.getAll({
         classId: sourceClassId,
-        sectionId: sourceSectionId,
-        isActive: true, // Only active students can be promoted
-        pageSize: 100 // Assume small classes for now
+        sectionId: sourceSectionId || undefined,
+        academicYear: sourceYear,
+        isActive: true, 
+        pageSize: 1000 // Increase page size for promotion lists
       });
       
-      // Since the API returns students for all years if not filtered on backend, 
-      // we filter by year locally if the backend doesn't support the year filter yet.
-      // But the backend Student table has AcademicYear field. 
-      // Let's assume the API might need updating if it doesn't filter perfectly.
-      const filtered = response.data.filter(s => s.academicYear === sourceYear);
+      const filtered = response.data;
       setStudents(filtered);
       setSelectedStudentIds(new Set(filtered.map(s => s.id as string)));
     } catch (err) {
@@ -93,8 +101,8 @@ export default function StudentPromotion() {
       setError('No students selected.');
       return;
     }
-    if (!targetClassId || !targetSectionId || !targetYear) {
-      setError('Please select Target Class, Section, and Academic Year.');
+    if (!targetClassId || !targetYear) {
+      setError('Please select Target Class and Academic Year.');
       return;
     }
 
@@ -103,7 +111,7 @@ export default function StudentPromotion() {
     try {
       const request: BulkPromotionRequestDto = {
         targetClassId,
-        targetSectionId,
+        targetSectionId: targetSectionId || undefined,
         targetAcademicYear: targetYear,
         students: Array.from(selectedStudentIds).map(id => ({
           studentId: id,
@@ -156,9 +164,7 @@ export default function StudentPromotion() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all outline-none"
                 >
                   <option value="">Select Year</option>
-                  <option value="2023-2024">2023-2024</option>
-                  <option value="2024-2025">2024-2025</option>
-                  <option value="2025-2026">2025-2026</option>
+                  {academicYearsList.map(y => <option key={y.id} value={y.name}>{y.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -180,7 +186,7 @@ export default function StudentPromotion() {
                     onChange={(e) => setSourceSectionId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white transition-all outline-none"
                   >
-                    <option value="">Select</option>
+                    <option value="">All Sections</option>
                     {sectionsList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
@@ -209,8 +215,7 @@ export default function StudentPromotion() {
                   className="w-full bg-emerald-50/30 border border-emerald-200/50 rounded-xl px-4 py-2.5 text-sm focus:bg-white transition-all outline-none"
                 >
                   <option value="">Select Year</option>
-                  <option value="2024-2025">2024-2025</option>
-                  <option value="2025-2026">2025-2026</option>
+                  {academicYearsList.map(y => <option key={y.id} value={y.name}>{y.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -232,7 +237,7 @@ export default function StudentPromotion() {
                     onChange={(e) => setTargetSectionId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white transition-all outline-none"
                   >
-                    <option value="">Select</option>
+                    <option value="">No Change / None</option>
                     {sectionsList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>

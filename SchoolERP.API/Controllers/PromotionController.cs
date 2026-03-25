@@ -31,35 +31,90 @@ public class PromotionController : ControllerBase
         if (request == null || request.Students == null || !request.Students.Any())
             return BadRequest("No students provided for promotion.");
 
-        if (string.IsNullOrWhiteSpace(request.TargetAcademicYear))
-            return BadRequest("Target academic year is required.");
-
         try 
         {
             int updatedCount = 0;
+            var targetYear = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+                .FirstOrDefaultAsync(y => y.Name == request.TargetAcademicYear);
+
+            if (targetYear == null) return BadRequest($"Academic Year '{request.TargetAcademicYear}' not found.");
+
             foreach (var studentRequest in request.Students)
             {
                 var student = await _unitOfWork.Repository<Student>().GetByIdAsync(studentRequest.StudentId);
                 if (student == null) continue;
 
-                // Promotion Logic
-                if (studentRequest.IsPromoted)
-                {
-                    // Move to new class/section
-                    student.ClassId = request.TargetClassId;
-                    student.SectionId = request.TargetSectionId;
-                }
-                // If not promoted (detained), they stay in current ClassId/SectionId 
-                // but their AcademicYear still updates to the new session.
+                // 1. Mark current record as Promoted/Completed
+                var currentAcademic = await _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                    .FirstOrDefaultAsync(sa => sa.StudentId == student.Id && sa.IsCurrent);
 
-                student.AcademicYear = request.TargetAcademicYear;
-                
-                if (!string.IsNullOrEmpty(studentRequest.NewRollNumber))
+                if (currentAcademic != null)
                 {
-                    student.RollNumber = studentRequest.NewRollNumber;
+                    currentAcademic.IsCurrent = false;
+                    currentAcademic.Status = studentRequest.IsPromoted ? "Promoted" : "Detained";
+                    _unitOfWork.Repository<StudentAcademic>().Update(currentAcademic);
                 }
 
-                _unitOfWork.Repository<Student>().Update(student);
+                // 2. Insert new Academic Mapping for the new session
+                var newAcademic = new StudentAcademic
+                {
+                    StudentId = student.Id,
+                    ClassId = studentRequest.IsPromoted ? request.TargetClassId : (currentAcademic?.ClassId ?? request.TargetClassId),
+                    SectionId = request.TargetSectionId,
+                    AcademicYear = request.TargetAcademicYear,
+                    RollNumber = studentRequest.NewRollNumber,
+                    IsCurrent = true,
+                    Status = "Active"
+                };
+
+                await _unitOfWork.Repository<StudentAcademic>().AddAsync(newAcademic);
+
+                // 3. Balance Carry Forward Logic
+                var account = await _unitOfWork.Repository<StudentFeeAccount>().GetQueryable()
+                    .FirstOrDefaultAsync(a => a.StudentId == student.Id);
+
+                if (account != null && account.CurrentBalance > 0)
+                {
+                    decimal arrearsAmount = account.CurrentBalance;
+                    
+                    // Add a Charge in the new academic session for the arrears
+                    var arrearsTx = new FeeTransaction
+                    {
+                        StudentId = student.Id,
+                        Type = "Charge",
+                        Amount = arrearsAmount,
+                        TransactionDate = DateTime.UtcNow,
+                        Description = $"Previous Session Dues (Arrears) from {currentAcademic?.AcademicYear ?? "Previous Year"}",
+                        AcademicYearId = targetYear.Id
+                    };
+                    
+                    await _unitOfWork.Repository<FeeTransaction>().AddAsync(arrearsTx);
+                    
+                    // IMPORTANT: To avoid double counting in the grand total (account.TotalAllocated)
+                    // we add an offsetting adjustment in the OLD year (as a "Transferred out")
+                    // If currentAcademic exists and had an ID... 
+                    // Wait, we need the OLD AcademicYear ID.
+                    
+                    var oldYear = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+                        .FirstOrDefaultAsync(y => y.Name == currentAcademic!.AcademicYear);
+                    
+                    if (oldYear != null) {
+                         var offsetTx = new FeeTransaction {
+                             StudentId = student.Id,
+                             Type = "Discount", // Using 'Discount' or 'Payment' as a placeholder for technical credit to old year
+                             Amount = arrearsAmount,
+                             TransactionDate = DateTime.UtcNow,
+                             Description = $"Balance Transferred to {request.TargetAcademicYear}",
+                             AcademicYearId = oldYear.Id
+                         };
+                         await _unitOfWork.Repository<FeeTransaction>().AddAsync(offsetTx);
+                         account.TotalDiscount += arrearsAmount;
+                    }
+                    
+                    account.TotalAllocated += arrearsAmount;
+                    _unitOfWork.Repository<StudentFeeAccount>().Update(account);
+                }
+
                 updatedCount++;
             }
 

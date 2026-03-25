@@ -26,12 +26,15 @@ public class CreateStudentDto
     public string? State { get; set; }
     public string? Pincode { get; set; }
 
-    public string? ClassId { get; set; }
+    [Required]
+    public string ClassId { get; set; } = string.Empty;
     public string? SectionId { get; set; }
     public string? RollNumber { get; set; }
     public string? DateOfBirth { get; set; }
     public DateTime AdmissionDate { get; set; } = DateTime.UtcNow;
-    public string? AcademicYear { get; set; }
+
+    [Required]
+    public string AcademicYear { get; set; } = string.Empty;
     public string? PreviousSchool { get; set; }
 
     public string? FatherName { get; set; }

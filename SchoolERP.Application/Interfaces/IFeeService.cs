@@ -16,6 +16,7 @@ public interface IFeeService
     Task<FeeStructureDto> CreateFeeStructureAsync(CreateFeeStructureRequest request);
     Task UpdateFeeStructureAsync(Guid id, CreateFeeStructureRequest request);
     Task DeleteFeeStructureAsync(Guid id);
+    Task CopyFeeStructureAsync(CopyFeeStructureRequest request);
 
     // Student Fee Operations
     Task<StudentFeeAccountDto> GetStudentFeeAccountAsync(Guid studentId);
@@ -28,7 +29,7 @@ public interface IFeeService
     Task DeleteSubscriptionAsync(Guid id);
     
     // Admin / Utility
-    Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null);
+    Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null, Guid? academicYearId = null);
     Task<IEnumerable<ClassFeeHistoryDto>> GetFeeHistoryAsync(Guid? classId = null, Guid? academicYearId = null);
     
     // Discounts

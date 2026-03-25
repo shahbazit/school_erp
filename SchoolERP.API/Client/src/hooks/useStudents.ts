@@ -7,11 +7,11 @@ export const useStudents = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (filters: any = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await studentApi.getAll({});
+      const response = await studentApi.getAll(filters);
       setStudents(response.data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch students');

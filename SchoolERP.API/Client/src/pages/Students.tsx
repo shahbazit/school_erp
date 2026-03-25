@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useStudents } from '../hooks/useStudents';
-import { Search, Plus, Edit2, Trash2, Eye, UserPlus, Users, GraduationCap, ArrowUpDown, CreditCard, FileText } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Eye, UserPlus, Users, GraduationCap, ArrowUpDown, CreditCard, FileText, Filter } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
 import StudentDetailPanel from '../components/StudentDetailPanel';
 import StudentDocumentsModal from '../components/StudentDocumentsModal';
@@ -10,6 +10,7 @@ import { masterApi } from '../api/masterApi';
 export default function Students() {
   const { students, fetchStudents, loading, error, removeStudent, addStudent, updateStudent } = useStudents();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSession, setSelectedSession] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -22,19 +23,26 @@ export default function Students() {
   // Masters mapping
   const [classesList, setClassesList] = useState<any[]>([]);
   const [sectionsList, setSectionsList] = useState<any[]>([]);
+  const [academicYearsList, setAcademicYearsList] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchStudents();
-    
     // Fetch master data for mapping IDs to Names
-    Promise.all([
-      masterApi.getAll('classes'),
-      masterApi.getAll('sections')
-    ]).then(([cls, sec]) => {
-      setClassesList(cls);
-      setSectionsList(sec);
+    masterApi.getAll('academic-years').then(years => {
+      setAcademicYearsList(years);
+      // Pre-select current session if none selected
+      const current = years.find((y: any) => y.isCurrent);
+      if (current && !selectedSession) {
+        setSelectedSession(current.name);
+      }
     }).catch(console.error);
-  }, [fetchStudents]);
+
+    masterApi.getAll('classes').then(setClassesList).catch(console.error);
+    masterApi.getAll('sections').then(setSectionsList).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    fetchStudents({ academicYear: selectedSession, pageSize: 1000 });
+  }, [fetchStudents, selectedSession]);
 
   const classMap = useMemo(() => {
     return classesList.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {});
@@ -148,20 +156,37 @@ export default function Students() {
 
       {/* Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center z-10 relative">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input 
-            type="text" 
-            placeholder="Search by name, adm no, or phone..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:max-w-2xl">
+          {/* Quick Filter: Academic Session */}
+          <div className="relative w-full sm:w-48 shrink-0">
+            <Filter className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <select
+              value={selectedSession}
+              onChange={(e) => setSelectedSession(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all font-medium appearance-none"
+            >
+              <option value="">All Sessions</option>
+              {academicYearsList.map(y => (
+                <option key={y.id} value={y.name}>{y.name}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <ArrowUpDown className="h-3 w-3 text-slate-400" />
+            </div>
+          </div>
+
+          <div className="relative w-full">
+            <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="Search by name, adm no, or phone..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+            />
+          </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <button className="btn-secondary hidden sm:flex px-4 py-2.5 text-sm whitespace-nowrap">
-            <ArrowUpDown className="h-4 w-4 mr-2" /> Sort
-          </button>
           <button onClick={handleOpenAddModal} className="btn-primary flex-1 sm:flex-none py-2.5 px-5 shadow-sm shadow-primary-500/20">
             <Plus className="h-4 w-4 mr-2" />
             New Student

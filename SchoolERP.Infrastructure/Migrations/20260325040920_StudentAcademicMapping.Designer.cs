@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SchoolERP.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SchoolERP.Infrastructure.Persistence;
 namespace SchoolERP.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260325040920_StudentAcademicMapping")]
+    partial class StudentAcademicMapping
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -961,14 +964,8 @@ namespace SchoolERP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AcademicYearId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("ApplicableMonth")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ClassId")
                         .HasColumnType("uniqueidentifier");
@@ -999,8 +996,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AcademicYearId");
 
                     b.HasIndex("ClassId");
 
@@ -2624,12 +2619,6 @@ namespace SchoolERP.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeStructure", b =>
                 {
-                    b.HasOne("SchoolERP.Domain.Entities.AcademicYear", "AcademicYear")
-                        .WithMany("FeeStructures")
-                        .HasForeignKey("AcademicYearId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("SchoolERP.Domain.Entities.AcademicClass", "Class")
                         .WithMany()
                         .HasForeignKey("ClassId")
@@ -2641,8 +2630,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasForeignKey("FeeHeadId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("AcademicYear");
 
                     b.Navigation("Class");
 
@@ -2958,11 +2945,6 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("Subject");
 
                     b.Navigation("TeacherProfile");
-                });
-
-            modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicYear", b =>
-                {
-                    b.Navigation("FeeStructures");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Course", b =>

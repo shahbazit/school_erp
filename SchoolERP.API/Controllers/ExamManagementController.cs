@@ -61,9 +61,11 @@ public class ExamManagementController : ControllerBase
     [HttpGet("results/exam/{examId}/class/{classId}/section/{sectionId}/subject/{subjectId}")]
     public async Task<ActionResult<IEnumerable<StudentExamResultDto>>> GetMarkEntrySheet(Guid examId, Guid classId, Guid sectionId, Guid subjectId)
     {
-        var students = await _context.Students
-            .Where(s => s.ClassId == classId && s.SectionId == sectionId && s.IsActive)
-            .OrderBy(s => s.FirstName)
+        var students = await _context.StudentAcademics
+            .Include(sa => sa.Student)
+            .Where(sa => sa.ClassId == classId && sa.SectionId == sectionId && sa.IsCurrent && sa.Student.IsActive)
+            .OrderBy(sa => sa.Student.FirstName)
+            .Select(sa => sa.Student)
             .ToListAsync();
 
         var existingMarks = await _context.StudentExamResults

@@ -16,6 +16,7 @@ export const studentApi = {
     classId?: string;
     sectionId?: string;
     courseId?: string;
+    academicYear?: string;
     isActive?: boolean;
     sortBy?: string;
   }): Promise<PaginatedResponse<Student>> => {

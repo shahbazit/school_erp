@@ -32,6 +32,9 @@ export const feeApi = {
   deleteStructure: async (id: string) => {
     await apiClient.delete(`/masters/fee/structures/${id}`);
   },
+  copyStructures: async (fromYearId: string, toYearId: string) => {
+    await apiClient.post('/masters/fee/structures/copy', { fromYearId, toYearId });
+  },
 
   // Student Account & Payment
   getStudentAccount: async (studentId: string) => {
@@ -44,8 +47,8 @@ export const feeApi = {
   },
 
   // Bulk Operations
-  generateMonthlyCharges: async (classIds: string[], month: string, feeHeadIds?: string[]) => {
-    await apiClient.post('/masters/fee/generate-charges', { classIds, month, feeHeadIds });
+  generateMonthlyCharges: async (classIds: string[], month: string, feeHeadIds?: string[], academicYearId?: string) => {
+    await apiClient.post('/masters/fee/generate-charges', { classIds, month, feeHeadIds, academicYearId });
   },
   getHistory: async (classId?: string, academicYearId?: string) => {
     let url = '/masters/fee/history?';

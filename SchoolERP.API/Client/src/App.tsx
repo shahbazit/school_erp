@@ -33,6 +33,7 @@ import ResetPassword from './pages/ResetPassword';
 import MenuPermissions from './pages/MenuPermissions';
 import UserManagement from './pages/UserManagement';
 import SystemSetup from './pages/SystemSetup';
+import { CopyFeeStructureAction } from './components/fees/CopyFeeStructureAction';
 import { usePermissions } from './hooks/usePermissions';
 import { useEffect as useAppEffect } from 'react';
 
@@ -41,6 +42,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const [currentSession, setCurrentSession] = useState<string>('');
   const location = useLocation();
 
   useAppEffect(() => {
@@ -112,6 +114,13 @@ function App() {
   useAppEffect(() => {
     if (isAuthenticated) {
       fetchMyPermissions();
+      // Fetch current academic session
+      import('./api/masterApi').then(({ masterApi }) => {
+        masterApi.getAll('academic-years').then(years => {
+          const current = years.find((y: any) => y.isCurrent);
+          if (current) setCurrentSession(current.name);
+        });
+      });
     }
   }, [isAuthenticated, currentRole, currentUserId, fetchMyPermissions]);
 
@@ -352,6 +361,11 @@ function App() {
           </div>
           
           <div className="flex items-center space-x-4">
+            {currentSession && (
+              <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                Session: {currentSession}
+              </span>
+            )}
             <button className="p-1.5 text-slate-400 hover:text-slate-600 relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
@@ -367,10 +381,10 @@ function App() {
                 <div className="h-8 w-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm shrink-0 ring-2 ring-white group-hover:ring-primary-100 transition-all">
                   {userName.substring(0, 2).toUpperCase()}
                 </div>
-                <div className="ml-2 hidden md:block text-left">
-                  <p className="text-xs font-normal text-slate-700 leading-tight">{userName}</p>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-tight">School: {organizationName}</p>
-                </div>
+                 <div className="ml-2 hidden md:block text-left">
+                   <p className="text-xs font-normal text-slate-700 leading-tight">{userName}</p>
+                   <p className="text-[10px] text-slate-500 uppercase tracking-tight">School: {organizationName}</p>
+                 </div>
                 <ChevronDown className={`h-4 w-4 text-slate-400 ml-2 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
               </button>
 
@@ -530,14 +544,17 @@ function App() {
               } />
               <Route path="/fees/structures" element={
                 <MasterDataPage 
-                  title="Fee Structure" subtitle="Assign fee amounts to classes" endpoint="fee/structures"
+                  title="Fee Structure" subtitle="Assign fee amounts to classes & sessions" endpoint="fee/structures"
                   columns={[ 
                     { key: 'feeHeadName', label: 'Fee Head' }, 
+                    { key: 'academicYearName', label: 'Session' },
                     { key: 'className', label: 'Class' }, 
                     { key: 'amount', label: 'Amount', render: (v) => `₹${v}` },
-                    { key: 'frequency', label: 'Frequency' }
+                    { key: 'frequency', label: 'Frequency' },
+                    { key: 'applicableMonth', label: 'Month' }
                   ]}
                   formFields={[ 
+                    { name: 'academicYearId', label: 'Academic Session', type: 'select', endpoint: 'academic-years', required: true },
                     { name: 'feeHeadId', label: 'Fee Head', type: 'select', endpoint: 'fee/heads', required: true },
                     { name: 'classId', label: 'Class', type: 'select', endpoint: 'classes', required: true },
                     { name: 'amount', label: 'Amount', type: 'number', required: true },
@@ -547,10 +564,30 @@ function App() {
                       { label: 'Yearly', value: 'Yearly' },
                       { label: 'One-time', value: 'One-time' }
                     ], required: true },
+                    { name: 'applicableMonth', label: 'Applicable Month', type: 'select', 
+                      visibleIf: (data) => data.frequency === 'Yearly' || data.frequency === 'One-time',
+                      options: [
+                      { label: 'January', value: 'January' },
+                      { label: 'February', value: 'February' },
+                      { label: 'March', value: 'March' },
+                      { label: 'April', value: 'April' },
+                      { label: 'May', value: 'May' },
+                      { label: 'June', value: 'June' },
+                      { label: 'July', value: 'July' },
+                      { label: 'August', value: 'August' },
+                      { label: 'September', value: 'September' },
+                      { label: 'October', value: 'October' },
+                      { label: 'November', value: 'November' },
+                      { label: 'December', value: 'December' }
+                    ] },
                     { name: 'description', label: 'Description', type: 'text' }
                   ]}
+                  renderToolbar={() => (
+                    <CopyFeeStructureAction onSuccess={() => window.location.reload()} />
+                  )}
                 />
               } />
+
               <Route path="/fees/student/:studentId" element={<StudentAccount />} />
               <Route path="/fees/generate" element={<FeeGeneration />} />
               <Route path="/fees/settings" element={<FeeSettings />} />

@@ -105,6 +105,7 @@ public class FeeService : IFeeService
         return await _unitOfWork.Repository<FeeStructure>().GetQueryable()
             .Include(f => f.FeeHead)
             .Include(f => f.Class)
+            .Include(f => f.AcademicYear)
             .Select(f => new FeeStructureDto
             {
                 Id = f.Id,
@@ -112,8 +113,11 @@ public class FeeService : IFeeService
                 FeeHeadName = f.FeeHead.Name,
                 ClassId = f.ClassId,
                 ClassName = f.Class.Name,
+                AcademicYearId = f.AcademicYearId,
+                AcademicYearName = f.AcademicYear.Name,
                 Amount = f.Amount,
                 Frequency = f.Frequency,
+                ApplicableMonth = f.ApplicableMonth,
                 Description = f.Description
             }).ToListAsync();
     }
@@ -124,8 +128,10 @@ public class FeeService : IFeeService
         {
             FeeHeadId = request.FeeHeadId,
             ClassId = request.ClassId,
+            AcademicYearId = request.AcademicYearId,
             Amount = request.Amount,
             Frequency = request.Frequency,
+            ApplicableMonth = (request.Frequency == "Yearly" || request.Frequency == "One-time" || request.Frequency == "One-Time") ? request.ApplicableMonth : null,
             Description = request.Description
         };
         await _unitOfWork.Repository<FeeStructure>().AddAsync(structure);
@@ -140,8 +146,10 @@ public class FeeService : IFeeService
         {
             structure.FeeHeadId = request.FeeHeadId;
             structure.ClassId = request.ClassId;
+            structure.AcademicYearId = request.AcademicYearId;
             structure.Amount = request.Amount;
             structure.Frequency = request.Frequency;
+            structure.ApplicableMonth = (request.Frequency == "Yearly" || request.Frequency == "One-time" || request.Frequency == "One-Time") ? request.ApplicableMonth : null;
             structure.Description = request.Description;
             _unitOfWork.Repository<FeeStructure>().Update(structure);
             await _unitOfWork.CompleteAsync();
@@ -154,6 +162,37 @@ public class FeeService : IFeeService
         if (structure != null)
         {
             _unitOfWork.Repository<FeeStructure>().Delete(structure);
+            await _unitOfWork.CompleteAsync();
+        }
+    }
+
+    public async Task CopyFeeStructureAsync(CopyFeeStructureRequest request)
+    {
+        var sourceStructures = await _unitOfWork.Repository<FeeStructure>().GetQueryable()
+            .Where(f => f.AcademicYearId == request.FromYearId)
+            .ToListAsync();
+
+        if (sourceStructures.Any())
+        {
+            var targetExisting = await _unitOfWork.Repository<FeeStructure>().GetQueryable()
+                .Where(f => f.AcademicYearId == request.ToYearId)
+                .ToListAsync();
+
+            foreach (var target in targetExisting)
+                _unitOfWork.Repository<FeeStructure>().Delete(target);
+
+            foreach (var source in sourceStructures)
+            {
+                await _unitOfWork.Repository<FeeStructure>().AddAsync(new FeeStructure
+                {
+                    AcademicYearId = request.ToYearId,
+                    FeeHeadId = source.FeeHeadId,
+                    ClassId = source.ClassId,
+                    Amount = source.Amount,
+                    Frequency = source.Frequency,
+                    Description = source.Description
+                });
+            }
             await _unitOfWork.CompleteAsync();
         }
     }
@@ -173,6 +212,7 @@ public class FeeService : IFeeService
             account = new StudentFeeAccount
             {
                 StudentId = studentId,
+                OrganizationId = _organizationService.GetOrganizationId(),
                 TotalAllocated = 0,
                 TotalPaid = 0,
                 TotalDiscount = 0,
@@ -222,6 +262,8 @@ public class FeeService : IFeeService
             var paymentTx = new FeeTransaction
             {
                 StudentId = request.StudentId,
+                OrganizationId = _organizationService.GetOrganizationId(),
+                AcademicYearId = request.AcademicYearId,
                 TransactionDate = DateTime.UtcNow,
                 Type = "Payment",
                 Amount = request.Amount,
@@ -239,6 +281,8 @@ public class FeeService : IFeeService
             var discountTx = new FeeTransaction
             {
                 StudentId = request.StudentId,
+                OrganizationId = _organizationService.GetOrganizationId(),
+                AcademicYearId = request.AcademicYearId,
                 TransactionDate = DateTime.UtcNow,
                 Type = "Discount",
                 Amount = request.Discount,
@@ -254,18 +298,20 @@ public class FeeService : IFeeService
         await _unitOfWork.CompleteAsync();
     }
 
-    public async Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null)
+    public async Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null, Guid? academicYearId = null)
     {
-        var currentYear = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
-            .FirstOrDefaultAsync(y => y.IsCurrent && y.IsActive);
+        var yearQuery = _unitOfWork.Repository<AcademicYear>().GetQueryable();
+        var currentYear = academicYearId.HasValue 
+            ? await yearQuery.FirstOrDefaultAsync(y => y.Id == academicYearId.Value)
+            : await yearQuery.FirstOrDefaultAsync(y => y.IsCurrent && y.IsActive);
             
-        if (currentYear == null) throw new Exception("No active academic session found. Please set a current academic year.");
+        if (currentYear == null) throw new Exception("No active academic session found for the provided ID or current configuration.");
 
         foreach (var classId in classIds)
         {
             var structuresQuery = _unitOfWork.Repository<FeeStructure>().GetQueryable()
                 .Include(f => f.FeeHead)
-                .Where(f => f.ClassId == classId);
+                .Where(f => f.ClassId == classId && f.AcademicYearId == currentYear.Id);
 
             if (feeHeadIds != null && feeHeadIds.Any())
             {
@@ -274,8 +320,10 @@ public class FeeService : IFeeService
 
             var structures = await structuresQuery.ToListAsync();
 
-            var students = await _unitOfWork.Repository<Student>().GetQueryable()
-                .Where(s => s.ClassId == classId && s.IsActive)
+            var students = await _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                .Include(sa => sa.Student)
+                .Where(sa => sa.ClassId == classId && sa.IsCurrent && sa.Student.IsActive)
+                .Select(sa => sa.Student)
                 .ToListAsync();
 
             if (!students.Any()) continue;
@@ -319,9 +367,36 @@ public class FeeService : IFeeService
                            chargeAmount = subscription.CustomAmount.Value;
                     }
 
+                    var monthName = month.Split(' ')[0];
                     bool shouldCharge = false;
 
-                    if (fee.Frequency == "Monthly") 
+                    // Applicable Month Check (For Yearly/One-time)
+                    if (fee.Frequency == "Yearly" || fee.Frequency == "One-time" || fee.Frequency == "One-Time")
+                    {
+                        if (string.IsNullOrEmpty(fee.ApplicableMonth) || 
+                            !fee.ApplicableMonth.Equals(monthName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue; // Skip if not the right month
+                        }
+                    }
+
+                    // Quarterly Logic (Standard: April, July, October, January)
+                    if (fee.Frequency == "Quarterly")
+                    {
+                        var standardQuarters = new[] { "April", "July", "October", "January" };
+                        if (!string.IsNullOrEmpty(fee.ApplicableMonth))
+                        {
+                            var allowedMonths = fee.ApplicableMonth.Split(',').Select(m => m.Trim());
+                            if (!allowedMonths.Any(m => m.Equals(monthName, StringComparison.OrdinalIgnoreCase)))
+                                continue;
+                        }
+                        else if (!standardQuarters.Any(q => q.Equals(monthName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (fee.Frequency == "Monthly" || fee.Frequency == "Quarterly") 
                     {
                         shouldCharge = !await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
                             .AnyAsync(t => t.StudentId == student.Id && t.Type == "Charge" && t.Description!.Contains(month) && t.Description.Contains(feeHead.Name));
@@ -342,11 +417,12 @@ public class FeeService : IFeeService
                         var chargeTx = new FeeTransaction
                         {
                             StudentId = student.Id,
+                            OrganizationId = _organizationService.GetOrganizationId(),
                             TransactionDate = DateTime.UtcNow,
                             Type = "Charge",
                             Amount = chargeAmount,
                             AcademicYearId = currentYear.Id,
-                            Description = fee.Frequency == "Monthly" ? $"{feeHead.Name} for {month}" : $"{feeHead.Name} ({fee.Frequency})"
+                            Description = (fee.Frequency == "Monthly" || fee.Frequency == "Quarterly") ? $"{feeHead.Name} for {month}" : $"{feeHead.Name} ({fee.Frequency})"
                         };
                         await _unitOfWork.Repository<FeeTransaction>().AddAsync(chargeTx);
                         account.TotalAllocated += chargeAmount;
@@ -376,6 +452,7 @@ public class FeeService : IFeeService
                                 var discountTx = new FeeTransaction
                                 {
                                     StudentId = student.Id,
+                                    OrganizationId = _organizationService.GetOrganizationId(),
                                     TransactionDate = DateTime.UtcNow,
                                     Type = "Discount",
                                     Amount = discountAmount,
@@ -400,7 +477,6 @@ public class FeeService : IFeeService
     {
         var query = _unitOfWork.Repository<FeeTransaction>().GetQueryable()
             .Include(t => t.Student)
-            .ThenInclude(s => s.StudentClass)
             .Where(t => t.Type == "Charge" && t.Description != null);
 
         if (academicYearId.HasValue)
@@ -410,15 +486,17 @@ public class FeeService : IFeeService
 
         if (classId.HasValue)
         {
-            query = query.Where(t => t.Student.ClassId == classId.Value);
+            // Join with StudentAcademic to filter by class
+            query = query.Where(t => _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                .Any(sa => sa.StudentId == t.StudentId && sa.ClassId == classId.Value && sa.AcademicYear == (t.AcademicYear != null ? t.AcademicYear.Name : "")));
         }
 
         var history = await query
-            .GroupBy(t => new { t.Description, ClassId = t.Student.ClassId, ClassName = t.Student.StudentClass.Name })
+            .GroupBy(t => new { t.Description, AcademicRecord = _unitOfWork.Repository<StudentAcademic>().GetQueryable().OrderByDescending(sa => sa.CreatedAt).FirstOrDefault(sa => sa.StudentId == t.StudentId) })
             .Select(g => new ClassFeeHistoryDto
             {
-                ClassId = g.Key.ClassId.GetValueOrDefault(),
-                ClassName = g.Key.ClassName,
+                ClassId = g.Key.AcademicRecord != null ? g.Key.AcademicRecord.ClassId : Guid.Empty,
+                ClassName = g.Key.AcademicRecord != null && g.Key.AcademicRecord.Class != null ? g.Key.AcademicRecord.Class.Name : "Unknown",
                 Month = g.Key.Description ?? "Unknown",
                 FeeHeadName = "Batch Generation",
                 TotalAmount = g.Sum(t => t.Amount),
