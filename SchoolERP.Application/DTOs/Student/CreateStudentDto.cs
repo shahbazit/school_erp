@@ -28,7 +28,9 @@ public class CreateStudentDto
 
     [Required]
     public string ClassId { get; set; } = string.Empty;
+    public string? ClassName { get; set; }
     public string? SectionId { get; set; }
+    public string? SectionName { get; set; }
     public string? RollNumber { get; set; }
     public string? DateOfBirth { get; set; }
     public DateTime AdmissionDate { get; set; } = DateTime.UtcNow;

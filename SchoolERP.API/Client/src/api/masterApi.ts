@@ -48,5 +48,13 @@ export const masterApi = {
 
   delete: async (endpoint: string, id: string): Promise<void> => {
     await apiClient.delete(`/masters/${endpoint}/${id}`);
-  }
+  },
+
+  // Semantic Helpers
+  getClasses: () => masterApi.getAll('classes'),
+  getSections: () => masterApi.getAll('sections'),
+  getSubjects: () => masterApi.getAll('subjects'),
+  getAcademicYears: () => masterApi.getAll('academic-years'),
+  getDepartments: () => masterApi.getAll('departments'),
+  getDesignations: () => masterApi.getAll('designations')
 };

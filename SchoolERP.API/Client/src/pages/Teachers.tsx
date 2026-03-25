@@ -2,13 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, BookOpen, Users, Star, Trash2, ChevronLeft, ChevronRight,
   X, Loader2, AlertCircle, GraduationCap, Mail, Phone, Building2,
-  Award, Filter, UserCheck
+  Award, Filter, UserCheck, Plus, Save, Calendar
 } from 'lucide-react';
 import {
   teacherApi,
   type TeacherProfileDto,
   type TeacherClassAssignmentDto,
+  type AssignSubjectDto,
+  type AssignClassDto
 } from '../api/teacherApi';
+import { masterApi } from '../api/masterApi';
 
 // ── Avatar helpers ────────────────────────────────────────────────────────
 
@@ -43,6 +46,25 @@ export default function Teachers() {
   const [selected, setSelected] = useState<TeacherProfileDto | null>(null);
   const [panelTab, setPanelTab] = useState<'profile' | 'subjects' | 'classes'>('profile');
 
+  // Master data
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+
+  // Modals
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [showClassModal, setShowClassModal] = useState(false);
+  const [isSubmitLoading, setIsSubmitLoading] = useState(false);
+
+  // Forms
+  const [subjectForm, setSubjectForm] = useState<AssignSubjectDto>({ 
+    subjectId: '', academicYearId: '', effectiveFrom: new Date().toISOString().split('T')[0] 
+  });
+  const [classForm, setClassForm] = useState<AssignClassDto>({ 
+    classId: '', sectionId: '', academicYearId: '', isClassTeacher: false 
+  });
+
   const fetchTeachers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -58,6 +80,31 @@ export default function Teachers() {
   }, [pageNumber, search]);
 
   useEffect(() => { fetchTeachers(); }, [fetchTeachers]);
+
+  useEffect(() => {
+    const loadMasters = async () => {
+      try {
+        const [sub, cls, sec, ay] = await Promise.all([
+          masterApi.getAll('subjects'),
+          masterApi.getAll('classes'),
+          masterApi.getAll('sections'),
+          masterApi.getAll('academic-years'),
+        ]);
+        setSubjects(sub.filter((s: any) => s.isActive));
+        setClasses(cls.filter((c: any) => c.isActive));
+        setSections(sec.filter((s: any) => s.isActive));
+        setAcademicYears(ay.filter((a: any) => a.isActive));
+        
+        // Auto-select current academic year
+        const currentYear = ay.find((a: any) => a.isCurrent);
+        if (currentYear) {
+          setSubjectForm(s => ({ ...s, academicYearId: currentYear.id }));
+          setClassForm(c => ({ ...c, academicYearId: currentYear.id }));
+        }
+      } catch { /* ignore */ }
+    };
+    loadMasters();
+  }, []);
 
   // Search debounce
   useEffect(() => {
@@ -97,6 +144,34 @@ export default function Teachers() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg || 'Failed to update class teacher status.');
+    }
+  };
+
+  const handleAssignSubject = async () => {
+    if (!selected) return;
+    setIsSubmitLoading(true);
+    try {
+      await teacherApi.assignSubject(selected.employeeId, subjectForm);
+      setShowSubjectModal(false);
+      refreshSelected(selected.employeeId);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to assign subject.');
+    } finally {
+      setIsSubmitLoading(false);
+    }
+  };
+
+  const handleAssignClass = async () => {
+    if (!selected) return;
+    setIsSubmitLoading(true);
+    try {
+      await teacherApi.assignClass(selected.employeeId, classForm);
+      setShowClassModal(false);
+      refreshSelected(selected.employeeId);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to assign class.');
+    } finally {
+      setIsSubmitLoading(false);
     }
   };
 
@@ -303,6 +378,12 @@ export default function Teachers() {
               {/* ── Subjects Tab ── */}
               {panelTab === 'subjects' && (
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Assigned Subjects</p>
+                    <button onClick={() => setShowSubjectModal(true)} className="flex items-center gap-1 text-xs font-bold text-primary-600 hover:text-primary-700 bg-primary-50 px-2.5 py-1 rounded-lg transition-colors border border-primary-100 shadow-sm">
+                      <Plus className="h-3.5 w-3.5" /> Assign Subject
+                    </button>
+                  </div>
                   {selected.subjectAssignments.length === 0 ? (
                     <EmptyState icon={<BookOpen className="h-8 w-8 opacity-30" />} message="No subjects assigned yet" />
                   ) : (
@@ -324,15 +405,18 @@ export default function Teachers() {
                       </div>
                     ))
                   )}
-                  <p className="text-xs text-slate-400 text-center pt-1">
-                    To assign subjects, use the backend API or Swagger at <code>/api/teacher/{'{employeeId}'}/subjects</code>
-                  </p>
                 </div>
               )}
 
               {/* ── Classes Tab ── */}
               {panelTab === 'classes' && (
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Class Responsibilities</p>
+                    <button onClick={() => setShowClassModal(true)} className="flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg transition-colors border border-amber-100 shadow-sm">
+                      <Plus className="h-3.5 w-3.5" /> Assign Class
+                    </button>
+                  </div>
                   {selected.classAssignments.length === 0 ? (
                     <EmptyState icon={<Users className="h-8 w-8 opacity-30" />} message="No class assignments yet" />
                   ) : (
@@ -370,15 +454,159 @@ export default function Teachers() {
                       </div>
                     ))
                   )}
-                  <p className="text-xs text-slate-400 text-center pt-1">
-                    To assign classes, use the backend API or Swagger at <code>/api/teacher/{'{employeeId}'}/classes</code>
-                  </p>
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* ── Assign Subject Modal ── */}
+      {showSubjectModal && selected && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowSubjectModal(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary-100 rounded-xl text-primary-600">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <h3 className="font-black text-slate-800 tracking-tight">Assign Subject</h3>
+              </div>
+              <button onClick={() => setShowSubjectModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl transition shadow-sm border border-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Select Subject</label>
+                <select 
+                  value={subjectForm.subjectId} 
+                  onChange={e => setSubjectForm({...subjectForm, subjectId: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">Choose a subject...</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Academic Year</label>
+                <select 
+                  value={subjectForm.academicYearId} 
+                  onChange={e => setSubjectForm({...subjectForm, academicYearId: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">Select Year...</option>
+                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Effective From</label>
+                <div className="relative">
+                  <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input 
+                    type="date"
+                    value={subjectForm.effectiveFrom?.toString().split('T')[0]} 
+                    onChange={e => setSubjectForm({...subjectForm, effectiveFrom: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 transition-all cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-100 flex gap-4">
+              <button onClick={() => setShowSubjectModal(false)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-white rounded-2xl transition border border-transparent hover:border-slate-200">Cancel</button>
+              <button 
+                onClick={handleAssignSubject} 
+                disabled={isSubmitLoading || !subjectForm.subjectId || !subjectForm.academicYearId}
+                className="flex-[2] flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-2xl text-sm font-black shadow-xl shadow-primary-200 disabled:opacity-50 transition-all hover:-translate-y-0.5"
+              >
+                {isSubmitLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                Assign Subject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Assign Class Modal ── */}
+      {showClassModal && selected && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowClassModal(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-100 rounded-xl text-amber-600">
+                  <Star className="h-5 w-5" />
+                </div>
+                <h3 className="font-black text-slate-800 tracking-tight">Assign Responsibility</h3>
+              </div>
+              <button onClick={() => setShowClassModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-xl transition shadow-sm border border-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-8 space-y-6 text-left">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Class</label>
+                  <select 
+                    value={classForm.classId} 
+                    onChange={e => setClassForm({...classForm, classId: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select...</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Section</label>
+                  <select 
+                    value={classForm.sectionId} 
+                    onChange={e => setClassForm({...classForm, sectionId: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select...</option>
+                    {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Academic Year</label>
+                <select 
+                  value={classForm.academicYearId} 
+                  onChange={e => setClassForm({...classForm, academicYearId: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">Select Year...</option>
+                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+                </select>
+              </div>
+              
+              <label className="flex items-center gap-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-100 cursor-pointer group hover:bg-amber-50 transition-colors">
+                <div className="relative flex items-center justify-center">
+                  <input 
+                    type="checkbox" 
+                    checked={classForm.isClassTeacher}
+                    onChange={e => setClassForm({...classForm, isClassTeacher: e.target.checked})}
+                    className="h-5 w-5 rounded-lg border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-black text-amber-900">Assign as Class Teacher</p>
+                  <p className="text-[10px] text-amber-600/80 uppercase tracking-wider font-bold">Primary academic lead for this section</p>
+                </div>
+                <Star className={`h-6 w-6 transition-all duration-300 ${classForm.isClassTeacher ? 'text-amber-500 fill-amber-500 scale-110' : 'text-amber-200 group-hover:text-amber-300'}`} />
+              </label>
+            </div>
+            <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-100 flex gap-4">
+              <button onClick={() => setShowClassModal(false)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-white rounded-2xl transition border border-transparent hover:border-slate-200">Cancel</button>
+              <button 
+                onClick={handleAssignClass} 
+                disabled={isSubmitLoading || !classForm.classId || !classForm.sectionId || !classForm.academicYearId}
+                className="flex-[2] flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-2xl text-sm font-black shadow-xl shadow-amber-200 disabled:opacity-50 transition-all hover:-translate-y-0.5"
+              >
+                {isSubmitLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                Assign Responsibility
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -145,6 +145,8 @@ public class StudentController : ControllerBase
             Console.WriteLine("ModelState Errors: " + JsonSerializer.Serialize(errors));
             return BadRequest(new { Errors = errors, Message = "Validation failed" });
         }
+        var (resolvedClassId, resolvedSectionId) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
+        
         var student = MapFromDto(dto);
         await _unitOfWork.Repository<Student>().AddAsync(student);
         
@@ -152,8 +154,8 @@ public class StudentController : ControllerBase
         var academic = new StudentAcademic
         {
             StudentId = student.Id,
-            ClassId = Guid.TryParse(dto.ClassId, out var cid) ? cid : Guid.Empty,
-            SectionId = Guid.TryParse(dto.SectionId, out var sid) ? sid : null,
+            ClassId = resolvedClassId,
+            SectionId = resolvedSectionId,
             AcademicYear = dto.AcademicYear ?? string.Empty,
             RollNumber = dto.RollNumber,
             IsCurrent = true,
@@ -221,11 +223,12 @@ public class StudentController : ControllerBase
         foreach (var student in students)
         {
             var dto = dtosList[index++];
+            var (resolvedClassId, resolvedSectionId) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
             var academic = new StudentAcademic
             {
                 StudentId = student.Id,
-                ClassId = Guid.TryParse(dto.ClassId, out var cid) ? cid : Guid.Empty,
-                SectionId = Guid.TryParse(dto.SectionId, out var sid) ? sid : null,
+                ClassId = resolvedClassId,
+                SectionId = resolvedSectionId,
                 AcademicYear = dto.AcademicYear ?? string.Empty,
                 RollNumber = dto.RollNumber,
                 IsCurrent = true,
@@ -518,5 +521,35 @@ public class StudentController : ControllerBase
                 Status = ec.Status
             }).ToList()
         };
+    }
+
+    private async Task<(Guid classId, Guid? sectionId)> ResolveAcademicIds(string? classIdStr, string? className, string? sectionIdStr, string? sectionName)
+    {
+        Guid resolvedClassId = Guid.Empty;
+        Guid? resolvedSectionId = null;
+
+        if (Guid.TryParse(classIdStr, out var cid) && cid != Guid.Empty)
+        {
+            resolvedClassId = cid;
+        }
+        else if (!string.IsNullOrWhiteSpace(className))
+        {
+            var cls = await _unitOfWork.Repository<AcademicClass>().GetQueryable()
+                .FirstOrDefaultAsync(c => c.Name.ToLower() == className.ToLower().Trim());
+            if (cls != null) resolvedClassId = cls.Id;
+        }
+
+        if (Guid.TryParse(sectionIdStr, out var sid))
+        {
+            resolvedSectionId = sid;
+        }
+        else if (!string.IsNullOrWhiteSpace(sectionName))
+        {
+            var sec = await _unitOfWork.Repository<AcademicSection>().GetQueryable()
+                .FirstOrDefaultAsync(s => s.Name.ToLower() == sectionName.ToLower().Trim());
+            if (sec != null) resolvedSectionId = sec.Id;
+        }
+
+        return (resolvedClassId, resolvedSectionId);
     }
 }

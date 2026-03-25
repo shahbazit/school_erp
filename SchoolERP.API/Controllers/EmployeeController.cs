@@ -21,6 +21,29 @@ public class EmployeeController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────
+    // GET /api/employee/me – Get current user's employee profile
+    // ─────────────────────────────────────────────────────
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var userIdClaim = User.FindFirst("id")?.Value;
+        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+
+        var userId = Guid.Parse(userIdClaim);
+        var employee = await _unitOfWork.Repository<Employee>().GetQueryable()
+            .Include(e => e.Department)
+            .Include(e => e.Designation)
+            .Include(e => e.EmployeeRole)
+            .Include(e => e.Documents)
+            .Include(e => e.TeacherProfile)
+            .FirstOrDefaultAsync(e => e.UserId == userId);
+
+        if (employee == null) return NotFound("Employee profile not found for this user.");
+
+        return Ok(MapToDetailedDto(employee));
+    }
+
+    // ─────────────────────────────────────────────────────
     // GET /api/employee  – Paginated list with search & filters
     // ─────────────────────────────────────────────────────
     [HttpGet]
@@ -312,6 +335,13 @@ public class EmployeeController : ControllerBase
     {
         var count = await _unitOfWork.Repository<Employee>().GetQueryable().CountAsync();
         return $"EMP{DateTime.UtcNow:yyyy}{(count + 1):D4}";
+    }
+
+    private EmployeeDto MapToDetailedDto(Employee e)
+    {
+        var dto = MapToDto(e);
+        // Add more detailed fields if needed, like teacher profile
+        return dto;
     }
 
     private EmployeeDto MapToDto(Employee e) => new()

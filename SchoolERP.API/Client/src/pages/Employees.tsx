@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Plus, Edit2, UserX, UserCheck, ChevronLeft, ChevronRight,
   Briefcase, Phone, Mail, MapPin, X, Save, Loader2, AlertCircle,
-  User, Building2, Calendar, Shield, Filter, MoreVertical
+  User, Building2, Calendar, Shield, Filter, MoreVertical, GraduationCap, Award
 } from 'lucide-react';
 import {
   employeeApi,
@@ -11,6 +11,10 @@ import {
   type UpdateEmployeeDto,
   type EmploymentType,
 } from '../api/employeeApi';
+import { 
+  teacherApi, 
+  type UpsertTeacherProfileDto 
+} from '../api/teacherApi';
 import { masterApi } from '../api/masterApi';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -91,6 +95,12 @@ export default function Employees() {
   // Active menu
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
+  // Teacher Profile state
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [teacherProfile, setTeacherProfile] = useState<UpsertTeacherProfileDto | null>(null);
+  const [isTeacherSaving, setIsTeacherSaving] = useState(false);
+  const [targetEmployeeName, setTargetEmployeeName] = useState('');
+
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -150,48 +160,67 @@ export default function Employees() {
   // ── Open edit modal ──
   const openEdit = async (id: string) => {
     setOpenMenu(null);
+    setIsLoading(true);
+    setFormError(null);
     try {
       const emp = await employeeApi.getById(id);
       setEditingId(id);
       setForm({
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        gender: emp.gender,
+        ...emp,
+        dateOfJoining: emp.dateOfJoining.split('T')[0],
         dateOfBirth: emp.dateOfBirth?.split('T')[0],
-        bloodGroup: emp.bloodGroup,
-        nationality: emp.nationality,
-        religion: emp.religion,
-        maritalStatus: emp.maritalStatus,
-        profilePhoto: emp.profilePhoto,
-        mobileNumber: emp.mobileNumber,
-        workEmail: emp.workEmail,
-        personalEmail: emp.personalEmail,
-        emergencyContactName: emp.emergencyContactName,
-        emergencyContactNumber: emp.emergencyContactNumber,
-        addressLine1: emp.addressLine1,
-        addressLine2: emp.addressLine2,
-        city: emp.city,
-        state: emp.state,
-        pincode: emp.pincode,
-        permanentAddressLine1: emp.permanentAddressLine1,
-        permanentAddressLine2: emp.permanentAddressLine2,
-        permanentCity: emp.permanentCity,
-        permanentState: emp.permanentState,
-        permanentPincode: emp.permanentPincode,
-        departmentId: emp.departmentId,
-        designationId: emp.designationId,
-        employeeRoleId: emp.employeeRoleId,
-        dateOfJoining: emp.dateOfJoining?.split('T')[0],
-        employmentType: emp.employmentType,
-        workLocation: emp.workLocation,
-        userId: emp.userId,
-        isActive: emp.isActive,
-        deactivationReason: emp.deactivationReason,
       } as UpdateEmployeeDto);
-      setFormError(null);
       setShowModal(true);
     } catch {
       setError('Failed to load employee details.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openTeacherProfile = async (emp: EmployeeDto) => {
+    setOpenMenu(null);
+    setTargetEmployeeName(emp.fullName);
+    setIsLoading(true);
+    try {
+      try {
+        const profile = await teacherApi.getByEmployeeId(emp.id);
+        setTeacherProfile({
+          employeeId: emp.id,
+          highestQualification: profile.highestQualification || '',
+          qualificationInstitution: profile.qualificationInstitution || '',
+          qualificationYear: profile.qualificationYear,
+          specializations: profile.specializations || '',
+          previousExperienceYears: profile.previousExperienceYears,
+          previousSchools: profile.previousSchools || '',
+        });
+      } catch {
+        setTeacherProfile({
+          employeeId: emp.id,
+          highestQualification: '',
+          qualificationInstitution: '',
+          specializations: '',
+          previousSchools: '',
+        });
+      }
+      setShowTeacherModal(true);
+    } catch {
+      setError('Failed to fetch academic profile.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveTeacher = async () => {
+    if (!teacherProfile) return;
+    setIsTeacherSaving(true);
+    try {
+      await teacherApi.upsert(teacherProfile);
+      setShowTeacherModal(false);
+    } catch {
+      setError('Failed to save academic profile.');
+    } finally {
+      setIsTeacherSaving(false);
     }
   };
 
@@ -353,7 +382,7 @@ export default function Employees() {
             <p className="text-sm">Try changing your search or filters.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[400px]">
             <table className="w-full min-w-[680px]">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/60 text-left">
@@ -449,6 +478,14 @@ export default function Employees() {
                             >
                               <Edit2 className="h-3.5 w-3.5" /> Edit Profile
                             </button>
+                            {emp.isActive && (
+                              <button
+                                onClick={() => openTeacherProfile(emp)}
+                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              >
+                                <GraduationCap className="h-3.5 w-3.5" /> Academic Profile
+                              </button>
+                            )}
                             {emp.isActive ? (
                               <button
                                 onClick={() => { setOpenMenu(null); setDeactivateTarget(emp); }}
@@ -771,6 +808,107 @@ export default function Employees() {
                 className="flex-1 px-4 py-2 text-sm font-semibold bg-red-500 hover:bg-red-600 text-white rounded-xl transition"
               >
                 Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          Academic Profile Modal (Teacher Profile)
+      ───────────────────────────────────────────────────────────────────── */}
+      {showTeacherModal && teacherProfile && (
+        <div className="fixed inset-0 z-[60] flex justify-end">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowTeacherModal(false)} />
+          <div className="relative bg-white shadow-2xl w-full sm:w-[500px] h-full flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Header */}
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-100 rounded-2xl text-indigo-600">
+                  <GraduationCap className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">Academic Profile</h3>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">{targetEmployeeName}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowTeacherModal(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              <Section icon={<GraduationCap className="h-4 w-4" />} title="Educational Background">
+                <div className="space-y-4">
+                  <FormField label="Highest Qualification *">
+                    <input 
+                      value={teacherProfile.highestQualification} 
+                      onChange={e => setTeacherProfile({...teacherProfile, highestQualification: e.target.value})}
+                      className="form-input" placeholder="e.g. M.Sc. Physics, B.Ed." 
+                    />
+                  </FormField>
+                  <FormField label="Institution">
+                    <input 
+                      value={teacherProfile.qualificationInstitution} 
+                      onChange={e => setTeacherProfile({...teacherProfile, qualificationInstitution: e.target.value})}
+                      className="form-input" placeholder="University / College Name" 
+                    />
+                  </FormField>
+                  <FormField label="Year of Completion">
+                    <input 
+                      type="number"
+                      value={teacherProfile.qualificationYear || ''} 
+                      onChange={e => setTeacherProfile({...teacherProfile, qualificationYear: e.target.value ? parseInt(e.target.value) : undefined})}
+                      className="form-input" placeholder="2015" 
+                    />
+                  </FormField>
+                </div>
+              </Section>
+
+              <Section icon={<Award className="h-4 w-4" />} title="Expertise & Experience">
+                <div className="space-y-4">
+                  <FormField label="Specializations (comma separated)">
+                    <input 
+                      value={teacherProfile.specializations} 
+                      onChange={e => setTeacherProfile({...teacherProfile, specializations: e.target.value})}
+                      className="form-input" placeholder="Mathematics, Quantum Physics" 
+                    />
+                  </FormField>
+                  <FormField label="Previous Teaching Experience (Years)">
+                    <input 
+                      type="number"
+                      value={teacherProfile.previousExperienceYears || ''} 
+                      onChange={e => setTeacherProfile({...teacherProfile, previousExperienceYears: e.target.value ? parseInt(e.target.value) : undefined})}
+                      className="form-input" placeholder="5" 
+                    />
+                  </FormField>
+                  <FormField label="Previous Schools">
+                    <textarea 
+                      value={teacherProfile.previousSchools} 
+                      onChange={e => setTeacherProfile({...teacherProfile, previousSchools: e.target.value})}
+                      className="form-input min-h-[80px]" placeholder="List of previously served institutions" 
+                    />
+                  </FormField>
+                </div>
+              </Section>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+              <button
+                onClick={() => setShowTeacherModal(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/50 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTeacher}
+                disabled={isTeacherSaving || !teacherProfile.highestQualification}
+                className="flex-[2] flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-200 transition disabled:opacity-50"
+              >
+                {isTeacherSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save Academic Profile
               </button>
             </div>
           </div>

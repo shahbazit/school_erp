@@ -27,7 +27,7 @@ public class SeedController : ControllerBase
         return Ok(new
         {
             Lookups = GetDefaultLookups(),
-            Classes = new[] { "Playgroup", "Nursery", "LKG", "UKG", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" },
+            Classes = new[] { "Playgroup", "Nursery", "LKG", "UKG", "Class-1", "Class-2", "Class-3", "Class-4", "Class-5", "Class-6", "Class-7", "Class-8", "Class-9", "Class-10", "Class-11", "Class-12" },
             Sections = new[] { "A", "B", "C" },
             Departments = new[] { "Administration", "Academic", "Finance", "Back Office", "Transport", "Security" },
             Designations = new[] { "Principal", "Vice Principal", "HOD", "Senior Teacher", "Teacher", "Accountant", "Clerk", "Librarian", "Coordinator" },
@@ -39,17 +39,18 @@ public class SeedController : ControllerBase
             FeeHeads = new[] {
                 new { Name = "Registration Fee", IsSelective = false }, new { Name = "Tuition Fee", IsSelective = false }, new { Name = "Examination Fee", IsSelective = false },
                 new { Name = "Computer Fee", IsSelective = false }, new { Name = "Library Fee", IsSelective = false }, new { Name = "Sports Fee", IsSelective = false },
-                new { Name = "Transport Fee", IsSelective = true }, new { Name = "Hostel Fee", IsSelective = true }, new { Name = "Late Fine", IsSelective = false }
+                new { Name = "Transport Fee", IsSelective = true }, new { Name = "Hostel Fee", IsSelective = true }, new { Name = "Fine", IsSelective = false }
             },
             LeaveTypes = new[] { "Casual Leave", "Sick Leave", "Earned Leave", "Maternity Leave", "Paternity Leave", "Duty Leave" },
             AcademicYears = new[] { 
                 new { 
-                    Name = $"{DateTime.Now.Year}-{DateTime.Now.Year + 1}", 
+                    Name = $"{DateTime.Now.Year}-{(DateTime.Now.Year + 1) % 100:D2}", 
                     StartDate = new DateTime(DateTime.Now.Year, 4, 1), 
                     EndDate = new DateTime(DateTime.Now.Year + 1, 3, 31), 
                     IsCurrent = true 
                 } 
             },
+            EmployeeRoles = new[] { "Admin", "Teacher", "Accountant", "Staff" },
             MenuMasters = GetDefaultMenuMasters(),
             FeeDiscounts = GetDefaultFeeDiscounts(),
             FeePolicy = GetDefaultFeePolicy()
@@ -90,6 +91,10 @@ public class SeedController : ControllerBase
 
         // 9. Seed Leave Types
         await SeedLeaveTypes(orgId, results);
+
+        // 10. Seed Employee Roles
+        await SeedEmployeeRoles(orgId, results);
+
         await SeedDiscounts(orgId, results);
         await SeedFeeConfig(orgId, results);
 
@@ -379,7 +384,7 @@ public class SeedController : ControllerBase
 
         var year = new AcademicYear
         {
-            Name = $"{DateTime.Now.Year}-{DateTime.Now.Year + 1}",
+            Name = $"{DateTime.Now.Year}-{(DateTime.Now.Year + 1) % 100:D2}",
             StartDate = new DateTime(DateTime.Now.Year, 4, 1),
             EndDate = new DateTime(DateTime.Now.Year + 1, 3, 31),
             IsCurrent = true,
@@ -400,7 +405,7 @@ public class SeedController : ControllerBase
             return;
         }
 
-        var classes = new List<string> { "Playgroup", "Nursery", "LKG", "UKG", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" };
+        var classes = new List<string> { "Playgroup", "Nursery", "LKG", "UKG", "Class-1", "Class-2", "Class-3", "Class-4", "Class-5", "Class-6", "Class-7", "Class-8", "Class-9", "Class-10", "Class-11", "Class-12" };
         for (int i = 0; i < classes.Count; i++)
         {
             await repo.AddAsync(new AcademicClass { Name = classes[i], Order = i + 1, IsActive = true, OrganizationId = orgId });
@@ -499,7 +504,7 @@ public class SeedController : ControllerBase
         {
             ("Registration Fee", false), ("Tuition Fee", false), ("Examination Fee", false),
             ("Computer Fee", false), ("Library Fee", false), ("Sports Fee", false),
-            ("Transport Fee", true), ("Hostel Fee", true), ("Late Fine", false)
+            ("Transport Fee", true), ("Hostel Fee", true), ("Fine", false)
         };
         foreach (var h in heads)
         {
@@ -718,5 +723,23 @@ public class SeedController : ControllerBase
 
         await repo.AddAsync(config);
         results.Add("Default fee configuration seeded.");
+    }
+
+    private async Task SeedEmployeeRoles(Guid orgId, List<string> results)
+    {
+        var repo = _unitOfWork.Repository<EmployeeRole>();
+        var count = await repo.GetQueryable().Where(x => x.OrganizationId == orgId).CountAsync();
+        if (count > 0)
+        {
+            results.Add("Employee roles already exist.");
+            return;
+        }
+
+        var roles = new List<string> { "Admin", "Teacher", "Accountant", "Staff" };
+        foreach (var r in roles)
+        {
+            await repo.AddAsync(new EmployeeRole { OrganizationId = orgId, Name = r, IsActive = true });
+        }
+        results.Add($"{roles.Count} employee roles added.");
     }
 }

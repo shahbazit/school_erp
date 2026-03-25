@@ -22,6 +22,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public Guid CurrentOrganizationId => _organizationService.GetOrganizationId();
+    public bool IgnoreTenant { get; set; } = false;
 
 
     public DbSet<Organization> Organizations { get; set; } = null!;
@@ -58,6 +59,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<EmployeeAttendance> EmployeeAttendances { get; set; } = null!;
     public DbSet<LeaveType> LeaveTypes { get; set; } = null!;
     public DbSet<LeaveApplication> LeaveApplications { get; set; } = null!;
+    public DbSet<Homework> Homeworks { get; set; } = null!;
     public DbSet<LeaveBalance> LeaveBalances { get; set; } = null!;
     public DbSet<SalaryStructure> SalaryStructures { get; set; } = null!;
     public DbSet<SalaryComponent> SalaryComponents { get; set; } = null!;
@@ -77,6 +79,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<FeeConfiguration> FeeConfigurations { get; set; } = null!;
     public DbSet<OfficeExpense> OfficeExpenses { get; set; } = null!;
     public DbSet<OtherIncome> OtherIncomes { get; set; } = null!;
+    public DbSet<Timetable> Timetables { get; set; } = null!;
+    public DbSet<TimetableDetail> TimetableDetails { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -91,56 +95,59 @@ public class ApplicationDbContext : DbContext
         }
 
         // Apply Global Query Filters for Organization isolation
-        builder.Entity<User>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Student>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentAcademic>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Course>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentCourse>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeStructure>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeTransaction>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentFeeAccount>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentFeeSubscription>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeHead>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Lookup>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentDocument>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentAttendance>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Exam>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<StudentExamResult>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeDiscount>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeDiscountAssignment>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<FeeConfiguration>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<OfficeExpense>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<OtherIncome>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<User>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Student>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentAcademic>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Course>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentCourse>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeStructure>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeTransaction>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentFeeAccount>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentFeeSubscription>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeHead>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Lookup>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentDocument>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentAttendance>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Exam>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<StudentExamResult>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeDiscount>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeDiscountAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FeeConfiguration>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<OfficeExpense>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<OtherIncome>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Timetable>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TimetableDetail>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
         // Master Query Filters
-        builder.Entity<AcademicClass>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<AcademicSection>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Subject>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<AcademicStream>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<AcademicYear>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Department>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Designation>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<EmployeeRole>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Room>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Lab>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Employee>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<EmployeeDocument>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<TeacherProfile>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<TeacherSubjectAssignment>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<TeacherClassAssignment>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<EmployeeAttendance>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<LeaveType>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<LeaveApplication>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<LeaveBalance>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<SalaryStructure>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<SalaryComponent>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<EmployeeSalary>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<PayrollRun>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<PayrollDetail>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<Country>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<State>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<City>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
-        builder.Entity<MenuPermission>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AcademicClass>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AcademicSection>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Subject>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AcademicStream>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AcademicYear>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Department>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Designation>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<EmployeeRole>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Room>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Lab>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Employee>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<EmployeeDocument>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TeacherProfile>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TeacherSubjectAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TeacherClassAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<EmployeeAttendance>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<LeaveType>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<LeaveApplication>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<LeaveBalance>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SalaryStructure>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SalaryComponent>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<EmployeeSalary>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<PayrollRun>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<PayrollDetail>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Country>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<State>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<City>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<MenuPermission>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Homework>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
 
 
@@ -165,6 +172,8 @@ public class ApplicationDbContext : DbContext
         builder.Entity<FeeConfiguration>().HasIndex(e => e.OrganizationId);
         builder.Entity<OfficeExpense>().HasIndex(e => e.OrganizationId);
         builder.Entity<OtherIncome>().HasIndex(e => e.OrganizationId);
+        builder.Entity<Timetable>().HasIndex(e => e.OrganizationId);
+        builder.Entity<TimetableDetail>().HasIndex(e => e.OrganizationId);
         
         // Ensure no duplicate attendance per student per day
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
@@ -241,6 +250,7 @@ public class ApplicationDbContext : DbContext
         builder.Entity<State>().HasIndex(e => e.OrganizationId);
         builder.Entity<City>().HasIndex(e => e.OrganizationId);
         builder.Entity<MenuPermission>().HasIndex(e => e.OrganizationId);
+        builder.Entity<Homework>().HasIndex(e => e.OrganizationId);
         builder.Entity<MenuPermission>().HasIndex(e => new { e.RoleName, e.UserId, e.MenuKey }).IsUnique();
         builder.Entity<MenuPermission>().HasIndex(e => new { e.UserId, e.MenuKey }).HasFilter("[UserId] IS NOT NULL");
         builder.Entity<MenuPermission>().HasIndex(e => new { e.RoleName, e.MenuKey }).HasFilter("[RoleName] IS NOT NULL");
@@ -407,6 +417,43 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(pd => pd.EmployeeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Timetable Relationships
+        builder.Entity<TimetableDetail>()
+            .HasOne(td => td.Timetable)
+            .WithMany(t => t.Periods)
+            .HasForeignKey(td => td.TimetableId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TimetableDetail>()
+            .HasOne(td => td.Subject)
+            .WithMany()
+            .HasForeignKey(td => td.SubjectId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<TimetableDetail>()
+            .HasOne(td => td.Teacher)
+            .WithMany()
+            .HasForeignKey(td => td.TeacherId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<Timetable>()
+            .HasOne(t => t.Class)
+            .WithMany()
+            .HasForeignKey(t => t.ClassId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Timetable>()
+            .HasOne(t => t.Section)
+            .WithMany()
+            .HasForeignKey(t => t.SectionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Timetable>()
+            .HasOne(t => t.AcademicYear)
+            .WithMany()
+            .HasForeignKey(t => t.AcademicYearId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
@@ -418,7 +465,7 @@ public class ApplicationDbContext : DbContext
         {
             if (entry.State == EntityState.Added)
             {
-                if (orgId != Guid.Empty && entry.Entity.OrganizationId == Guid.Empty)
+                if (orgId != Guid.Empty && (entry.Entity.OrganizationId == Guid.Empty || entry.Entity.OrganizationId == null))
                 {
                     entry.Entity.OrganizationId = orgId;
                 }
@@ -429,10 +476,36 @@ public class ApplicationDbContext : DbContext
             {
                 entry.Entity.UpdatedAt = DateTime.UtcNow;
                 entry.Entity.UpdatedBy = userId;
-                entry.Property(x => x.OrganizationId).IsModified = false;
+                
+                // CRITICAL FAILSAFE: If the entity currently has Guid.Empty but we have a valid orgId, fix it!
+                if (orgId != Guid.Empty && entry.Entity.OrganizationId == Guid.Empty)
+                {
+                    entry.Entity.OrganizationId = orgId;
+                    entry.Property(x => x.OrganizationId).IsModified = true;
+                }
+                else if (entry.Property(x => x.OrganizationId).IsModified)
+                {
+                   // If it was manually changed (illegal or deliberate migration), allow it
+                }
+                else 
+                {
+                    // Otherwise don't touch the modified state
+                    entry.Property(x => x.OrganizationId).IsModified = false;
+                }
             }
         }
 
-        return await base.SaveChangesAsync(cancellationToken);
+        try {
+            return await base.SaveChangesAsync(cancellationToken);
+        } catch (DbUpdateConcurrencyException ex) {
+             // Extract more info if available
+             foreach (var entry in ex.Entries) {
+                 if (entry.Entity is BaseEntity baseEntity) {
+                     Serilog.Log.Error("Concurrency Exception on {Entity} ({State}) with ID {Id}. CurrentOrgId: {OrgId}, EntityOrgId: {EntityOrgId}", 
+                        entry.Metadata.Name, entry.State.ToString(), baseEntity.Id, orgId, baseEntity.OrganizationId);
+                 }
+             }
+             throw;
+        }
     }
 }

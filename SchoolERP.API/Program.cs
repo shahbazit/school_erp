@@ -19,6 +19,7 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
+    .WriteTo.File("Logs/schoolerp-logs-.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -172,12 +173,10 @@ app.UseCors("AllowAll");
 app.UseStaticFiles();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseMiddleware<OrganizationMiddleware>();
-
-// app.UseHttpsRedirection(); // Commented out to prevent HTTPS cert issues on localhost
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseMiddleware<OrganizationMiddleware>();
 
 app.MapControllers();
 

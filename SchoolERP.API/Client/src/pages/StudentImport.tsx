@@ -2,21 +2,50 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Upload, FileJson, Download, CheckCircle2, 
   AlertCircle, Loader2, Database, Trash2, 
-  ChevronRight, Info, Filter, ArrowRight
+  Info, Filter, ArrowRight, ClipboardCheck, Copy, HelpCircle
 } from 'lucide-react';
 import { studentApi } from '../api/studentApi';
 import { masterApi } from '../api/masterApi';
 
 interface ImportRow {
+  admissionNo?: string;
   firstName: string;
   lastName: string;
-  admissionNo: string;
   gender: string;
   dateOfBirth: string;
+  bloodGroup?: string;
+  mobileNumber: string;
+  email?: string;
+  rollNumber?: string;
+  class: string;
+  section: string;
+  classId?: string;
+  sectionId?: string;
+  academicYear: string;
+  previousSchool?: string;
   fatherName: string;
   fatherMobile: string;
-  classId: string;
-  sectionId: string;
+  fatherEmail?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherMobile?: string;
+  motherEmail?: string;
+  motherOccupation?: string;
+  guardianName?: string;
+  guardianMobile?: string;
+  guardianEmail?: string;
+  guardianRelation?: string;
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  emergencyContactRelation?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  isActive?: boolean;
+  consentAccepted?: boolean;
+  
   // Dynamic validation status
   status: 'valid' | 'invalid' | 'warning';
   errors: string[];
@@ -28,16 +57,25 @@ export default function StudentImport() {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   
   const [classes, setClasses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [showReference, setShowReference] = useState(false);
+  const [copying, setCopying] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     masterApi.getAll('classes').then(setClasses);
     masterApi.getAll('sections').then(setSections);
+    masterApi.getAll('academic-years').then(setAcademicYears);
   }, []);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopying(id);
+    setTimeout(() => setCopying(null), 2000);
+  };
 
   const downloadTemplate = () => {
     const template = [
@@ -47,10 +85,36 @@ export default function StudentImport() {
         lastName: "Doe",
         gender: "Male",
         dateOfBirth: "2010-05-15",
+        bloodGroup: "O+",
+        mobileNumber: "9876543210",
+        email: "john@example.com",
+        rollNumber: "1",
+        class: classes[0]?.name || "Class 1",
+        section: sections[0]?.name || "Section A",
+        academicYear: academicYears.find(y => y.isCurrent)?.name || "2024-25",
+        previousSchool: "St. Xavier Academy",
         fatherName: "Richard Doe",
         fatherMobile: "9876543210",
-        classId: classes[0]?.id || "GUID-HERE",
-        sectionId: sections[0]?.id || "GUID-HERE"
+        fatherEmail: "richard@example.com",
+        fatherOccupation: "Engineer",
+        motherName: "Jane Doe",
+        motherMobile: "9876543211",
+        motherEmail: "jane@example.com",
+        motherOccupation: "Doctor",
+        guardianName: "",
+        guardianMobile: "",
+        guardianEmail: "",
+        guardianRelation: "",
+        emergencyContactName: "Richard Doe",
+        emergencyContactNumber: "9876543210",
+        emergencyContactRelation: "Father",
+        addressLine1: "123 Main St",
+        addressLine2: "Apt 4B",
+        city: "New York",
+        state: "NY",
+        pincode: "10001",
+        isActive: true,
+        consentAccepted: true
       }
     ];
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(template, null, 2));
@@ -78,11 +142,29 @@ export default function StudentImport() {
         const mapped = json.map((item: any) => {
           const errors: string[] = [];
           if (!item.firstName) errors.push("First name is missing");
-          if (!item.admissionNo) errors.push("Admission no is missing");
-          if (!item.classId) errors.push("Class ID is missing");
+          if (!item.lastName) errors.push("Last name is missing");
+          if (!item.mobileNumber) errors.push("Mobile number is missing");
+          if (!item.academicYear) errors.push("Academic Year is missing");
+          
+          // Map Class Name to ID
+          const className = item.class || item.className;
+          const foundClass = classes.find(c => c.name.toLowerCase() === className?.toString().toLowerCase().trim());
+          if (!className) errors.push("Class name is missing");
+          else if (!foundClass) errors.push(`Class '${className}' not found in system`);
+
+          // Map Section Name to ID
+          const sectionName = item.section || item.sectionName;
+          const foundSection = sections.find(s => s.name.toLowerCase() === sectionName?.toString().toLowerCase().trim());
+          if (!sectionName) errors.push("Section name is missing");
+          else if (!foundSection) errors.push(`Section '${sectionName}' not found in system`);
+
+          const hasParent = item.fatherName || item.motherName || item.guardianName;
+          if (!hasParent) errors.push("Parent/Guardian name is required (Father, Mother, or Guardian)");
           
           return {
             ...item,
+            classId: foundClass?.id,
+            sectionId: foundSection?.id,
             status: errors.length > 0 ? 'invalid' : 'valid',
             errors
           };
@@ -106,7 +188,6 @@ export default function StudentImport() {
     setProcessing(true);
     try {
       await studentApi.bulkEnroll(validRows);
-      setSuccess(true);
       setStep(3);
     } catch (err: any) {
       setError(err.message || "Failed to process bulk import.");
@@ -134,11 +215,82 @@ export default function StudentImport() {
         </div>
         
         <div className="flex items-center gap-3">
+           <button 
+              onClick={() => setShowReference(!showReference)} 
+              className={`btn-secondary flex items-center gap-2 py-2.5 px-5 ${showReference ? 'bg-primary-50 border-primary-200 text-primary-600' : ''}`}
+           >
+              <HelpCircle className="h-4 w-4" /> {showReference ? 'Hide IDs' : 'Show ID Reference'}
+           </button>
            <button onClick={downloadTemplate} className="btn-secondary flex items-center gap-2 py-2.5 px-5">
-              <Download className="h-4 w-4" /> Download Format
+              <Download className="h-4 w-4" /> Download JSON Template
            </button>
         </div>
       </div>
+
+      {/* Reference Data Sheet */}
+      {showReference && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-300">
+          <div className="glass-card p-5 border-primary-100 bg-primary-50/10">
+            <h3 className="text-sm font-bold text-primary-800 mb-4 flex items-center gap-2">
+              <span className="p-1 bg-primary-600/10 rounded">🏫</span> Available Classes
+            </h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+              {classes.map(c => (
+                <div key={c.id} className="flex items-center justify-between text-xs p-2.5 bg-white border border-slate-100 rounded-lg group hover:border-primary-200 transition-colors">
+                  <span className="font-bold text-slate-700">{c.name}</span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => copyToClipboard(c.name, c.id)} className="p-1.5 text-slate-300 hover:text-primary-600 transition-colors flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold">Copy Name</span>
+                      {copying === c.id ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-card p-5 border-purple-100 bg-purple-50/10">
+            <h3 className="text-sm font-bold text-purple-800 mb-4 flex items-center gap-2">
+              <span className="p-1 bg-purple-600/10 rounded">📂</span> Available Sections
+            </h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+              {sections.map(s => (
+                <div key={s.id} className="flex items-center justify-between text-xs p-2.5 bg-white border border-slate-100 rounded-lg group hover:border-purple-200 transition-colors">
+                  <span className="font-bold text-slate-700">{s.name}</span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => copyToClipboard(s.name, s.id)} className="p-1.5 text-slate-300 hover:text-purple-600 transition-colors flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold">Copy Name</span>
+                      {copying === s.id ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-card p-5 border-emerald-100 bg-emerald-50/10">
+            <h3 className="text-sm font-bold text-emerald-800 mb-4 flex items-center gap-2">
+              <span className="p-1 bg-emerald-600/10 rounded">📅</span> Academic Years
+            </h3>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+              {academicYears.map(y => (
+                <div key={y.id} className="flex items-center justify-between text-xs p-2.5 bg-white border border-slate-100 rounded-lg group hover:border-emerald-200 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-700">{y.name}</span>
+                    {y.isCurrent && <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">Current Session</span>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => copyToClipboard(y.name, y.id)} className="p-1.5 text-slate-300 hover:text-emerald-600 transition-colors flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold">Copy Name</span>
+                      {copying === y.id ? <ClipboardCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Steps Indicator */}
       <div className="flex items-center justify-center py-6">
@@ -255,7 +407,7 @@ export default function StudentImport() {
                                {row.status === 'invalid' ? (
                                  <span className="text-[10px] text-rose-500 font-medium italic">{row.errors.join(', ')}</span>
                                ) : (
-                                 <span className="text-[10px] text-slate-400">Class: {row.classId.substring(0,8)}...</span>
+                                 <span className="text-[10px] text-slate-400">Class: {row.class} • {row.section}</span>
                                )}
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -284,7 +436,7 @@ export default function StudentImport() {
                  <button onClick={() => window.location.href='/students'} className="btn-primary px-8 flex items-center gap-2">
                     <Filter className="h-4 w-4" /> View Directory
                  </button>
-                 <button onClick={() => { setStep(1); setImportData([]); setSuccess(false); }} className="btn-secondary px-8">
+                 <button onClick={() => { setStep(1); setImportData([]); }} className="btn-secondary px-8">
                     Import More
                  </button>
               </div>

@@ -286,7 +286,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
             name="bloodGroup" 
             value={formData.bloodGroup} 
             onChange={handleChange} 
-            className="form-input"
+            className={inputCls('bloodGroup')}
           >
             <option value="">Select Group</option>
             {BLOOD_GROUPS.map(bg => <option key={bg} value={bg}>{bg}</option>)}

@@ -25,6 +25,7 @@ export default function SystemSetup() {
     { name: 'Sections', count: 0, loading: true, icon: Users, endpoint: 'masters/sections' },
     { name: 'Departments', count: 0, loading: true, icon: Building, endpoint: 'masters/departments' },
     { name: 'Designations', count: 0, loading: true, icon: Briefcase, endpoint: 'masters/designations' },
+    { name: 'Employee Roles', count: 0, loading: true, icon: Briefcase, endpoint: 'masters/roles' },
     { name: 'Subjects', count: 0, loading: true, icon: GraduationCap, endpoint: 'masters/subjects' },
     { name: 'Fee Heads', count: 0, loading: true, icon: Building, endpoint: 'masters/fee/heads' },
     { name: 'Fee Discounts', count: 0, loading: true, icon: Percent, endpoint: 'masters/fee/discounts' },
@@ -111,8 +112,9 @@ export default function SystemSetup() {
     if (category === 'Sections') newItem = "D";
     if (category === 'Departments') newItem = "New Dept";
     if (category === 'Designations') newItem = "New Desig";
+    if (category === 'EmployeeRoles') newItem = { name: "New Role", description: "" };
     if (category === 'LeaveTypes') newItem = "New Leave";
-    if (category === 'AcademicYears') newItem = { name: "202x-2x", startDate: "202x-04-01", endDate: "202x-03-31", isCurrent: false };
+    if (category === 'AcademicYears') newItem = { name: `${new Date().getFullYear()}-${(new Date().getFullYear() + 1) % 100}`, startDate: `${new Date().getFullYear()}-04-01`, endDate: `${new Date().getFullYear() + 1}-03-31`, isCurrent: false };
     if (category === 'MenuMasters') newItem = { key: "new", label: "New Menu", icon: "Layout", sortOrder: 10 };
     if (category === 'FeeDiscounts') newItem = { name: "New Discount", category: "Other", calculationType: "Percentage", value: 10, frequency: "Monthly" };
     if (category === 'FeePolicy') newItem = { monthlyDueDay: 10, gracePeriodDays: 5, lateFeeType: "Fixed", lateFeeAmount: 500, autoCalculateLateFee: true };
@@ -373,6 +375,17 @@ export default function SystemSetup() {
                                                 <div className="flex items-center gap-2 mt-4">
                                                     <input type="checkbox" checked={item.autoCalculateLateFee} onChange={(e) => updateItem(activeTab, idx, 'autoCalculateLateFee', e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
                                                     <span className="text-[10px] text-slate-500">Auto Calculate Late Fee</span>
+                                                </div>
+                                            </div>
+                                        ) : activeTab === 'EmployeeRoles' ? (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] text-slate-400">Role Name</label>
+                                                    <input value={item.name} onChange={(e) => updateItem(activeTab, idx, 'name', e.target.value)} className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-slate-400">Description</label>
+                                                    <input value={item.description} onChange={(e) => updateItem(activeTab, idx, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs" />
                                                 </div>
                                             </div>
                                         ) : (

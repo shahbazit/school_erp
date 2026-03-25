@@ -28,6 +28,7 @@ import Payroll from './pages/Payroll';
 import StudentAccount from './pages/fees/StudentAccount';
 import FeeGeneration from './pages/fees/FeeGeneration';
 import FeeSettings from './pages/fees/FeeSettings';
+import Timetable from './pages/Timetable';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import MenuPermissions from './pages/MenuPermissions';
@@ -83,6 +84,7 @@ function App() {
       case '/fees/settings': return 'Fee Policy & Discounts';
       case '/settings/permissions': return 'Menu Access Permissions';
       case '/settings/setup': return 'System Initial Setup';
+      case '/timetable': return 'Class Timetables';
       default: return 'School ERP';
     }
   };
@@ -185,6 +187,7 @@ function App() {
                     <Link to="/examinations" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Exams & Result</Link>
                     <Link to="/student-promotion" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Promotion & Transfer</Link>
                     <Link to="/certificates" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Certificate & ID</Link>
+                    <Link to="/timetable" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors font-bold text-primary-600">Class Timetables</Link>
                     <Link to="/student-import" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Bulk Import</Link>
                   </div>
                 )}
@@ -439,6 +442,7 @@ function App() {
               <Route path="/settings/users" element={<UserManagement />} />
               <Route path="/settings/permissions" element={<MenuPermissions />} />
               <Route path="/settings/setup" element={<SystemSetup />} />
+              <Route path="/timetable" element={<Timetable />} />
               
               {/* Academic Masters */}
               <Route path="/masters/classes" element={
