@@ -75,6 +75,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<FeeDiscount> FeeDiscounts { get; set; } = null!;
     public DbSet<FeeDiscountAssignment> FeeDiscountAssignments { get; set; } = null!;
     public DbSet<FeeConfiguration> FeeConfigurations { get; set; } = null!;
+    public DbSet<OfficeExpense> OfficeExpenses { get; set; } = null!;
+    public DbSet<OtherIncome> OtherIncomes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -107,6 +109,8 @@ public class ApplicationDbContext : DbContext
         builder.Entity<FeeDiscount>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<FeeDiscountAssignment>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
         builder.Entity<FeeConfiguration>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<OfficeExpense>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<OtherIncome>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
 
         // Master Query Filters
         builder.Entity<AcademicClass>().HasQueryFilter(e => e.OrganizationId == CurrentOrganizationId);
@@ -159,6 +163,8 @@ public class ApplicationDbContext : DbContext
         builder.Entity<FeeDiscount>().HasIndex(e => e.OrganizationId);
         builder.Entity<FeeDiscountAssignment>().HasIndex(e => e.OrganizationId);
         builder.Entity<FeeConfiguration>().HasIndex(e => e.OrganizationId);
+        builder.Entity<OfficeExpense>().HasIndex(e => e.OrganizationId);
+        builder.Entity<OtherIncome>().HasIndex(e => e.OrganizationId);
         
         // Ensure no duplicate attendance per student per day
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
