@@ -1,0 +1,349 @@
+import { useEffect, useState, useMemo } from 'react';
+import { useStudents } from '../hooks/useStudents';
+import { Search, Plus, Edit2, Trash2, Eye, UserPlus, Users, GraduationCap, ArrowUpDown, CreditCard, FileText } from 'lucide-react';
+import StudentModal from '../components/StudentModal';
+import StudentDetailPanel from '../components/StudentDetailPanel';
+import StudentDocumentsModal from '../components/StudentDocumentsModal';
+import { Student } from '../types';
+import { masterApi } from '../api/masterApi';
+
+export default function Students() {
+  const { students, fetchStudents, loading, error, removeStudent, addStudent, updateStudent } = useStudents();
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [docStudent, setDocStudent] = useState<Student | null>(null);
+  
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Masters mapping
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [sectionsList, setSectionsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchStudents();
+    
+    // Fetch master data for mapping IDs to Names
+    Promise.all([
+      masterApi.getAll('classes'),
+      masterApi.getAll('sections')
+    ]).then(([cls, sec]) => {
+      setClassesList(cls);
+      setSectionsList(sec);
+    }).catch(console.error);
+  }, [fetchStudents]);
+
+  const classMap = useMemo(() => {
+    return classesList.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {});
+  }, [classesList]);
+
+  const sectionMap = useMemo(() => {
+    return sectionsList.reduce((acc, s) => ({ ...acc, [s.id]: s.name }), {});
+  }, [sectionsList]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => 
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.admissionNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.mobileNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [students, searchTerm]);
+
+  // Quick Stats Calculate
+  const stats = useMemo(() => {
+    const active = students.filter(s => s.isActive).length;
+    return {
+      total: students.length,
+      active,
+      inactive: students.length - active,
+      newThisMonth: students.filter(s => {
+        const d = new Date(s.admissionDate);
+        const now = new Date();
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }).length
+    };
+  }, [students]);
+
+  const handleOpenAddModal = () => {
+    setEditingStudent(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (student: Student) => {
+    setEditingStudent(student);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveStudent = async (studentData: any) => {
+    if (editingStudent && editingStudent.id) {
+      const success = await updateStudent(editingStudent.id, studentData);
+      if (success && selectedStudent?.id === editingStudent.id) {
+        // Update selected student view if it's open
+        setSelectedStudent({ ...studentData, id: editingStudent.id });
+      }
+    } else {
+      await addStudent(studentData);
+    }
+  };
+
+  // Helper for generating avatar colors based on initials
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      'bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 
+      'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700',
+      'bg-pink-100 text-pink-700', 'bg-teal-100 text-teal-700'
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+      
+      {/* Header & Stats Strip */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <Users className="h-6 w-6 text-primary-600" />
+            Student Directory
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">Manage enrollments, profiles, and academic records.</p>
+        </div>
+        
+        {/* Quick Stats */}
+        <div className="flex bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-x-auto custom-scrollbar text-sm divide-x divide-slate-100 w-full lg:w-auto">
+          <div className="px-5 py-3 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Total Enrolled</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{stats.total}</p>
+            </div>
+          </div>
+          <div className="px-5 py-3 flex items-center gap-3 hidden sm:flex">
+            <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Active Status</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{stats.active}</p>
+            </div>
+          </div>
+          <div className="px-5 py-3 flex items-center gap-3 hidden md:flex">
+            <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+              <UserPlus className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">New This Month</p>
+              <p className="text-lg font-bold text-slate-700 leading-tight">{stats.newThisMonth}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center z-10 relative">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Search by name, adm no, or phone..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all font-medium"
+          />
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button className="btn-secondary hidden sm:flex px-4 py-2.5 text-sm whitespace-nowrap">
+            <ArrowUpDown className="h-4 w-4 mr-2" /> Sort
+          </button>
+          <button onClick={handleOpenAddModal} className="btn-primary flex-1 sm:flex-none py-2.5 px-5 shadow-sm shadow-primary-500/20">
+            <Plus className="h-4 w-4 mr-2" />
+            New Student
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 flex items-center">
+          <span className="font-semibold mr-2">Error:</span> {error}
+        </div>
+      )}
+
+      {/* Data Table */}
+      <div className="glass-card overflow-hidden max-w-full">
+        <div className="overflow-x-auto min-h-[400px] custom-scrollbar">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-50/80 uppercase text-[10px] font-bold tracking-widest text-slate-500 border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4">Student Info</th>
+                <th className="px-6 py-4">Adm No.</th>
+                <th className="px-6 py-4">Class & Section</th>
+                <th className="px-6 py-4">Parent Contact</th>
+                <th className="px-6 py-4 text-center">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100/80">
+              {loading && students.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                    <div className="animate-pulse flex flex-col items-center">
+                      <div className="h-10 w-10 bg-slate-200 rounded-full mb-3"></div>
+                      <p className="text-sm font-medium">Loading records...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-3">
+                      <Search className="h-6 w-6 text-slate-300" />
+                    </div>
+                    <p className="text-slate-500 font-medium">No students found matching your criteria.</p>
+                    <p className="text-slate-400 text-xs mt-1">Try adjusting your filters or search term.</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student) => (
+                  <tr key={student.id} className="hover:bg-primary-50/30 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center cursor-pointer" onClick={() => setSelectedStudent(student)}>
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center font-bold text-xs mr-3 ring-2 ring-white shadow-sm ${getAvatarColor(student.firstName)}`}>
+                          {student.firstName[0]}{student.lastName[0]}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 group-hover:text-primary-600 transition-colors">
+                            {student.firstName} {student.lastName}
+                          </p>
+                          <p className="text-xs text-slate-500">{student.gender}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">
+                      {student.admissionNo || '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold">
+                          {classMap[student.classId] || '—'}
+                        </span>
+                        <span className="text-slate-400 text-xs">-</span>
+                        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold">
+                          {sectionMap[student.sectionId] || '—'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-slate-700 font-medium">{student.fatherName || student.motherName || student.guardianName || '—'}</p>
+                      <p className="text-slate-500 text-xs">{student.fatherMobile || student.motherMobile || student.guardianMobile || '—'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                        student.isActive 
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {student.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => setSelectedStudent(student)}
+                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setDocStudent(student);
+                            setIsDocModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                          title="Manage Documents"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => window.location.href = `/fees/student/${student.id}`}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                          title="Collect Fee"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleOpenEditModal(student)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to deactivate ${student.firstName}?`)) {
+                              removeStudent(student.id!);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Deactivate"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Pagination Strip (Placeholder UI for future) */}
+        {!loading && students.length > 0 && (
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs font-medium text-slate-500">
+            <p>Showing {filteredStudents.length} of {students.length} entries</p>
+            <div className="flex gap-1">
+              <button disabled className="px-3 py-1.5 border border-slate-200 rounded-md bg-white text-slate-300 cursor-not-allowed">Previous</button>
+              <button className="px-3 py-1.5 border border-primary-600 rounded-md bg-primary-600 text-white shadow-sm">1</button>
+              <button disabled className="px-3 py-1.5 border border-slate-200 rounded-md bg-white text-slate-300 cursor-not-allowed">Next</button>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Create/Edit Modal */}
+      <StudentModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveStudent}
+        initialData={editingStudent}
+      />
+
+      {/* Slide-out Detail Panel */}
+      <StudentDetailPanel
+        student={selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        onEdit={(s) => {
+          setSelectedStudent(null);
+          handleOpenEditModal(s);
+        }}
+        className={selectedStudent?.classId ? classMap[selectedStudent.classId] : ''}
+        sectionName={selectedStudent?.sectionId ? sectionMap[selectedStudent.sectionId] : ''}
+      />
+
+      {/* Documents Modal */}
+      <StudentDocumentsModal
+        isOpen={isDocModalOpen}
+        onClose={() => setIsDocModalOpen(false)}
+        student={docStudent}
+      />
+    </div>
+  );
+}
