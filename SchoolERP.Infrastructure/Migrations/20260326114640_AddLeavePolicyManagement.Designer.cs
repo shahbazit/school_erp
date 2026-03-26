@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SchoolERP.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SchoolERP.Infrastructure.Persistence;
 namespace SchoolERP.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260326114640_AddLeavePolicyManagement")]
+    partial class AddLeavePolicyManagement
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -437,7 +440,7 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("LeavePlanId")
+                    b.Property<Guid?>("LeavePolicyId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("MaritalStatus")
@@ -512,7 +515,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeRoleId");
 
-                    b.HasIndex("LeavePlanId");
+                    b.HasIndex("LeavePolicyId");
 
                     b.HasIndex("OrganizationId");
 
@@ -1183,9 +1186,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("AcademicYearId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime?>("ActionDate")
                         .HasColumnType("datetime2");
 
@@ -1200,9 +1200,6 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("DayType")
-                        .HasColumnType("int");
 
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uniqueidentifier");
@@ -1233,8 +1230,6 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AcademicYearId");
-
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("LeaveTypeId");
@@ -1264,9 +1259,6 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("InitialBalance")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("LeaveTypeId")
                         .HasColumnType("uniqueidentifier");
@@ -1299,7 +1291,7 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.ToTable("LeaveBalances");
                 });
 
-            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePlan", b =>
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePolicy", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1335,7 +1327,58 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LeavePlan");
+                    b.ToTable("LeavePolicy");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePolicyRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AccrualRatePerMonth")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("CanCarryForward")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsMonthlyAccrual")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("LeavePolicyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LeaveTypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("MaxCarryForwardDays")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("MaxDaysPerYear")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeavePolicyId");
+
+                    b.HasIndex("LeaveTypeId");
+
+                    b.ToTable("LeavePolicyRule");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveType", b =>
@@ -1365,9 +1408,6 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<bool>("IsMonthlyAccrual")
                         .HasColumnType("bit");
 
-                    b.Property<Guid?>("LeavePlanId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<decimal>("MaxCarryForwardDays")
                         .HasColumnType("decimal(18,2)");
 
@@ -1388,8 +1428,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("LeavePlanId");
 
                     b.HasIndex("OrganizationId");
 
@@ -2899,9 +2937,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasForeignKey("EmployeeRoleId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("SchoolERP.Domain.Entities.LeavePlan", "LeavePlan")
-                        .WithMany("Employees")
-                        .HasForeignKey("LeavePlanId");
+                    b.HasOne("SchoolERP.Domain.Entities.LeavePolicy", "LeavePolicy")
+                        .WithMany()
+                        .HasForeignKey("LeavePolicyId");
 
                     b.Navigation("Department");
 
@@ -2909,7 +2947,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.Navigation("EmployeeRole");
 
-                    b.Navigation("LeavePlan");
+                    b.Navigation("LeavePolicy");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.EmployeeAttendance", b =>
@@ -3061,12 +3099,6 @@ namespace SchoolERP.Infrastructure.Migrations
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveApplication", b =>
                 {
-                    b.HasOne("SchoolERP.Domain.Entities.AcademicYear", "AcademicYear")
-                        .WithMany()
-                        .HasForeignKey("AcademicYearId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("SchoolERP.Domain.Entities.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
@@ -3078,8 +3110,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasForeignKey("LeaveTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("AcademicYear");
 
                     b.Navigation("Employee");
 
@@ -3113,13 +3143,23 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("LeaveType");
                 });
 
-            modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveType", b =>
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePolicyRule", b =>
                 {
-                    b.HasOne("SchoolERP.Domain.Entities.LeavePlan", "LeavePlan")
-                        .WithMany("LeaveTypes")
-                        .HasForeignKey("LeavePlanId");
+                    b.HasOne("SchoolERP.Domain.Entities.LeavePolicy", "LeavePolicy")
+                        .WithMany("Rules")
+                        .HasForeignKey("LeavePolicyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Navigation("LeavePlan");
+                    b.HasOne("SchoolERP.Domain.Entities.LeaveType", "LeaveType")
+                        .WithMany()
+                        .HasForeignKey("LeaveTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LeavePolicy");
+
+                    b.Navigation("LeaveType");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollDetail", b =>
@@ -3442,11 +3482,9 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("ExamResults");
                 });
 
-            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePlan", b =>
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePolicy", b =>
                 {
-                    b.Navigation("Employees");
-
-                    b.Navigation("LeaveTypes");
+                    b.Navigation("Rules");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollRun", b =>

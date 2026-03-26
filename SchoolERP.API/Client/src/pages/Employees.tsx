@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  User, Search, Plus, Edit, 
+  User, Search, Plus, Edit, DollarSign,
   MapPin, Phone, Briefcase, GraduationCap, 
   Award, Shield, 
   X, Save, Loader2, AlertCircle, UserX,
@@ -12,6 +12,7 @@ import {
   employeeApi
 } from '../api/employeeApi';
 import { masterApi } from '../api/masterApi';
+import { leaveApi, type LeavePlanDto } from '../api/leaveApi';
 import apiClient from '../api/apiClient';
 
 // --- Constants ---
@@ -32,6 +33,8 @@ export default function Employees() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
+  const [salaryStructures, setSalaryStructures] = useState<any[]>([]);
+  const [leavePlans, setLeavePlans] = useState<LeavePlanDto[]>([]);
 
   // Filters & pagination
   const [search, setSearch] = useState('');
@@ -59,6 +62,11 @@ export default function Employees() {
   // Teacher Profile state
   const [teacherProfile, setTeacherProfile] = useState<any>(null);
   const [isTeacherLoading, setIsTeacherLoading] = useState(false);
+
+  // Salary state
+  const [employeeSalary, setEmployeeSalary] = useState<any>(null);
+  const [selectedStructureId, setSelectedStructureId] = useState<string>('');
+  const [isSalarySaving, setIsSalarySaving] = useState(false);
 
   // Deactivate
   const [deactivateTarget, setDeactivateTarget] = useState<EmployeeDto | null>(null);
@@ -90,6 +98,8 @@ export default function Employees() {
     masterApi.getAll('departments').then(setDepartments).catch(console.error);
     masterApi.getAll('designations').then(setDesignations).catch(console.error);
     masterApi.getAll('roles').then(setRoles).catch(console.error);
+    leaveApi.getPlans().then(setLeavePlans).catch(console.error);
+    apiClient.get('/payroll/structures').then(res => setSalaryStructures(res.data)).catch(console.error);
   }, []);
 
   function blankForm() {
@@ -98,7 +108,7 @@ export default function Employees() {
       mobileNumber: '', personalEmail: '', workEmail: '', emergencyContactName: '', emergencyContactNumber: '',
       addressLine1: '', addressLine2: '', city: '', state: '', pincode: '',
       dateOfJoining: new Date().toISOString().substring(0,10), employmentType: 1, workLocation: '',
-      departmentId: '', designationId: '', employeeRoleId: '',
+      departmentId: '', designationId: '', employeeRoleId: '', leavePlanId: '',
       createSystemUser: false, systemPassword: '', isActive: true, deactivationReason: ''
     };
   }
@@ -135,10 +145,13 @@ export default function Employees() {
       setFormError(null);
       setErrors({});
       setActiveTab('personal');
+      
+      // Fetch salary if editing
+      fetchEmployeeSalary(id);
+
       setShowModal(true);
     } catch { alert('Failed to load details'); }
   };
-
   const fetchTeacherProfile = async (empId: string) => {
     setIsTeacherLoading(true);
     try {
@@ -148,6 +161,34 @@ export default function Employees() {
       setTeacherProfile({ employeeId: empId, highestQualification: '' });
     } finally {
       setIsTeacherLoading(false);
+    }
+  };
+
+  const fetchEmployeeSalary = async (empId: string) => {
+    try {
+      const res = await apiClient.get(`/payroll/employee/${empId}`);
+      setEmployeeSalary(res.data);
+      setSelectedStructureId(res.data.salaryStructureId);
+    } catch {
+      setEmployeeSalary(null);
+      setSelectedStructureId('');
+    }
+  };
+
+  const handleSaveSalary = async () => {
+    if (!editingId || !selectedStructureId) return;
+    setIsSalarySaving(true);
+    try {
+      await apiClient.post('/payroll/assign', {
+        employeeId: editingId,
+        salaryStructureId: selectedStructureId
+      });
+      await fetchEmployeeSalary(editingId);
+      alert('Salary structure assigned successfully!');
+    } catch {
+      alert('Failed to assign salary structure.');
+    } finally {
+      setIsSalarySaving(false);
     }
   };
 
@@ -205,6 +246,7 @@ export default function Employees() {
     if (payload.departmentId === '') payload.departmentId = null;
     if (payload.designationId === '') payload.designationId = null;
     if (payload.employeeRoleId === '') payload.employeeRoleId = null;
+    if (payload.leavePlanId === '') payload.leavePlanId = null;
     if (payload.userId === '') payload.userId = null;
     if (payload.dateOfBirth === '') payload.dateOfBirth = null;
 
@@ -262,9 +304,12 @@ export default function Employees() {
     if (isTeacher) {
       base.push({ id: 'academic', label: 'Academic', icon: GraduationCap });
     }
+    if (editingId) {
+      base.push({ id: 'salary', label: 'Salary & Payroll', icon: DollarSign });
+    }
     base.push({ id: 'system', label: 'System Access', icon: Shield });
     return base;
-  }, [isTeacher]);
+  }, [isTeacher, editingId]);
 
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -612,6 +657,14 @@ export default function Employees() {
                           {designations.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                       </FormField>
+
+                      <FormField label="Assign Leave Plan (Group)" error={errors.leavePlanId}>
+                        <select value={form.leavePlanId} onChange={e => setField('leavePlanId', e.target.value)} className={inputCls('leavePlanId')}>
+                          <option value="">System Default</option>
+                          {leavePlans.map(p => <option key={p.id} value={p.id}>{p.name} {p.isDefault ? '(Default)' : ''}</option>)}
+                        </select>
+                        <p className="text-[10px] text-slate-400 mt-1 italic leading-tight">Assigning a plan defines allowed leave categories and accrual rules.</p>
+                      </FormField>
                     </div>
                   </Section>
                 </div>
@@ -656,8 +709,61 @@ export default function Employees() {
                   </Section>
                 </div>
               )}
+                            {activeTab === 'salary' && editingId && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <Section title="Current Salary Assignment" icon={<DollarSign className="h-4 w-4" />}>
+                        {employeeSalary ? (
+                          <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl flex items-center justify-between mb-2">
+                             <div>
+                                <h4 className="font-black text-emerald-800 text-lg">{employeeSalary.salaryStructureName}</h4>
+                                <div className="flex items-center gap-4 mt-1">
+                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Gross: ₹{employeeSalary.grossSalary.toLocaleString()}</div>
+                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider bg-emerald-100/50 px-2 py-0.5 rounded-lg">Net: ₹{employeeSalary.netSalary.toLocaleString()}</div>
+                                </div>
+                             </div>
+                             <div className="h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                <DollarSign className="w-6 h-6" />
+                             </div>
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-2xl flex items-center gap-4 text-amber-600">
+                             <AlertCircle className="w-6 h-6" />
+                             <p className="text-sm font-bold">No salary structure assigned. This employee will not be included in payroll runs.</p>
+                          </div>
+                        )}
+                      </Section>
 
-              {activeTab === 'system' && (
+                      <Section title="Update Remuneration" icon={<Save className="h-4 w-4" />}>
+                         <div className="space-y-4">
+                            <FormField label="Assign Salary Structure">
+                               <select 
+                                 value={selectedStructureId} 
+                                 onChange={e => setSelectedStructureId(e.target.value)}
+                                 className={inputCls('salaryStructure')}
+                               >
+                                  <option value="">Select a Structure...</option>
+                                  {salaryStructures.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name} (Net: ₹{s.netTotal.toLocaleString()})</option>
+                                  ))}
+                               </select>
+                            </FormField>
+                            
+                            <div className="pt-2">
+                               <button 
+                                 onClick={handleSaveSalary}
+                                 disabled={isSalarySaving || !selectedStructureId || selectedStructureId === employeeSalary?.salaryStructureId}
+                                 className="w-full py-3 bg-primary-600 text-white rounded-xl text-sm font-black hover:bg-primary-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                               >
+                                  {isSalarySaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                  {employeeSalary ? 'Update Assignment' : 'Assign Structure'}
+                               </button>
+                            </div>
+                         </div>
+                      </Section>
+                    </div>
+                  )}
+
+                  {activeTab === 'system' && (
                 <div className="space-y-6">
                   <Section title="Permissions & Access" icon={<Shield className="h-4 w-4" />}>
                     <div className="space-y-5">

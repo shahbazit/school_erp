@@ -29,8 +29,7 @@ export default function SystemSetup() {
     { name: 'Subjects', count: 0, loading: true, icon: GraduationCap, endpoint: 'masters/subjects' },
     { name: 'Fee Heads', count: 0, loading: true, icon: Building, endpoint: 'masters/fee/heads' },
     { name: 'Fee Discounts', count: 0, loading: true, icon: Percent, endpoint: 'masters/fee/discounts' },
-    { name: 'Fee Policy', count: 0, loading: true, icon: Settings2, endpoint: 'masters/fee/config' },
-    { name: 'Leave Types', count: 0, loading: true, icon: Calendar, endpoint: 'Leave/types' },
+    { name: 'Fee Policy', count: 0, loading: true, icon: Settings2, endpoint: 'masters/fee/config' }
   ]);
 
   const [isSeeding, setIsSeeding] = useState(false);
@@ -113,7 +112,6 @@ export default function SystemSetup() {
     if (category === 'Departments') newItem = "New Dept";
     if (category === 'Designations') newItem = "New Desig";
     if (category === 'EmployeeRoles') newItem = { name: "New Role", description: "" };
-    if (category === 'LeaveTypes') newItem = "New Leave";
     if (category === 'AcademicYears') newItem = { name: `${new Date().getFullYear()}-${(new Date().getFullYear() + 1) % 100}`, startDate: `${new Date().getFullYear()}-04-01`, endDate: `${new Date().getFullYear() + 1}-03-31`, isCurrent: false };
     if (category === 'MenuMasters') newItem = { key: "new", label: "New Menu", icon: "Layout", sortOrder: 10 };
     if (category === 'FeeDiscounts') newItem = { name: "New Discount", category: "Other", calculationType: "Percentage", value: 10, frequency: "Monthly" };

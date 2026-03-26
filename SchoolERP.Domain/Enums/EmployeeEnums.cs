@@ -56,3 +56,11 @@ public enum PayrollStatus
     Approved = 3,
     Paid = 4
 }
+
+public enum LeaveDayType
+{
+    FullDay = 1,
+    FirstHalf = 2,
+    SecondHalf = 3,
+    Quarter = 4
+}

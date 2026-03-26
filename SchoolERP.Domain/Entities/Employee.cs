@@ -42,6 +42,7 @@ public class Employee : BaseEntity
     public Guid? DepartmentId { get; set; }
     public Guid? DesignationId { get; set; }
     public Guid? EmployeeRoleId { get; set; }   // FK → EmployeeRole master
+    public Guid? LeavePlanId { get; set; }     // FK → LeavePlan
     public DateTime DateOfJoining { get; set; }
     public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
     public string? WorkLocation { get; set; }
@@ -58,6 +59,7 @@ public class Employee : BaseEntity
     // Navigation
     public virtual Department? Department { get; set; }
     public virtual Designation? Designation { get; set; }
+    public virtual LeavePlan? LeavePlan { get; set; }
     public virtual EmployeeRole? EmployeeRole { get; set; }
     public virtual ICollection<EmployeeDocument> Documents { get; set; } = new List<EmployeeDocument>();
 

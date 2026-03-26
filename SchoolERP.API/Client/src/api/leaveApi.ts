@@ -7,12 +7,35 @@ export enum LeaveStatus {
   Cancelled = 4,
 }
 
+export enum LeaveDayType {
+  FullDay = 1,
+  FirstHalf = 2,
+  SecondHalf = 3,
+  Quarter = 4,
+}
+
+export interface LeavePlanDto {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isDefault: boolean;
+  employeeCount: number;
+  leaveTypes?: LeaveTypeDto[];
+}
+
 export interface LeaveTypeDto {
   id: string;
   name: string;
   description?: string;
   maxDaysPerYear: number;
   isActive: boolean;
+  leavePlanId?: string;
+  // Policy Settings
+  isMonthlyAccrual: boolean;
+  accrualRatePerMonth: number;
+  canCarryForward: boolean;
+  maxCarryForwardDays: number;
 }
 
 export interface LeaveApplicationDto {
@@ -25,6 +48,7 @@ export interface LeaveApplicationDto {
   endDate: string;
   totalDays: number;
   reason?: string;
+  dayType: LeaveDayType;
   status: LeaveStatus;
   statusName: string;
   approvedById?: string;
@@ -38,6 +62,7 @@ export interface ApplyLeaveDto {
   leaveTypeId: string;
   startDate: string;
   endDate: string;
+  dayType: LeaveDayType;
   reason?: string;
 }
 
@@ -57,8 +82,36 @@ export interface LeaveBalanceDto {
 }
 
 export const leaveApi = {
-  getTypes: async (): Promise<LeaveTypeDto[]> => {
-    const res = await apiClient.get<LeaveTypeDto[]>('/leave/types');
+  getPlans: async (): Promise<LeavePlanDto[]> => {
+    const res = await apiClient.get<LeavePlanDto[]>('/leave/plans');
+    return res.data;
+  },
+
+  createPlan: async (data: { name: string; description?: string }): Promise<LeavePlanDto> => {
+    const res = await apiClient.post<LeavePlanDto>('/leave/plans', data);
+    return res.data;
+  },
+
+  deletePlan: async (id: string): Promise<void> => {
+    await apiClient.delete(`/leave/plans/${id}`);
+  },
+
+  setDefaultPlan: async (id: string): Promise<void> => {
+    await apiClient.post(`/leave/plans/${id}/set-default`);
+  },
+
+  getTypes: async (planId?: string): Promise<LeaveTypeDto[]> => {
+    const res = await apiClient.get<LeaveTypeDto[]>(planId ? `/leave/types` : `/leave/types/my`, { params: { planId } });
+    return res.data;
+  },
+
+  createType: async (data: Omit<LeaveTypeDto, 'id' | 'isActive'>): Promise<LeaveTypeDto> => {
+    const res = await apiClient.post<LeaveTypeDto>('/leave/types', data);
+    return res.data;
+  },
+
+  updateType: async (id: string, data: Omit<LeaveTypeDto, 'id' | 'isActive'>): Promise<LeaveTypeDto> => {
+    const res = await apiClient.put<LeaveTypeDto>(`/leave/types/${id}`, data);
     return res.data;
   },
 
@@ -77,8 +130,19 @@ export const leaveApi = {
     return res.data;
   },
 
-  getBalances: async (employeeId: string): Promise<LeaveBalanceDto[]> => {
-    const res = await apiClient.get<LeaveBalanceDto[]>(`/leave/balances/${employeeId}`);
+  getBalances: async (employeeId?: string): Promise<LeaveBalanceDto[]> => {
+    const url = employeeId ? `/leave/balances/${employeeId}` : '/leave/balances';
+    const res = await apiClient.get<LeaveBalanceDto[]>(url);
+    return res.data;
+  },
+
+  updateBalance: async (data: { employeeId: string, leaveTypeId: string, totalDays: number }): Promise<{ message: string }> => {
+    const res = await apiClient.post<{ message: string }>('/leave/balances/update', data);
+    return res.data;
+  },
+
+  bulkInitializeBalances: async (data: { leaveTypeId: string, totalDays: number }): Promise<{ message: string }> => {
+    const res = await apiClient.post<{ message: string }>('/leave/balances/bulk-initialize', data);
     return res.data;
   }
 };

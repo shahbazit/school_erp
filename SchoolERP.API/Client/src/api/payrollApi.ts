@@ -114,6 +114,11 @@ export const payrollApi = {
     return res.data;
   },
 
+  getRun: async (id: string): Promise<PayrollRunDto> => {
+    const res = await apiClient.get<PayrollRunDto>(`/payroll/runs/${id}`);
+    return res.data;
+  },
+
   processPayroll: async (data: ProcessPayrollDto): Promise<{ message: string; runId: string }> => {
     const res = await apiClient.post<{ message: string; runId: string }>('/payroll/process', data);
     return res.data;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  DollarSign, Calculator, History, Plus, Loader2,
-  CheckCircle2, Clock, FileText, Settings, 
+  DollarSign, Calculator, History, Plus, Loader2, Search,
+  CheckCircle2, Clock, Settings, X,
   Trash2, ArrowRight, UserCheck, TrendingUp, TrendingDown
 } from 'lucide-react';
 import {
@@ -49,6 +49,7 @@ export default function Payroll() {
 function PayrollRuns() {
   const [runs, setRuns] = useState<PayrollRunDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const loadRuns = useCallback(async () => {
     setIsLoading(true);
@@ -110,14 +111,14 @@ function PayrollRuns() {
               </div>
 
               <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
+                <button onClick={() => setSelectedRunId(run.id)} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-100">
+                  View Slips
+                </button>
                 {run.status === PayrollStatus.Draft && (
                   <button onClick={() => handleApprove(run.id)} className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition shadow-lg shadow-primary-100">
-                    Approve & Lock
+                    Approve
                   </button>
                 )}
-                <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-100 hover:text-slate-600 transition">
-                  <FileText className="w-5 h-5" />
-                </button>
               </div>
             </div>
             
@@ -125,6 +126,108 @@ function PayrollRuns() {
           </div>
         ))
       )}
+
+      {selectedRunId && (
+        <RunDetailsModal runId={selectedRunId} onClose={() => setSelectedRunId(null)} />
+      )}
+    </div>
+  );
+}
+
+// ── Shared Modal Component ────────────────────────────────────────────────
+function RunDetailsModal({ runId, onClose }: { runId: string, onClose: () => void }) {
+  const [run, setRun] = useState<PayrollRunDto | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    payrollApi.getRun(runId).then(setRun).finally(() => setIsLoading(false));
+  }, [runId]);
+
+  const filteredDetails = run?.details?.filter(d => 
+    d.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    d.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white shadow-2xl w-full lg:w-[60%] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+           <div>
+             <h3 className="text-xl font-black text-slate-800">Payroll Run Details</h3>
+             {run && <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">{new Date(0, run.month - 1).toLocaleString('default', { month: 'long' })} {run.year}</p>}
+           </div>
+           <button onClick={onClose} className="p-2 border border-slate-200 hover:bg-slate-200 rounded-xl text-slate-400 transition">
+             <X className="w-5 h-5" />
+           </button>
+        </div>
+
+        <div className="flex-grow overflow-hidden flex flex-col p-6">
+          {isLoading ? (
+            <div className="flex-grow flex items-center justify-center text-slate-400">Loading details...</div>
+          ) : !run ? (
+             <div className="flex-grow flex items-center justify-center text-rose-400">Failed to load run data.</div>
+          ) : (
+            <>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                 <div className="flex items-center gap-6">
+                    <div className="text-center">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Employees</p>
+                       <p className="text-xl font-black text-slate-800">{run.employeeCount}</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div className="text-center">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Payout</p>
+                       <p className="text-xl font-black text-primary-600">₹{run.totalAmount.toLocaleString()}</p>
+                    </div>
+                 </div>
+                 <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input 
+                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-100 w-full md:w-64"
+                      placeholder="Search employees..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                    />
+                 </div>
+              </div>
+
+              <div className="flex-grow overflow-y-auto border border-slate-100 rounded-2xl">
+                 <table className="w-full text-left">
+                    <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                       <tr>
+                          <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
+                          <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross</th>
+                          <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Deductions</th>
+                          <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Net Payout</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                       {filteredDetails.map(d => (
+                         <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-5 py-3">
+                               <p className="text-sm font-bold text-slate-800">{d.employeeName}</p>
+                               <p className="text-[10px] text-slate-400 font-bold">{d.employeeCode}</p>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                               <p className="text-sm font-mono font-bold text-slate-600">₹{d.grossSalary.toLocaleString()}</p>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                               <p className="text-sm font-mono font-bold text-rose-500">₹{d.totalDeductions.toLocaleString()}</p>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                               <p className="text-sm font-mono font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg inline-block">₹{d.netSalary.toLocaleString()}</p>
+                            </td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

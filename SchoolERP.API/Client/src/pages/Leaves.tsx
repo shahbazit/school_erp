@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, Clock, FileText, Plus,
-  Loader2, Search, Trash2
+  Loader2, Trash2, Edit2, Save, Calendar
 } from 'lucide-react';
 import {
   leaveApi,
   LeaveStatus,
+  LeaveDayType,
   type LeaveTypeDto,
   type LeaveApplicationDto,
   type LeaveBalanceDto,
 } from '../api/leaveApi';
+import apiClient from '../api/apiClient';
 
 const statusConfig = {
   [LeaveStatus.Pending]: { label: 'Pending', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: <Clock className="w-4 h-4" /> },
@@ -23,6 +25,14 @@ export default function Leaves() {
 
   // Common State
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeDto[]>([]);
+  const [activeSession, setActiveSession] = useState<any>(null);
+
+  useEffect(() => {
+    apiClient.get('/academicyears').then(res => {
+      const active = res.data.find((y: any) => y.isActive);
+      setActiveSession(active);
+    }).catch(console.error);
+  }, []);
 
   useEffect(() => {
     const loadLeaveTypes = async () => {
@@ -36,12 +46,25 @@ export default function Leaves() {
     loadLeaveTypes();
   }, []);
 
+  const token = localStorage.getItem('token');
+  const decodedToken = token ? JSON.parse(atob(token.split('.')[1])) : null;
+  const role = (decodedToken?.Role || decodedToken?.role || decodedToken?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || 'Guest').toLowerCase();
+  const canManage = role === 'admin' || role === 'hr';
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Leave Management</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Apply for leaves or manage approvals</p>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-primary-600" />
+            Leave Management
+          </h1>
+          {activeSession && (
+            <p className="text-sm font-bold text-primary-600 mt-1 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary-600 animate-pulse" />
+              Active Session: {activeSession.name}
+            </p>
+          )}
         </div>
         
         <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
@@ -53,7 +76,7 @@ export default function Leaves() {
 
       {activeTab === 'my-leaves' && <MyLeaves leaveTypes={leaveTypes} />}
       {activeTab === 'approvals' && <Approvals />}
-      {activeTab === 'balances' && <Balances />}
+      {activeTab === 'balances' && <Balances leaveTypes={leaveTypes} canManage={canManage} />}
     </div>
   );
 }
@@ -65,10 +88,11 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
   const [isApplying, setIsApplying] = useState(false);
   const [showApplyModal, setShowApplyModal] = useState(false);
 
-  const [applyData, setApplyData] = useState({
+  const [applyData, setApplyData] = useState<any>({
     leaveTypeId: '',
     startDate: '',
     endDate: '',
+    dayType: LeaveDayType.FullDay,
     reason: ''
   });
 
@@ -91,7 +115,7 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
     try {
       await leaveApi.applyLeave(applyData);
       setShowApplyModal(false);
-      setApplyData({ leaveTypeId: '', startDate: '', endDate: '', reason: '' });
+      setApplyData({ leaveTypeId: '', startDate: '', endDate: '', dayType: LeaveDayType.FullDay, reason: '' });
       loadMyApplications();
     } finally {
       setIsApplying(false);
@@ -124,6 +148,7 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
                 <tr>
                   <th className="px-5 py-3 border-b border-slate-100">Leave Type</th>
                   <th className="px-5 py-3 border-b border-slate-100">Duration</th>
+                  <th className="px-5 py-3 border-b border-slate-100">Type</th>
                   <th className="px-5 py-3 border-b border-slate-100">Reason</th>
                   <th className="px-5 py-3 border-b border-slate-100">Status</th>
                   <th className="px-5 py-3 border-b border-slate-100">Applied On</th>
@@ -136,6 +161,11 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
                     <td className="px-5 py-3 text-slate-500">
                       {new Date(app.startDate).toLocaleDateString()} to {new Date(app.endDate).toLocaleDateString()}
                       <span className="block text-[10px] font-bold text-slate-400 mt-0.5">{app.totalDays} day(s)</span>
+                    </td>
+                    <td className="px-5 py-3">
+                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${app.dayType === 1 ? 'bg-slate-100 text-slate-600' : 'bg-primary-50 text-primary-600'}`}>
+                          {app.dayType === 1 ? 'Full Day' : app.dayType === 4 ? 'Quarter' : 'Half Day'}
+                       </span>
                     </td>
                     <td className="px-5 py-3 text-slate-500 italic max-w-xs truncate">{app.reason}</td>
                     <td className="px-5 py-3">
@@ -166,7 +196,7 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
                   <select 
                     required 
                     value={applyData.leaveTypeId}
-                    onChange={e => setApplyData(prev => ({ ...prev, leaveTypeId: e.target.value }))}
+                    onChange={e => setApplyData((prev: any) => ({ ...prev, leaveTypeId: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                   >
                     <option value="">Select Type</option>
@@ -180,7 +210,7 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
                       type="date" 
                       required 
                       value={applyData.startDate}
-                      onChange={e => setApplyData(prev => ({ ...prev, startDate: e.target.value }))}
+                      onChange={e => setApplyData((prev: any) => ({ ...prev, startDate: e.target.value }))}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" 
                     />
                   </div>
@@ -190,17 +220,42 @@ function MyLeaves({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
                       type="date" 
                       required 
                       value={applyData.endDate}
-                      onChange={e => setApplyData(prev => ({ ...prev, endDate: e.target.value }))}
+                      onChange={e => setApplyData((prev: any) => ({ ...prev, endDate: e.target.value }))}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" 
                     />
                   </div>
+                </div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Leave Duration</label>
+                   <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: 'Full Day', value: LeaveDayType.FullDay },
+                        { label: 'First Half', value: LeaveDayType.FirstHalf },
+                        { label: 'Second Half', value: LeaveDayType.SecondHalf },
+                        { label: 'Quarter', value: LeaveDayType.Quarter },
+                      ].map(opt => (
+                        <button 
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setApplyData((p: any) => ({ ...p, dayType: opt.value }))}
+                          className={`px-4 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                            applyData.dayType === opt.value 
+                              ? 'bg-primary-600 text-white border-primary-600 shadow-sm' 
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-primary-300 hover:text-primary-600'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                   </div>
+                   <p className="text-[10px] text-slate-400 mt-1.5 italic">Note: Choosing a partial day will automatically adjust the daily quota (e.g., 0.5 for Half Day).</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Reason</label>
                   <textarea 
                     rows={3} 
                     value={applyData.reason}
-                    onChange={e => setApplyData(prev => ({ ...prev, reason: e.target.value }))}
+                    onChange={e => setApplyData((prev: any) => ({ ...prev, reason: e.target.value }))}
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 placeholder:text-slate-300" 
                     placeholder="Enter reason for leave..."
                   />
@@ -286,61 +341,212 @@ function Approvals() {
 }
 
 // ── Tab 3: Balances ───────────────────────────────────────────────────────
-function Balances() {
-  const [employeeId, setEmployeeId] = useState('');
+function Balances({ leaveTypes, canManage }: { leaveTypes: LeaveTypeDto[]; canManage: boolean }) {
   const [balances, setBalances] = useState<LeaveBalanceDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingBalance, setEditingBalance] = useState<LeaveBalanceDto | null>(null);
+  const [newTotal, setNewTotal] = useState<number>(0);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ leaveTypeId: '', totalDays: 0 });
 
   const fetchBalance = async () => {
-    if (!employeeId.trim()) return;
     setIsLoading(true);
     try {
-      const data = await leaveApi.getBalances(employeeId);
+      const data = await leaveApi.getBalances();
       setBalances(data);
+    } catch {
+      alert("Failed to load balances.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-4xl">
-       <h3 className="text-lg font-bold text-slate-800 mb-4">Check Leave Balances</h3>
-       <div className="flex gap-4 mb-8">
-          <input 
-            type="text" 
-            placeholder="Enter Employee ID (GUID)"
-            value={employeeId}
-            onChange={e => setEmployeeId(e.target.value)}
-            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-          />
-          <button onClick={fetchBalance} disabled={isLoading} className="px-6 py-2 bg-slate-800 text-white rounded-xl text-sm font-semibold hover:bg-slate-700 transition flex items-center gap-2">
-             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} View Balance
-          </button>
-       </div>
+  useEffect(() => { fetchBalance(); }, []);
 
-       {balances.length > 0 && (
-         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-           {balances.map(b => (
-             <div key={b.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50 relative overflow-hidden group hover:shadow-md transition">
-                <div className="absolute right-[-10px] top-[-10px] w-20 h-20 bg-primary-100/30 rounded-full blur-2xl group-hover:bg-primary-200 transition"></div>
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">{b.leaveTypeName}</h4>
-                <div className="flex items-end justify-between mt-4">
-                   <div>
-                     <p className="text-2xl font-black text-slate-800">{b.remainingDays}</p>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase">Days Remaining</p>
-                   </div>
-                   <div className="text-right">
-                     <p className="text-sm font-bold text-slate-500">{b.totalDays}</p>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase">Total Quota</p>
-                   </div>
-                </div>
-                <div className="h-1.5 w-full bg-slate-200 rounded-full mt-4 overflow-hidden">
-                   <div className="h-full bg-primary-600 rounded-full" style={{ width: `${(b.consumedDays/b.totalDays)*100}%` }}></div>
-                </div>
-             </div>
-           ))}
-         </div>
-       )}
+  const handleUpdate = async () => {
+    if (!editingBalance) return;
+    setIsUpdating(true);
+    try {
+      await leaveApi.updateBalance({
+        employeeId: editingBalance.employeeId,
+        leaveTypeId: editingBalance.leaveTypeId,
+        totalDays: newTotal
+      });
+      setEditingBalance(null);
+      fetchBalance();
+    } catch {
+      alert("Failed to update balance.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleBulkAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdating(true);
+    try {
+      await leaveApi.bulkInitializeBalances(addForm);
+      setShowBulkAdd(false);
+      setAddForm({ leaveTypeId: '', totalDays: 0 });
+      fetchBalance();
+      alert("Leave quotas initialized for all employees successfully!");
+    } catch {
+      alert("Failed to initialize bulk quotas.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      {canManage && (
+        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm mb-4">
+           <div>
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight">Administrator Controls</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">Initialize yearly quotas for all active employees.</p>
+           </div>
+           <button 
+             onClick={() => setShowBulkAdd(true)}
+             className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black transition flex items-center gap-2 shadow-lg shadow-primary-200"
+           >
+              <Plus className="w-3.5 h-3.5" />
+              Bulk Initialize Quotas
+           </button>
+        </div>
+      )}
+
+      {balances.length > 0 ? (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+           <div className="flex items-center justify-between mb-4 px-1">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">My Active Quotas</h4>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+             {balances.map(b => (
+               <div key={b.id} className="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm relative overflow-hidden group hover:border-primary-200 transition-all">
+                  <div className="flex items-start justify-between">
+                     <div>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{b.leaveTypeName}</h4>
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 border border-slate-100 w-fit">
+                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Remaining</span>
+                           <span className="text-xs font-black text-slate-800">{b.remainingDays}</span>
+                        </div>
+                     </div>
+                      {canManage && (
+                        <button 
+                          onClick={() => { setEditingBalance(b); setNewTotal(Number(b.totalDays)); }}
+                          className="p-2 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
+                        >
+                           <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
+                  </div>
+
+                  <div className="flex items-end justify-between mt-6">
+                     <div>
+                        <p className="text-2xl font-black text-slate-800 leading-none">{(b.totalDays - b.consumedDays).toFixed(0)}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Available Days</p>
+                     </div>
+                     <div className="text-right">
+                        <p className="text-xs font-bold text-slate-500 leading-none">{b.totalDays}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tighter">Total Allocation</p>
+                     </div>
+                  </div>
+
+                  <div className="h-2 w-full bg-slate-100 rounded-full mt-5 overflow-hidden border border-slate-50">
+                     <div className={`h-full rounded-full transition-all duration-1000 ${b.consumedDays/b.totalDays > 0.8 ? 'bg-rose-500' : 'bg-primary-600'}`} style={{ width: `${Math.min(100, (b.consumedDays/b.totalDays)*100)}%` }}></div>
+                  </div>
+               </div>
+             ))}
+           </div>
+        </div>
+      ) : (
+        <div className="p-10 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400">
+           {isLoading ? 'Fetching balances...' : 'No active leave balances found for current session.'}
+        </div>
+      )}
+
+      {editingBalance && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setEditingBalance(null)} />
+           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                 <h3 className="text-lg font-black text-slate-800">Update Quota</h3>
+                 <p className="text-xs text-slate-400 font-bold uppercase">Adjusting: {editingBalance.leaveTypeName}</p>
+              </div>
+              <div className="p-8 space-y-6">
+                 <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Adjust Total Yearly Days</label>
+                    <div className="flex items-center gap-4">
+                       <input 
+                         type="number"
+                         value={newTotal}
+                         onChange={e => setNewTotal(Number(e.target.value))}
+                         className="flex-1 px-5 py-3 rounded-2xl border-0 bg-slate-50 font-black text-xl text-slate-800 focus:ring-2 focus:ring-primary-400 shadow-inner"
+                       />
+                       <span className="text-sm font-bold text-slate-400">Days</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic mt-3 px-1 leading-relaxed border-l-2 border-slate-100 pl-3">Increasing this value will immediately increase the employee's available leave balance for the current academic session.</p>
+                 </div>
+                 
+                 <div className="flex gap-3">
+                    <button onClick={() => setEditingBalance(null)} className="flex-1 py-3 px-4 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition">Discard</button>
+                    <button onClick={handleUpdate} disabled={isUpdating} className="flex-[2] py-3 px-4 bg-primary-600 text-white rounded-2xl text-sm font-black hover:bg-primary-700 transition shadow-xl shadow-primary-200 flex items-center justify-center gap-2">
+                       {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                       Save Changes
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showBulkAdd && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowBulkAdd(false)} />
+           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50 text-center">
+                 <h3 className="text-lg font-black text-slate-800">Bulk Initialize Leave Quotas</h3>
+                 <p className="text-xs text-slate-400 font-bold uppercase mt-1">Applying to ALL active employees</p>
+              </div>
+              <form onSubmit={handleBulkAdd} className="p-8 space-y-5">
+                 <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl text-[10px] text-amber-600 font-bold leading-relaxed mb-2">
+                    Note: This will only initialize balances for employees who don't already have one for the selected category in the current year.
+                 </div>
+                 <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Leave Category</label>
+                    <select 
+                      required
+                      value={addForm.leaveTypeId}
+                      onChange={e => setAddForm((p: any) => ({ ...p, leaveTypeId: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-2xl border-0 bg-slate-50 font-bold text-sm text-slate-800 focus:ring-2 focus:ring-primary-400 shadow-inner"
+                    >
+                       <option value="">Select Category...</option>
+                       {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                 </div>
+                 <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Standard Yearly Allowance</label>
+                    <input 
+                      type="number"
+                      required
+                      value={addForm.totalDays}
+                      onChange={e => setAddForm((p: any) => ({ ...p, totalDays: Number(e.target.value) }))}
+                      className="w-full px-4 py-3 rounded-2xl border-0 bg-slate-50 font-black text-xl text-slate-800 focus:ring-2 focus:ring-primary-400 shadow-inner"
+                    />
+                 </div>
+                 <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => setShowBulkAdd(false)} className="flex-1 py-3 px-4 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition">Cancel</button>
+                    <button type="submit" disabled={isUpdating} className="flex-[2] py-3 px-4 bg-emerald-600 text-white rounded-2xl text-sm font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-200 flex items-center justify-center gap-2">
+                       {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                       Process All Employees
+                    </button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

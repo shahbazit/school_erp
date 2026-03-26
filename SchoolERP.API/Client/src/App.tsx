@@ -24,6 +24,7 @@ import CommunicationHub from './pages/CommunicationHub';
 import Financials from './pages/Financials';
 import Examinations from './pages/Examinations';
 import Leaves from './pages/Leaves';
+import LeaveSettings from './pages/LeaveSettings';
 import Payroll from './pages/Payroll';
 import StudentAccount from './pages/fees/StudentAccount';
 import FeeGeneration from './pages/fees/FeeGeneration';
@@ -199,7 +200,6 @@ function App() {
                     <Link to="/fees/structures" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Structure</Link>
                     <Link to="/fees/generate" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Allocation</Link>
                     <Link to="/fees/settings" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Policies & Discounts</Link>
-                    <Link to="/payroll" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Payroll</Link>
                   </div>
                 )}
               </div>
@@ -223,6 +223,8 @@ function App() {
                     <Link to="/teachers" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Academic Staff</Link>
                     <Link to="/attendance" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Attendance</Link>
                     <Link to="/leaves" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Leave Management</Link>
+                    <Link to="/leave/settings" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Leave Policies</Link>
+                    <Link to="/payroll" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Payroll</Link>
                   </div>
                 )}
               </div>
@@ -419,6 +421,7 @@ function App() {
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/examinations" element={<Examinations />} />
               <Route path="/leaves" element={<Leaves />} />
+              <Route path="/leave/settings" element={<LeaveSettings />} />
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/lookups" element={<LookupManagement />} />
               <Route path="/settings/users" element={<UserManagement />} />

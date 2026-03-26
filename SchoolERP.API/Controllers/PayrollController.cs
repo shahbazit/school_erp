@@ -137,6 +137,42 @@ public class PayrollController : ControllerBase
 
     // ── Payroll Processing ─────────────────────────────────────────────────
 
+    [HttpGet("runs/{id}")]
+    public async Task<IActionResult> GetPayrollRun(Guid id)
+    {
+        var run = await _unitOfWork.Repository<PayrollRun>().GetQueryable()
+            .Include(r => r.PayrollDetails)
+                .ThenInclude(d => d.Employee)
+            .Include(r => r.ProcessedBy)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (run == null) return NotFound();
+
+        return Ok(new PayrollRunDto
+        {
+            Id = run.Id,
+            Year = run.Year,
+            Month = run.Month,
+            ProcessedDate = run.ProcessedDate,
+            ProcessedByName = run.ProcessedBy != null ? $"{run.ProcessedBy.FirstName} {run.ProcessedBy.LastName}" : string.Empty,
+            Status = run.Status,
+            TotalAmount = run.TotalAmount,
+            EmployeeCount = run.PayrollDetails.Count,
+            Remarks = run.Remarks,
+            Details = run.PayrollDetails.Select(d => new PayrollDetailDto
+            {
+                Id = d.Id,
+                EmployeeId = d.EmployeeId,
+                EmployeeCode = d.Employee?.EmployeeCode ?? string.Empty,
+                EmployeeName = $"{d.Employee?.FirstName} {d.Employee?.LastName}",
+                GrossSalary = d.GrossSalary,
+                TotalDeductions = d.TotalDeductions,
+                NetSalary = d.NetSalary,
+                ComponentBreakdownDetails = d.ComponentBreakdownDetails
+            }).ToList()
+        });
+    }
+
     [HttpGet("runs")]
     public async Task<IActionResult> GetPayrollRuns()
     {

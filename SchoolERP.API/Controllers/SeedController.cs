@@ -41,7 +41,6 @@ public class SeedController : ControllerBase
                 new { Name = "Computer Fee", IsSelective = false }, new { Name = "Library Fee", IsSelective = false }, new { Name = "Sports Fee", IsSelective = false },
                 new { Name = "Transport Fee", IsSelective = true }, new { Name = "Hostel Fee", IsSelective = true }, new { Name = "Fine", IsSelective = false }
             },
-            LeaveTypes = new[] { "Casual Leave", "Sick Leave", "Earned Leave", "Maternity Leave", "Paternity Leave", "Duty Leave" },
             AcademicYears = new[] { 
                 new { 
                     Name = $"{DateTime.Now.Year - 1}-{DateTime.Now.Year % 100:D2}", 
@@ -101,11 +100,11 @@ public class SeedController : ControllerBase
         // 8. Seed Fee Heads
         await SeedFeeHeads(orgId, results);
 
-        // 9. Seed Leave Types
-        await SeedLeaveTypes(orgId, results);
-
-        // 10. Seed Employee Roles
+        // 9. Seed Employee Roles
         await SeedEmployeeRoles(orgId, results);
+
+        // 10. Seed Default Leave Plan
+        await SeedLeavePlans(orgId, results);
 
         await SeedDiscounts(orgId, results);
         await SeedFeeConfig(orgId, results);
@@ -131,7 +130,6 @@ public class SeedController : ControllerBase
         if (request.Designations != null) await SeedDesignationsCustom(orgId, request.Designations, results);
         if (request.Subjects != null) await SeedSubjectsCustom(orgId, request.Subjects, results);
         if (request.FeeHeads != null) await SeedFeeHeadsCustom(orgId, request.FeeHeads, results);
-        if (request.LeaveTypes != null) await SeedLeaveTypesCustom(orgId, request.LeaveTypes, results);
         if (request.AcademicYears != null) await SeedAcademicYearsCustom(orgId, request.AcademicYears, results);
         if (request.MenuMasters != null) await SeedMenuMastersCustom(request.MenuMasters, results);
         if (request.FeeDiscounts != null) await SeedFeeDiscountsCustom(orgId, request.FeeDiscounts, results);
@@ -151,7 +149,6 @@ public class SeedController : ControllerBase
         public List<string>? Designations { get; set; }
         public List<SubjectSeedDto>? Subjects { get; set; }
         public List<FeeHeadSeedDto>? FeeHeads { get; set; }
-        public List<string>? LeaveTypes { get; set; }
         public List<AcademicYearSeedDto>? AcademicYears { get; set; }
         public List<MenuMasterSeedDto>? MenuMasters { get; set; }
         public List<FeeDiscountSeedDto>? FeeDiscounts { get; set; }
@@ -850,5 +847,44 @@ public class SeedController : ControllerBase
             await _unitOfWork.CompleteAsync(); // COMMIT THE EMPLOYEE
             results.Add($"Initial staff record for '{employee.FirstName} {employee.LastName}' seeded and linked to user.");
         }
+    }
+
+    private async Task SeedLeavePlans(Guid orgId, List<string> results)
+    {
+        var planRepo = _unitOfWork.Repository<LeavePlan>();
+        var typeRepo = _unitOfWork.Repository<LeaveType>();
+
+        var exists = await planRepo.GetQueryable().AnyAsync(x => x.OrganizationId == orgId);
+        if (exists)
+        {
+            results.Add("Leave plans already exist. Skipping.");
+            return;
+        }
+
+        var defaultPlan = new LeavePlan
+        {
+            OrganizationId = orgId,
+            Name = "General Staff Plan",
+            Description = "Standard leave policies for all employees",
+            IsActive = true,
+            IsDefault = true
+        };
+
+        await planRepo.AddAsync(defaultPlan);
+        await _unitOfWork.CompleteAsync(); // Save to get Plan Id
+
+        var defaultTypes = new List<LeaveType>
+        {
+            new() { OrganizationId = orgId, LeavePlanId = defaultPlan.Id, Name = "Casual Leave", MaxDaysPerYear = 12, IsMonthlyAccrual = true, AccrualRatePerMonth = 1, IsActive = true },
+            new() { OrganizationId = orgId, LeavePlanId = defaultPlan.Id, Name = "Sick Leave", MaxDaysPerYear = 10, IsMonthlyAccrual = false, IsActive = true },
+            new() { OrganizationId = orgId, LeavePlanId = defaultPlan.Id, Name = "Earned Leave", MaxDaysPerYear = 15, IsMonthlyAccrual = false, CanCarryForward = true, MaxCarryForwardDays = 30, IsActive = true }
+        };
+
+        foreach (var t in defaultTypes)
+        {
+            await typeRepo.AddAsync(t);
+        }
+
+        results.Add("Default Leave Plan and child categories initialized.");
     }
 }
