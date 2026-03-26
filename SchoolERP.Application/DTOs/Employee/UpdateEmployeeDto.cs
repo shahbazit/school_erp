@@ -49,6 +49,10 @@ public class UpdateEmployeeDto
     public bool IsActive { get; set; } = true;
     public string? DeactivationReason { get; set; }
 
+    // System Account
+    public bool CreateSystemUser { get; set; }
+    public string? SystemPassword { get; set; }
+
     // Optional login
     public Guid? UserId { get; set; }
 }

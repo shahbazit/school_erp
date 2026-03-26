@@ -310,6 +310,23 @@ export default function Teachers() {
                 <h3 className="font-bold text-slate-800 truncate">{selected.fullName}</h3>
                 <p className="text-xs text-slate-400 font-mono">{selected.employeeCode}</p>
               </div>
+              <button 
+                onClick={async () => {
+                  if (confirm(`Remove ${selected.fullName} from Teacher Directory? This will not delete their employee record.`)) {
+                    try {
+                      await teacherApi.delete(selected.employeeId);
+                      setSelected(null);
+                      fetchTeachers();
+                    } catch {
+                      setError("Failed to remove teacher profile.");
+                    }
+                  }
+                }}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition"
+                title="Remove from Teachers Directory"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
               <button onClick={() => setSelected(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
                 <X className="h-4 w-4" />
               </button>

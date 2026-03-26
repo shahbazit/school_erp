@@ -5,7 +5,7 @@ namespace SchoolERP.Application.DTOs.Masters;
 // AcademicClass
 public class CreateClassDto : CreateMasterDto { public int Order { get; set; } }
 public class UpdateClassDto : UpdateMasterDto { public int Order { get; set; } }
-public class ClassDto : MasterDto { public int Order { get; set; } }
+public class ClassDto : MasterDto { public int Order { get; set; } public int StudentCount { get; set; } }
 
 // Subject
 public class CreateSubjectDto : CreateMasterDto { public string Code { get; set; } = string.Empty; }

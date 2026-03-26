@@ -9,6 +9,7 @@ using SchoolERP.Infrastructure.Persistence;
 using SchoolERP.Infrastructure.Services;
 using SchoolERP.Infrastructure.Settings;
 using SchoolERP.Domain.Entities;
+using SchoolERP.Domain.Enums;
 using Serilog;
 using System.Text;
 
@@ -121,7 +122,27 @@ using (var scope = app.Services.CreateScope())
     {
         if (!context.Organizations.Any()) 
         {
-            Log.Information("Seeding initial organization and admin user...");
+            Log.Information("Seeding initial organization and admin user with full rights...");
+            
+            // 1. Ensure Menu Masters exist Globally
+            if (!context.MenuMasters.Any())
+            {
+                var menus = new[] 
+                {
+                    new MenuMaster { Key = "dashboard", Label = "Dashboard", Icon = "LayoutDashboard", SortOrder = 1 },
+                    new MenuMaster { Key = "students", Label = "Students", Icon = "Users", SortOrder = 2 },
+                    new MenuMaster { Key = "academics", Label = "Academics", Icon = "GraduationCap", SortOrder = 3 },
+                    new MenuMaster { Key = "fee", Label = "Fee Management", Icon = "CreditCard", SortOrder = 4 },
+                    new MenuMaster { Key = "hr", Label = "Human Resource", Icon = "Briefcase", SortOrder = 5 },
+                    new MenuMaster { Key = "attendance", Label = "Attendance", Icon = "CalendarCheck", SortOrder = 6 },
+                    new MenuMaster { Key = "examination", Label = "Examination", Icon = "FileText", SortOrder = 7 },
+                    new MenuMaster { Key = "settings", Label = "Settings", Icon = "Settings", SortOrder = 8 }
+                };
+                context.MenuMasters.AddRange(menus);
+                context.SaveChanges();
+            }
+
+            // 2. Create Organization
             var org = new Organization {
                 Id = Guid.NewGuid(),
                 Name = "School ERP Demo",
@@ -130,12 +151,20 @@ using (var scope = app.Services.CreateScope())
             context.Organizations.Add(org);
             context.SaveChanges();
 
+            // 3. Create Default Roles for this organization 
+            var adminRole = new EmployeeRole { Name = "Admin", OrganizationId = org.Id, CreatedAt = DateTime.UtcNow };
+            context.EmployeeRoles.Add(adminRole);
+            context.EmployeeRoles.Add(new EmployeeRole { Name = "Teacher", OrganizationId = org.Id, CreatedAt = DateTime.UtcNow });
+            context.EmployeeRoles.Add(new EmployeeRole { Name = "Staff", OrganizationId = org.Id, CreatedAt = DateTime.UtcNow });
+            context.SaveChanges();
+
+            // 4. Create Initial User
             var user = new User {
                 Email = "shahbazit007@gmail.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password"),
-                FirstName = "Admin",
-                LastName = "User",
-                MobileNumber = "1234567890",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Shahbaz@123"),
+                FirstName = "Shahbaz",
+                LastName = "Ahmad",
+                MobileNumber = "9999999999",
                 Role = "Admin",
                 OrganizationId = org.Id,
                 CreatedAt = DateTime.UtcNow,
@@ -144,12 +173,77 @@ using (var scope = app.Services.CreateScope())
             };
             context.Users.Add(user);
             context.SaveChanges();
-            Log.Information("Initial admin seeded successfully.");
+
+            // 5. Create Linked Employee Record 
+            var employee = new Employee
+            {
+                OrganizationId = org.Id,
+                FirstName = "Shahbaz",
+                LastName = "Ahmad",
+                WorkEmail = user.Email,
+                MobileNumber = user.MobileNumber,
+                DateOfJoining = DateTime.UtcNow,
+                EmploymentType = EmploymentType.FullTime,
+                IsActive = true,
+                IsLoginEnabled = true,
+                UserId = user.Id,
+                EmployeeRoleId = adminRole.Id, // Link to Admin Role
+            };
+            context.Employees.Add(employee);
+            context.SaveChanges();
+
+            // 6. Grant Full Permissions to Admin Role
+            var allMenus = context.MenuMasters.ToList();
+            foreach (var menu in allMenus)
+            {
+                context.MenuPermissions.Add(new MenuPermission
+                {
+                    RoleName = "Admin",
+                    MenuKey = menu.Key,
+                    IsVisible = true,
+                    OrganizationId = org.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            context.SaveChanges();
+
+            Log.Information("Initial admin, employee roles, and full permissions seeded successfully.");
+        }
+        // Ensure Admin user always has access and is not locked out
+        var adminEmail = "shahbazit007@gmail.com";
+        var existingAdmin = context.Users.IgnoreQueryFilters().FirstOrDefault(u => u.Email == adminEmail);
+        if (existingAdmin != null)
+        {
+            var isModified = false;
+            if (existingAdmin.LockoutEnd != null)
+            {
+                existingAdmin.LockoutEnd = null;
+                existingAdmin.FailedLoginAttempts = 0;
+                Log.Information("Unlocked admin user account.");
+                isModified = true;
+            }
+
+            var adminEmployee = context.Employees.IgnoreQueryFilters().FirstOrDefault(e => e.UserId == existingAdmin.Id);
+            if (adminEmployee != null)
+            {
+                if (!adminEmployee.IsActive || !adminEmployee.IsLoginEnabled)
+                {
+                    adminEmployee.IsActive = true;
+                    adminEmployee.IsLoginEnabled = true;
+                    Log.Information("Enabled login and reactivated admin employee record.");
+                    isModified = true;
+                }
+            }
+
+            if (isModified)
+            {
+                context.SaveChanges();
+            }
         }
     } 
     catch (Exception ex) 
     {
-        Log.Error(ex, "Failed to seed default data.");
+        Log.Error(ex, "Failed to seed default data or ensure admin status.");
     }
 }
 

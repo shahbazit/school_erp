@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SchoolERP.Application.DTOs.Masters;
 using SchoolERP.Application.Interfaces;
 using SchoolERP.Domain.Entities;
@@ -9,6 +10,24 @@ namespace SchoolERP.API.Controllers;
 public class ClassesController : BaseMasterController<AcademicClass, ClassDto, CreateClassDto, UpdateClassDto>
 {
     public ClassesController(IUnitOfWork unitOfWork) : base(unitOfWork) { }
+
+    [HttpGet]
+    public override async Task<ActionResult<IEnumerable<ClassDto>>> GetAll()
+    {
+        var classes = await _unitOfWork.Repository<AcademicClass>().GetQueryable()
+            .Select(c => new ClassDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Order = c.Order,
+                IsActive = c.IsActive,
+                CreatedAt = c.CreatedAt,
+                StudentCount = _unitOfWork.Repository<StudentAcademic>().GetQueryable().Count(s => s.ClassId == c.Id && s.IsCurrent)
+            })
+            .ToListAsync();
+        return Ok(classes);
+    }
+
     protected override ClassDto MapToDto(AcademicClass e) => new() { Id = e.Id, Name = e.Name, Order = e.Order, IsActive = e.IsActive, CreatedAt = e.CreatedAt };
     protected override AcademicClass MapToEntity(CreateClassDto d) => new() { Name = d.Name, Order = d.Order, IsActive = d.IsActive };
     protected override void MapToEntity(UpdateClassDto d, AcademicClass e) { e.Name = d.Name; e.Order = d.Order; e.IsActive = d.IsActive; }

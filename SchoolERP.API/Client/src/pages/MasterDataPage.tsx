@@ -25,7 +25,7 @@ function SelectField({ field, value, onChange }: { field: any, value: any, onCha
       required={field.required}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="form-input"
+      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-all font-medium disabled:opacity-50 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-[size:1.5em_1.5em] bg-no-repeat pr-10"
       disabled={loading}
     >
       <option value="">Select {field.label}</option>
@@ -231,10 +231,10 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
             if (!isVisible) return null;
 
             return (
-              <div key={field.name} className="space-y-1">
-                <label className="block text-sm font-semibold text-slate-700">{field.label}</label>
+              <div key={field.name} className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{field.label}</label>
                 {field.type === 'checkbox' ? (
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <input 
                       type="checkbox" 
                       id={field.name}
@@ -242,7 +242,7 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
                       onChange={(e) => setFormData({...formData, [field.name]: e.target.checked})}
                       className="h-4 w-4 text-primary-600 border-slate-300 rounded focus:ring-primary-500"
                     />
-                    <label htmlFor={field.name} className="ml-2 block text-sm text-slate-600 font-medium">{field.label}</label>
+                    <label htmlFor={field.name} className="text-sm font-medium text-slate-700 cursor-pointer">{field.label}</label>
                   </div>
                 ) : field.type === 'select' ? (
                   <SelectField 
@@ -256,7 +256,7 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
                     required={field.required}
                     value={formData[field.name]}
                     onChange={(e) => setFormData({...formData, [field.name]: e.target.value})}
-                    className="form-input"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 transition-all font-medium"
                     placeholder={`Enter ${field.label.toLowerCase()}...`}
                   />
                 )}

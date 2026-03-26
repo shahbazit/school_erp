@@ -145,7 +145,28 @@ public class StudentController : ControllerBase
             Console.WriteLine("ModelState Errors: " + JsonSerializer.Serialize(errors));
             return BadRequest(new { Errors = errors, Message = "Validation failed" });
         }
+        // Academic Year Validation
+        var ay = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+            .FirstOrDefaultAsync(ay => ay.IsActive && ay.Name.Equals(dto.AcademicYear.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (ay == null) return BadRequest(new { Message = $"Academic Year '{dto.AcademicYear}' is not valid or active." });
+
+        // Duplicate Check (Name + Mobile)
+        var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
+        var mobile = dto.MobileNumber.Trim();
+        var isDuplicate = await _unitOfWork.Repository<Student>().GetQueryable()
+            .AnyAsync(s => (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && s.MobileNumber == mobile);
+        
+        if (isDuplicate) return BadRequest(new { Message = $"Student '{fullName}' with mobile '{mobile}' already exists." });
+
+        if (!string.IsNullOrWhiteSpace(dto.AdmissionNo))
+        {
+            var isAdmDup = await _unitOfWork.Repository<Student>().GetQueryable()
+                .AnyAsync(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (isAdmDup) return BadRequest(new { Message = $"Admission No '{dto.AdmissionNo}' is already taken." });
+        }
+
         var (resolvedClassId, resolvedSectionId) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
+        if (resolvedClassId == Guid.Empty) return BadRequest(new { Message = "Could not resolve Class." });
         
         var student = MapFromDto(dto);
         await _unitOfWork.Repository<Student>().AddAsync(student);
@@ -156,7 +177,7 @@ public class StudentController : ControllerBase
             StudentId = student.Id,
             ClassId = resolvedClassId,
             SectionId = resolvedSectionId,
-            AcademicYear = dto.AcademicYear ?? string.Empty,
+            AcademicYear = dto.AcademicYear.Trim(),
             RollNumber = dto.RollNumber,
             IsCurrent = true,
             Status = "Active"
@@ -203,43 +224,179 @@ public class StudentController : ControllerBase
         return CreatedAtAction(nameof(GetStudentById), new { id = student.Id }, MapToDto(student));
     }
 
+    [HttpPost("bulk/validate")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> BulkValidateStudents([FromBody] IEnumerable<CreateStudentDto> dtos)
+    {
+        if (dtos == null || !dtos.Any()) return BadRequest("No students provided.");
+
+        var dtosList = dtos.ToList();
+        var results = new List<object>();
+
+        // Fetch Masters
+        var activeAcademicYears = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+            .Where(ay => ay.IsActive).ToListAsync();
+        
+        var existingStudents = await _unitOfWork.Repository<Student>().GetQueryable()
+            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo })
+            .ToListAsync();
+        
+        var internalTrack = new HashSet<string>();
+
+        for (int i = 0; i < dtosList.Count; i++)
+        {
+            var dto = dtosList[i];
+            var rowErrors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(dto.FirstName)) rowErrors.Add("First Name is missing.");
+            if (string.IsNullOrWhiteSpace(dto.LastName)) rowErrors.Add("Last Name is missing.");
+            if (string.IsNullOrWhiteSpace(dto.MobileNumber)) rowErrors.Add("Mobile Number is missing.");
+            
+            if (string.IsNullOrWhiteSpace(dto.AcademicYear)) rowErrors.Add("Academic Year is required.");
+            else if (!activeAcademicYears.Any(ay => ay.Name.Equals(dto.AcademicYear.Trim(), StringComparison.OrdinalIgnoreCase)))
+                rowErrors.Add($"Academic Year '{dto.AcademicYear}' not found.");
+
+            var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
+            var mobile = dto.MobileNumber.Trim();
+            var dupKey = $"{fullName}|{mobile}";
+
+            if (existingStudents.Any(s => (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && s.MobileNumber == mobile))
+                rowErrors.Add("Student already exists in database (Name + Mobile).");
+            
+            if (internalTrack.Contains(dupKey))
+                rowErrors.Add("Duplicate entry found within this file.");
+            else internalTrack.Add(dupKey);
+
+            if (!string.IsNullOrWhiteSpace(dto.AdmissionNo) && existingStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)))
+                rowErrors.Add("Admission Number is already taken.");
+
+            var (resolvedClassId, _) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
+            if (resolvedClassId == Guid.Empty) rowErrors.Add($"Class '{dto.ClassName ?? dto.ClassId}' not found.");
+
+            results.Add(new { Row = i + 1, Errors = rowErrors, Status = rowErrors.Any() ? "invalid" : "valid" });
+        }
+
+        return Ok(results);
+    }
+
     [HttpPost("bulk")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BulkAddStudents([FromBody] IEnumerable<CreateStudentDto> dtos)
     {
         if (dtos == null || !dtos.Any()) return BadRequest("No students provided.");
-        
-        var students = dtos.Select(MapFromDto).ToList();
-        
-        foreach (var student in students)
-        {
-            await _unitOfWork.Repository<Student>().AddAsync(student);
-        }
-        await _unitOfWork.CompleteAsync();
 
-        // Add Academic Mappings in bulk
-        var index = 0;
         var dtosList = dtos.ToList();
-        foreach (var student in students)
+        var errors = new List<object>();
+
+        // 1. Fetch Masters for validation
+        var activeAcademicYears = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+            .Where(ay => ay.IsActive).ToListAsync();
+        
+        var existingStudents = await _unitOfWork.Repository<Student>().GetQueryable()
+            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo })
+            .ToListAsync();
+        
+        var toAddStudents = new List<Student>();
+        var academicMappings = new List<StudentAcademic>();
+        
+        // Tracking within the current batch to prevent internal duplicates
+        var internalTrack = new HashSet<string>();
+
+        for (int i = 0; i < dtosList.Count; i++)
         {
-            var dto = dtosList[index++];
+            var dto = dtosList[i];
+            var rowErrors = new List<string>();
+
+            // Basic Validation
+            if (string.IsNullOrWhiteSpace(dto.FirstName)) rowErrors.Add("First Name is required.");
+            if (string.IsNullOrWhiteSpace(dto.LastName)) rowErrors.Add("Last Name is required.");
+            if (string.IsNullOrWhiteSpace(dto.MobileNumber)) rowErrors.Add("Mobile Number is required.");
+            
+            // Academic Year Validation
+            if (string.IsNullOrWhiteSpace(dto.AcademicYear)) 
+            {
+                rowErrors.Add("Academic Year is required.");
+            }
+            else if (!activeAcademicYears.Any(ay => ay.Name.Equals(dto.AcademicYear.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                rowErrors.Add($"Academic Year '{dto.AcademicYear}' is not valid or active.");
+            }
+
+            // Duplicacy Check (Name + Mobile)
+            var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
+            var mobile = dto.MobileNumber.Trim();
+            var duplicateKey = $"{fullName}|{mobile}";
+
+            // Check against existing database
+            if (existingStudents.Any(s => 
+                (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && 
+                s.MobileNumber == mobile))
+            {
+                rowErrors.Add($"Student '{fullName}' with mobile '{mobile}' already exists in the system.");
+            }
+            
+            // Check against current batch
+            if (internalTrack.Contains(duplicateKey))
+            {
+                rowErrors.Add($"Duplicate student '{fullName}' with mobile '{mobile}' found within the import list.");
+            }
+            else
+            {
+                internalTrack.Add(duplicateKey);
+            }
+
+            // Admission No Duplicacy (if provided)
+            if (!string.IsNullOrWhiteSpace(dto.AdmissionNo))
+            {
+                if (existingStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)) ||
+                    toAddStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)))
+                {
+                    rowErrors.Add($"Admission Number '{dto.AdmissionNo}' is already taken.");
+                }
+            }
+
+            if (rowErrors.Any())
+            {
+                errors.Add(new { Row = i + 1, Errors = rowErrors });
+                continue;
+            }
+
+            // Resolve Class and Section
             var (resolvedClassId, resolvedSectionId) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
-            var academic = new StudentAcademic
+            if (resolvedClassId == Guid.Empty)
+            {
+                errors.Add(new { Row = i + 1, Errors = new[] { $"Could not resolve Class '{dto.ClassName ?? dto.ClassId}'." } });
+                continue;
+            }
+
+            // Map and Add to collection
+            var student = MapFromDto(dto);
+            toAddStudents.Add(student);
+
+            academicMappings.Add(new StudentAcademic
             {
                 StudentId = student.Id,
                 ClassId = resolvedClassId,
                 SectionId = resolvedSectionId,
-                AcademicYear = dto.AcademicYear ?? string.Empty,
+                AcademicYear = dto.AcademicYear.Trim(),
                 RollNumber = dto.RollNumber,
                 IsCurrent = true,
                 Status = "Active"
-            };
-            await _unitOfWork.Repository<StudentAcademic>().AddAsync(academic);
+            });
         }
-        
+
+        if (errors.Any())
+        {
+            return BadRequest(new { Message = "One or more validation errors occurred during bulk import.", Details = errors });
+        }
+
+        // Apply to database
+        foreach (var s in toAddStudents) await _unitOfWork.Repository<Student>().AddAsync(s);
+        foreach (var a in academicMappings) await _unitOfWork.Repository<StudentAcademic>().AddAsync(a);
+
         await _unitOfWork.CompleteAsync();
 
-        return Ok(new { count = students.Count, success = true });
+        return Ok(new { count = toAddStudents.Count, success = true });
     }
 
     private Student MapFromDto(CreateStudentDto dto)
@@ -484,8 +641,8 @@ public class StudentController : ControllerBase
             DateOfBirth = student.DateOfBirth,
             BloodGroup = student.BloodGroup,
             StudentPhoto = student.StudentPhoto,
-            MobileNumber = student.MaskedMobile,
-            Email = student.MaskedEmail,
+            MobileNumber = student.MobileNumber,
+            Email = student.Email,
             AddressLine1 = student.AddressLine1,
             AddressLine2 = student.AddressLine2,
             City = student.City,

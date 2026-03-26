@@ -46,5 +46,10 @@ export const studentApi = {
   bulkEnroll: async (students: any[]) => {
     const response = await apiClient.post('/Student/bulk', students);
     return response.data;
+  },
+
+  bulkValidate: async (students: any[]) => {
+    const response = await apiClient.post<any[]>('/Student/bulk/validate', students);
+    return response.data;
   }
 };

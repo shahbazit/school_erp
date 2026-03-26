@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SchoolERP.Application.DTOs.Auth;
 using SchoolERP.Application.Interfaces;
@@ -6,6 +7,7 @@ namespace SchoolERP.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -42,7 +44,7 @@ public class AuthController : ControllerBase
         var result = await _authService.LoginAsync(request.Email, request.Password, orgId != Guid.Empty ? orgId : null);
 
         if (!result.Success)
-            return Unauthorized(new { Errors = result.Errors });
+            return BadRequest(new { Errors = result.Errors });
 
         return Ok(result);
     }

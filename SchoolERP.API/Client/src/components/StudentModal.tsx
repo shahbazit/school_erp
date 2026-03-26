@@ -66,6 +66,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
   const [formData, setFormData] = useState({ ...defaultForm });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   const [classes, setClasses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [feeHeads, setFeeHeads] = useState<any[]>([]);
@@ -184,11 +185,13 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
     e.preventDefault();
     if (!validate()) return;
     setIsSubmitting(true);
+    setServerError(null);
     try {
       await onSave(formData as any);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save student', error);
+      setServerError(error.message || 'Failed to save student. Please check for duplicate entries.');
     } finally {
       setIsSubmitting(false);
     }
@@ -817,8 +820,18 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
 
         {/* Tab Content */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            {tabContent[activeTab]}
+          {/* Modal Body */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+            {serverError && (
+               <div className="mb-6 bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                  <Settings className="h-5 w-5 animate-pulse" />
+                  <p className="text-sm font-semibold">{serverError}</p>
+               </div>
+            )}
+
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {tabContent[activeTab]}
+            </div>
           </div>
 
           {/* Footer */}

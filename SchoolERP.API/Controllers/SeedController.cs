@@ -37,17 +37,29 @@ public class SeedController : ControllerBase
                 new { Name = "Physics", Code = "PHY" }, new { Name = "Chemistry", Code = "CHEM" }, new { Name = "Biology", Code = "BIO" }
             },
             FeeHeads = new[] {
-                new { Name = "Registration Fee", IsSelective = false }, new { Name = "Tuition Fee", IsSelective = false }, new { Name = "Examination Fee", IsSelective = false },
+                new { Name = "Admission Fee", IsSelective = false }, new { Name = "Registration Fee", IsSelective = false }, new { Name = "Tuition Fee", IsSelective = false }, new { Name = "Examination Fee", IsSelective = false },
                 new { Name = "Computer Fee", IsSelective = false }, new { Name = "Library Fee", IsSelective = false }, new { Name = "Sports Fee", IsSelective = false },
                 new { Name = "Transport Fee", IsSelective = true }, new { Name = "Hostel Fee", IsSelective = true }, new { Name = "Fine", IsSelective = false }
             },
             LeaveTypes = new[] { "Casual Leave", "Sick Leave", "Earned Leave", "Maternity Leave", "Paternity Leave", "Duty Leave" },
             AcademicYears = new[] { 
                 new { 
+                    Name = $"{DateTime.Now.Year - 1}-{DateTime.Now.Year % 100:D2}", 
+                    StartDate = new DateTime(DateTime.Now.Year - 1, 4, 1), 
+                    EndDate = new DateTime(DateTime.Now.Year, 3, 31), 
+                    IsCurrent = false 
+                },
+                new { 
                     Name = $"{DateTime.Now.Year}-{(DateTime.Now.Year + 1) % 100:D2}", 
                     StartDate = new DateTime(DateTime.Now.Year, 4, 1), 
                     EndDate = new DateTime(DateTime.Now.Year + 1, 3, 31), 
                     IsCurrent = true 
+                },
+                new { 
+                    Name = $"{DateTime.Now.Year + 1}-{(DateTime.Now.Year + 2) % 100:D2}", 
+                    StartDate = new DateTime(DateTime.Now.Year + 1, 4, 1), 
+                    EndDate = new DateTime(DateTime.Now.Year + 2, 3, 31), 
+                    IsCurrent = false 
                 } 
             },
             EmployeeRoles = new[] { "Admin", "Teacher", "Accountant", "Staff" },
@@ -97,6 +109,7 @@ public class SeedController : ControllerBase
 
         await SeedDiscounts(orgId, results);
         await SeedFeeConfig(orgId, results);
+        await SeedInitialStaff(orgId, results);
 
         await _unitOfWork.CompleteAsync();
 
@@ -382,17 +395,42 @@ public class SeedController : ControllerBase
             return;
         }
 
-        var year = new AcademicYear
+        var years = new List<AcademicYear>
         {
-            Name = $"{DateTime.Now.Year}-{(DateTime.Now.Year + 1) % 100:D2}",
-            StartDate = new DateTime(DateTime.Now.Year, 4, 1),
-            EndDate = new DateTime(DateTime.Now.Year + 1, 3, 31),
-            IsCurrent = true,
-            IsActive = true,
-            OrganizationId = orgId
+            new AcademicYear
+            {
+                Name = $"{DateTime.Now.Year - 1}-{DateTime.Now.Year % 100:D2}",
+                StartDate = new DateTime(DateTime.Now.Year - 1, 4, 1),
+                EndDate = new DateTime(DateTime.Now.Year, 3, 31),
+                IsCurrent = false,
+                IsActive = true,
+                OrganizationId = orgId
+            },
+            new AcademicYear
+            {
+                Name = $"{DateTime.Now.Year}-{(DateTime.Now.Year + 1) % 100:D2}",
+                StartDate = new DateTime(DateTime.Now.Year, 4, 1),
+                EndDate = new DateTime(DateTime.Now.Year + 1, 3, 31),
+                IsCurrent = true,
+                IsActive = true,
+                OrganizationId = orgId
+            },
+            new AcademicYear
+            {
+                Name = $"{DateTime.Now.Year + 1}-{(DateTime.Now.Year + 2) % 100:D2}",
+                StartDate = new DateTime(DateTime.Now.Year + 1, 4, 1),
+                EndDate = new DateTime(DateTime.Now.Year + 2, 3, 31),
+                IsCurrent = false,
+                IsActive = true,
+                OrganizationId = orgId
+            }
         };
-        await repo.AddAsync(year);
-        results.Add("Default academic year added.");
+
+        foreach(var y in years)
+        {
+            await repo.AddAsync(y);
+        }
+        results.Add("Academic years (Previous, Current, Next) added.");
     }
 
     private async Task SeedClasses(Guid orgId, List<string> results)
@@ -502,7 +540,7 @@ public class SeedController : ControllerBase
 
         var heads = new List<(string Name, bool Selective)>
         {
-            ("Registration Fee", false), ("Tuition Fee", false), ("Examination Fee", false),
+            ("Admission Fee", false), ("Registration Fee", false), ("Tuition Fee", false), ("Examination Fee", false),
             ("Computer Fee", false), ("Library Fee", false), ("Sports Fee", false),
             ("Transport Fee", true), ("Hostel Fee", true), ("Fine", false)
         };
@@ -741,5 +779,76 @@ public class SeedController : ControllerBase
             await repo.AddAsync(new EmployeeRole { OrganizationId = orgId, Name = r, IsActive = true });
         }
         results.Add($"{roles.Count} employee roles added.");
+    }
+
+    private async Task SeedInitialStaff(Guid orgId, List<string> results)
+    {
+        var employeeRepo = _unitOfWork.Repository<Employee>();
+        var userRepo = _unitOfWork.Repository<User>();
+        var email = "shahbazit007@gmail.com";
+        
+        var employeeExists = await employeeRepo.GetQueryable().AnyAsync(x => x.OrganizationId == orgId && (x.WorkEmail == email || x.PersonalEmail == email));
+        var userExists = await userRepo.GetQueryable().IgnoreQueryFilters().AnyAsync(x => x.Email == email && x.OrganizationId == orgId);
+
+        if (employeeExists && userExists)
+        {
+            results.Add("Initial staff and user already exist. Skipping.");
+            return;
+        }
+
+        var dept = await _unitOfWork.Repository<Department>().GetQueryable().FirstOrDefaultAsync(x => x.OrganizationId == orgId);
+        var desig = await _unitOfWork.Repository<Designation>().GetQueryable().FirstOrDefaultAsync(x => x.OrganizationId == orgId);
+        var role = await _unitOfWork.Repository<EmployeeRole>().GetQueryable().FirstOrDefaultAsync(x => x.OrganizationId == orgId);
+
+        User? user = null;
+        if (!userExists)
+        {
+            user = new User
+            {
+                OrganizationId = orgId,
+                Email = email,
+                FirstName = "Shahbaz",
+                LastName = "Ahmad",
+                MobileNumber = "9999999999",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Shahbaz@123"),
+                Role = role?.Name ?? "Admin",
+                IsEmailVerified = true,
+                IsMobileVerified = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            await userRepo.AddAsync(user);
+            await _unitOfWork.CompleteAsync(); // To get ID
+            results.Add($"Initial user '{user.Email}' seeded.");
+        }
+        else 
+        {
+            user = await userRepo.GetQueryable().IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Email == email && x.OrganizationId == orgId);
+        }
+
+        if (!employeeExists)
+        {
+            var employee = new Employee
+            {
+                OrganizationId = orgId,
+                FirstName = "Shahbaz",
+                LastName = "Ahmad",
+                WorkEmail = email,
+                PersonalEmail = email,
+                MobileNumber = "9999999999",
+                Gender = "Male",
+                DateOfBirth = new DateTime(1990, 1, 1),
+                DateOfJoining = DateTime.Now,
+                EmploymentType = EmploymentType.FullTime,
+                DepartmentId = dept?.Id,
+                DesignationId = desig?.Id,
+                EmployeeRoleId = role?.Id,
+                IsActive = true,
+                IsLoginEnabled = true, // Added
+                UserId = user?.Id // Added link
+            };
+            await employeeRepo.AddAsync(employee);
+            await _unitOfWork.CompleteAsync(); // COMMIT THE EMPLOYEE
+            results.Add($"Initial staff record for '{employee.FirstName} {employee.LastName}' seeded and linked to user.");
+        }
     }
 }

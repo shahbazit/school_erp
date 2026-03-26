@@ -45,6 +45,10 @@ public class CreateEmployeeDto
     public EmploymentType EmploymentType { get; set; } = EmploymentType.FullTime;
     public string? WorkLocation { get; set; }
 
+    // System Account
+    public bool CreateSystemUser { get; set; }
+    public string? SystemPassword { get; set; }
+
     // Optional login
     public Guid? UserId { get; set; }
 }

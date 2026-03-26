@@ -28,13 +28,13 @@ import Payroll from './pages/Payroll';
 import StudentAccount from './pages/fees/StudentAccount';
 import FeeGeneration from './pages/fees/FeeGeneration';
 import FeeSettings from './pages/fees/FeeSettings';
+import FeeStructures from './pages/fees/FeeStructures';
 import Timetable from './pages/Timetable';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import MenuPermissions from './pages/MenuPermissions';
 import UserManagement from './pages/UserManagement';
 import SystemSetup from './pages/SystemSetup';
-import { CopyFeeStructureAction } from './components/fees/CopyFeeStructureAction';
 import { usePermissions } from './hooks/usePermissions';
 import { useEffect as useAppEffect } from 'react';
 
@@ -52,42 +52,7 @@ function App() {
     }
   }, [location.pathname]);
 
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case '/': return 'Dashboard Overview';
-      case '/students': return 'Students Directory';
-      case '/employees': return 'Employee Directory';
-      case '/teachers': return 'Teachers';
-      case '/student-attendance': return 'Student Attendance';
-      case '/student-promotion': return 'Student Promotion & Transfer';
-      case '/certificates': return 'Certificates & ID Cards';
-      case '/student-import': return 'Bulk Import/Export';
-      case '/infrastructure': return 'Transport & Hostel';
-      case '/communication': return 'Communication Hub';
-      case '/financials': return 'Financial Management';
-      case '/examinations': return 'Exams & Marks';
-      case '/attendance': return 'Employee Attendance';
-      case '/leaves': return 'Leave Management';
-      case '/payroll': return 'Payroll Management';
-      case '/lookups': return 'System Lookups';
-      case '/masters/classes': return 'Class Master';
-      case '/masters/sections': return 'Section Master';
-      case '/masters/subjects': return 'Subject Master';
-      case '/masters/academic-years': return 'Academic Year Master';
-      case '/masters/departments': return 'Department Master';
-      case '/masters/designations': return 'Designation Master';
-      case '/masters/rooms': return 'Infrastructure - Rooms';
-      case '/masters/labs': return 'Infrastructure - Labs';
-      case '/fees/heads': return 'Fee Heads Configuration';
-      case '/fees/structures': return 'Fee Structure Management';
-      case '/fees/student': return 'Student Fee Account';
-      case '/fees/settings': return 'Fee Policy & Discounts';
-      case '/settings/permissions': return 'Menu Access Permissions';
-      case '/settings/setup': return 'System Initial Setup';
-      case '/timetable': return 'Class Timetables';
-      default: return 'School ERP';
-    }
-  };
+
 
   const toggleSubMenu = (menu: string) => {
     setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
@@ -187,7 +152,7 @@ function App() {
                     <Link to="/examinations" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Exams & Result</Link>
                     <Link to="/student-promotion" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Promotion & Transfer</Link>
                     <Link to="/certificates" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Certificate & ID</Link>
-                    <Link to="/timetable" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors font-bold text-primary-600">Class Timetables</Link>
+                    <Link to="/timetable" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Class Timetables</Link>
                     <Link to="/student-import" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Bulk Import</Link>
                   </div>
                 )}
@@ -232,7 +197,7 @@ function App() {
                     <Link to="/financials" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">General Ledger</Link>
                     <Link to="/fees/heads" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Heads</Link>
                     <Link to="/fees/structures" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Structure</Link>
-                    <Link to="/fees/generate" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors underline decoration-primary-300 decoration-2 underline-offset-4 font-bold">Fee Allocation</Link>
+                    <Link to="/fees/generate" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Allocation</Link>
                     <Link to="/fees/settings" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Policies & Discounts</Link>
                     <Link to="/payroll" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Payroll</Link>
                   </div>
@@ -328,7 +293,7 @@ function App() {
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
                     <Link to="/settings/permissions" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Menu Controls</Link>
                     <Link to="/settings/users" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">User Management</Link>
-                    <Link to="/settings/setup" className="block py-1.5 text-sm text-primary-600 font-bold hover:text-primary-700 transition-colors">System Quick Setup</Link>
+                    <Link to="/settings/setup" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">System Quick Setup</Link>
                   </div>
                 )}
               </div>
@@ -377,10 +342,7 @@ function App() {
               <Menu className="h-5 w-5" />
             </button>
             
-            {/* Dynamic Page Title in Header */}
-            <div className="ml-2 sm:ml-4 flex items-center h-full">
-              <h1 className="text-sm sm:text-base font-semibold tracking-tight text-slate-700 truncate max-w-[140px] sm:max-w-sm py-1">{getPageTitle()}</h1>
-            </div>
+
           </div>
           
           <div className="flex items-center space-x-4">
@@ -571,51 +533,7 @@ function App() {
                   ]}
                 />
               } />
-              <Route path="/fees/structures" element={
-                <MasterDataPage 
-                  title="Fee Structure" subtitle="Assign fee amounts to classes & sessions" endpoint="fee/structures"
-                  columns={[ 
-                    { key: 'feeHeadName', label: 'Fee Head' }, 
-                    { key: 'academicYearName', label: 'Session' },
-                    { key: 'className', label: 'Class' }, 
-                    { key: 'amount', label: 'Amount', render: (v) => `₹${v}` },
-                    { key: 'frequency', label: 'Frequency' },
-                    { key: 'applicableMonth', label: 'Month' }
-                  ]}
-                  formFields={[ 
-                    { name: 'academicYearId', label: 'Academic Session', type: 'select', endpoint: 'academic-years', required: true },
-                    { name: 'feeHeadId', label: 'Fee Head', type: 'select', endpoint: 'fee/heads', required: true },
-                    { name: 'classId', label: 'Class', type: 'select', endpoint: 'classes', required: true },
-                    { name: 'amount', label: 'Amount', type: 'number', required: true },
-                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
-                      { label: 'Monthly', value: 'Monthly' },
-                      { label: 'Quarterly', value: 'Quarterly' },
-                      { label: 'Yearly', value: 'Yearly' },
-                      { label: 'One-time', value: 'One-time' }
-                    ], required: true },
-                    { name: 'applicableMonth', label: 'Applicable Month', type: 'select', 
-                      visibleIf: (data) => data.frequency === 'Yearly' || data.frequency === 'One-time',
-                      options: [
-                      { label: 'January', value: 'January' },
-                      { label: 'February', value: 'February' },
-                      { label: 'March', value: 'March' },
-                      { label: 'April', value: 'April' },
-                      { label: 'May', value: 'May' },
-                      { label: 'June', value: 'June' },
-                      { label: 'July', value: 'July' },
-                      { label: 'August', value: 'August' },
-                      { label: 'September', value: 'September' },
-                      { label: 'October', value: 'October' },
-                      { label: 'November', value: 'November' },
-                      { label: 'December', value: 'December' }
-                    ] },
-                    { name: 'description', label: 'Description', type: 'text' }
-                  ]}
-                  renderToolbar={() => (
-                    <CopyFeeStructureAction onSuccess={() => window.location.reload()} />
-                  )}
-                />
-              } />
+              <Route path="/fees/structures" element={<FeeStructures />} />
 
               <Route path="/fees/student/:studentId" element={<StudentAccount />} />
               <Route path="/fees/generate" element={<FeeGeneration />} />

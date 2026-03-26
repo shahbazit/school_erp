@@ -309,6 +309,24 @@ public class TeacherController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // DELETE /api/teacher/{employeeId} – Remove only the academic profile
+    // ─────────────────────────────────────────────────────────────────────
+    [HttpDelete("{employeeId}")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> DeleteProfile(Guid employeeId)
+    {
+        var profile = await _unitOfWork.Repository<TeacherProfile>().GetQueryable()
+            .FirstOrDefaultAsync(tp => tp.EmployeeId == employeeId);
+
+        if (profile == null) return NotFound();
+
+        _unitOfWork.Repository<TeacherProfile>().Delete(profile);
+        await _unitOfWork.CompleteAsync();
+
+        return NoContent();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────
     private async Task<TeacherProfile?> GetFullProfile(Guid employeeId)

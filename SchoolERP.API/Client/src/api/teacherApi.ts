@@ -102,6 +102,10 @@ export const teacherApi = {
     const res = await apiClient.post<TeacherProfileDto>('/teacher', data);
     return res.data;
   },
+  
+  delete: async (employeeId: string): Promise<void> => {
+    await apiClient.delete(`/teacher/${employeeId}`);
+  },
 
   assignSubject: async (employeeId: string, data: AssignSubjectDto): Promise<{ message: string; assignmentId: string }> => {
     const res = await apiClient.post(`/teacher/${employeeId}/subjects`, data);

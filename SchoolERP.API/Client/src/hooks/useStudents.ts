@@ -28,8 +28,9 @@ export const useStudents = () => {
       setStudents(prev => [...prev, newStudent]);
       return true;
     } catch (err: any) {
-      setError(err.message || 'Failed to add student');
-      return false;
+      const msg = err.response?.data?.Message || err.message || 'Failed to add student';
+      setError(msg);
+      throw new Error(msg); // Throw so modal can handle it
     } finally {
       setLoading(false);
     }
@@ -43,8 +44,9 @@ export const useStudents = () => {
       setStudents(prev => prev.map(s => s.id === id ? student : s));
       return true;
     } catch (err: any) {
-      setError(err.message || 'Failed to update student');
-      return false;
+      const msg = err.response?.data?.Message || err.message || 'Failed to update student';
+      setError(msg);
+      throw new Error(msg); // Throw so modal can handle it
     } finally {
       setLoading(false);
     }

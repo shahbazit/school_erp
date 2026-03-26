@@ -30,6 +30,7 @@ public interface IFeeService
     
     // Admin / Utility
     Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null, Guid? academicYearId = null);
+    Task UndoMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, Guid? academicYearId = null);
     Task<IEnumerable<ClassFeeHistoryDto>> GetFeeHistoryAsync(Guid? classId = null, Guid? academicYearId = null);
     
     // Discounts

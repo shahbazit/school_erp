@@ -58,6 +58,10 @@ public class EmployeeDto
     public string StatusName => Status.ToString();
     public string? DeactivationReason { get; set; }
 
+    // Teacher Profile
+    public bool HasTeacherProfile { get; set; }
+    public bool CreateSystemUser { get; set; }
+
     // Login
     public Guid? UserId { get; set; }
 

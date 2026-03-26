@@ -5,6 +5,7 @@ using SchoolERP.Application.DTOs.Employee;
 using SchoolERP.Application.Interfaces;
 using SchoolERP.Domain.Entities;
 using SchoolERP.Domain.Enums;
+using SchoolERP.Application.DTOs.Teacher;
 
 namespace SchoolERP.API.Controllers;
 
@@ -14,10 +15,14 @@ namespace SchoolERP.API.Controllers;
 public class EmployeeController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuthService _authService;
+    private readonly IOrganizationService _organizationService;
 
-    public EmployeeController(IUnitOfWork unitOfWork)
+    public EmployeeController(IUnitOfWork unitOfWork, IAuthService authService, IOrganizationService organizationService)
     {
         _unitOfWork = unitOfWork;
+        _authService = authService;
+        _organizationService = organizationService;
     }
 
     // ─────────────────────────────────────────────────────
@@ -65,6 +70,7 @@ public class EmployeeController : ControllerBase
             .Include(e => e.Designation)
             .Include(e => e.EmployeeRole)
             .Include(e => e.Documents)
+            .Include(e => e.TeacherProfile)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -116,6 +122,7 @@ public class EmployeeController : ControllerBase
             .Include(e => e.Designation)
             .Include(e => e.EmployeeRole)
             .Include(e => e.Documents)
+            .Include(e => e.TeacherProfile)
             .FirstOrDefaultAsync(e => e.Id == id);
 
         if (employee == null) return NotFound();
@@ -171,11 +178,47 @@ public class EmployeeController : ControllerBase
             WorkLocation    = dto.WorkLocation,
             UserId          = dto.UserId,
             IsActive        = true,
+            IsLoginEnabled  = dto.CreateSystemUser,
             Status          = EmployeeStatus.Active
         };
 
         await _unitOfWork.Repository<Employee>().AddAsync(employee);
         await _unitOfWork.CompleteAsync();
+
+        // Optional: Auto-create User if requested
+        if (dto.CreateSystemUser && !string.IsNullOrEmpty(dto.SystemPassword))
+        {
+            var orgId = _organizationService.GetOrganizationId();
+            var roleName = "Staff"; // Default or lookup from Designation/Role
+            if (employee.EmployeeRoleId.HasValue) 
+            {
+               var er = await _unitOfWork.Repository<EmployeeRole>().GetByIdAsync(employee.EmployeeRoleId.Value);
+               if (er != null) roleName = er.Name;
+            }
+
+            var authResult = await _authService.RegisterAsync(
+                dto.WorkEmail, 
+                dto.SystemPassword, 
+                dto.MobileNumber, 
+                dto.FirstName, 
+                dto.LastName, 
+                roleName, 
+                orgId
+            );
+
+            if (authResult.Success)
+            {
+                // Capture the new User ID (need to modify AuthService or lookup by email)
+                var newUser = await _unitOfWork.Repository<User>().GetQueryable()
+                    .FirstOrDefaultAsync(u => u.Email == dto.WorkEmail);
+                if (newUser != null)
+                {
+                    employee.UserId = newUser.Id;
+                    _unitOfWork.Repository<Employee>().Update(employee);
+                    await _unitOfWork.CompleteAsync();
+                }
+            }
+        }
 
         return CreatedAtAction(nameof(GetById), new { id = employee.Id }, MapToDto(employee));
     }
@@ -234,11 +277,87 @@ public class EmployeeController : ControllerBase
         employee.WorkLocation    = dto.WorkLocation;
         employee.UserId          = dto.UserId;
         employee.IsActive        = dto.IsActive;
+        employee.IsLoginEnabled  = dto.CreateSystemUser;
         employee.DeactivationReason = dto.DeactivationReason;
         employee.Status = dto.IsActive ? EmployeeStatus.Active : EmployeeStatus.Inactive;
 
         _unitOfWork.Repository<Employee>().Update(employee);
         await _unitOfWork.CompleteAsync();
+
+        // ─────────────────────────────────────────────────────
+        // Sync Linked User Account Status & Email
+        // ─────────────────────────────────────────────────────
+        if (employee.UserId.HasValue)
+        {
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(employee.UserId.Value);
+            if (user != null)
+            {
+                // Sync Email (Username)
+                user.Email = employee.WorkEmail;
+
+                // Sync Status
+                if (!employee.IsActive)
+                {
+                    // Lock user account
+                    user.LockoutEnd = DateTime.UtcNow.AddYears(100);
+                }
+                else
+                {
+                    // Unlock user account
+                    user.LockoutEnd = null;
+                }
+
+                // Sync Role (NEW)
+                if (employee.EmployeeRoleId.HasValue)
+                {
+                    var er = await _unitOfWork.Repository<EmployeeRole>().GetByIdAsync(employee.EmployeeRoleId.Value);
+                    if (er != null) user.Role = er.Name;
+                }
+
+                // Sync Password if provided
+                if (!string.IsNullOrEmpty(dto.SystemPassword))
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.SystemPassword);
+                }
+                
+                _unitOfWork.Repository<User>().Update(user);
+                await _unitOfWork.CompleteAsync();
+            }
+        }
+
+        // Optional: Auto-create User if requested and not linked
+        if (dto.CreateSystemUser && !string.IsNullOrEmpty(dto.SystemPassword) && !employee.UserId.HasValue)
+        {
+            var orgId = _organizationService.GetOrganizationId();
+            var roleName = "Staff";
+            if (employee.EmployeeRoleId.HasValue)
+            {
+                var er = await _unitOfWork.Repository<EmployeeRole>().GetByIdAsync(employee.EmployeeRoleId.Value);
+                if (er != null) roleName = er.Name;
+            }
+
+            var authResult = await _authService.RegisterAsync(
+                dto.WorkEmail,
+                dto.SystemPassword,
+                dto.MobileNumber,
+                dto.FirstName,
+                dto.LastName,
+                roleName,
+                orgId
+            );
+
+            if (authResult.Success)
+            {
+                var newUser = await _unitOfWork.Repository<User>().GetQueryable()
+                    .FirstOrDefaultAsync(u => u.Email == dto.WorkEmail);
+                if (newUser != null)
+                {
+                    employee.UserId = newUser.Id;
+                    _unitOfWork.Repository<Employee>().Update(employee);
+                    await _unitOfWork.CompleteAsync();
+                }
+            }
+        }
 
         return Ok(MapToDto(employee));
     }
@@ -329,8 +448,51 @@ public class EmployeeController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────
-    // Helpers
+    // GET /api/employee/{id}/teacher-profile
     // ─────────────────────────────────────────────────────
+    [HttpGet("{id}/teacher-profile")]
+    public async Task<IActionResult> GetTeacherProfile(Guid id)
+    {
+        var profile = await _unitOfWork.Repository<TeacherProfile>().GetQueryable()
+            .FirstOrDefaultAsync(p => p.EmployeeId == id);
+            
+        return Ok(profile);
+    }
+
+    // ─────────────────────────────────────────────────────
+    // POST /api/employee/teacher-profile (Upsert)
+    // ─────────────────────────────────────────────────────
+    [HttpPost("teacher-profile")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> UpsertTeacherProfile([FromBody] UpsertTeacherProfileDto dto)
+    {
+        var profile = await _unitOfWork.Repository<TeacherProfile>().GetQueryable()
+            .FirstOrDefaultAsync(p => p.EmployeeId == dto.EmployeeId);
+
+        bool isNew = false;
+        if (profile == null)
+        {
+            profile = new TeacherProfile { EmployeeId = dto.EmployeeId };
+            await _unitOfWork.Repository<TeacherProfile>().AddAsync(profile);
+            isNew = true;
+        }
+
+        profile.HighestQualification = dto.HighestQualification;
+        profile.QualificationInstitution = dto.QualificationInstitution;
+        profile.QualificationYear = dto.QualificationYear;
+        profile.Specializations = dto.Specializations;
+        profile.PreviousExperienceYears = dto.PreviousExperienceYears;
+        profile.PreviousSchools = dto.PreviousSchools;
+
+        if (!isNew)
+        {
+            _unitOfWork.Repository<TeacherProfile>().Update(profile);
+        }
+        
+        await _unitOfWork.CompleteAsync();
+
+        return Ok(profile);
+    }
     private async Task<string> GenerateEmployeeCodeAsync()
     {
         var count = await _unitOfWork.Repository<Employee>().GetQueryable().CountAsync();
@@ -384,6 +546,8 @@ public class EmployeeController : ControllerBase
         IsActive        = e.IsActive,
         Status          = e.Status,
         DeactivationReason = e.DeactivationReason,
+        CreateSystemUser = e.IsLoginEnabled,
+        HasTeacherProfile = e.TeacherProfile != null,
         UserId          = e.UserId,
         CreatedAt       = e.CreatedAt,
         UpdatedAt       = e.UpdatedAt,

@@ -123,6 +123,13 @@ public class FeeController : ControllerBase
         await _feeService.GenerateMonthlyChargesAsync(request.ClassIds, request.Month, request.FeeHeadIds, request.AcademicYearId);
         return Ok();
     }
+    
+    [HttpPost("undo-generation")]
+    public async Task<IActionResult> UndoMonthlyCharges(GenerateChargesRequest request)
+    {
+        await _feeService.UndoMonthlyChargesAsync(request.ClassIds, request.Month, request.AcademicYearId);
+        return Ok();
+    }
 
     [HttpGet("history")]
     public async Task<IActionResult> GetFeeHistory([FromQuery] Guid? classId = null, [FromQuery] Guid? academicYearId = null)

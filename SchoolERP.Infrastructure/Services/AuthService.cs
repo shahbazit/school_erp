@@ -133,96 +133,101 @@ public class AuthService : IAuthService
             return new AuthResult { Success = false, Errors = new[] { "Invalid or expired OTP. Please request a new one." } };
         }
 
-        using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            // 1. Create Organization
-            var organization = new SchoolERP.Domain.Entities.Organization
+            using var transaction = await _dbContext.Database.BeginTransactionAsync();
+            try
             {
-                Name = schoolName,
-                Domain = schoolDomain,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dbContext.Organizations.Add(organization);
-            await _dbContext.SaveChangesAsync();
-
-            // 2. Create Employee Roles Master (NEW FEATURE)
-            var roleNames = new[] { "Admin", "Teacher", "Accountant", "Staff" };
-            EmployeeRole? adminRole = null;
-            foreach (var roleName in roleNames)
-            {
-                var er = new EmployeeRole { Name = roleName, OrganizationId = organization.Id, CreatedAt = DateTime.UtcNow };
-                _dbContext.EmployeeRoles.Add(er);
-                if (roleName == "Admin") adminRole = er;
-            }
-            await _dbContext.SaveChangesAsync();
-
-            // 3. Create Admin User
-            var names = pending.Name.Split(' ', 2);
-            var user = new User
-            {
-                Email = pending.Email,
-                MobileNumber = pending.Mobile ?? "",
-                PasswordHash = pending.PasswordHash,
-                FirstName = names[0],
-                LastName = names.Length > 1 ? names[1] : "",
-                Role = "Admin",
-                OrganizationId = organization.Id,
-                IsEmailVerified = true, 
-                IsMobileVerified = true,
-                HasConsentedToTerms = true,
-                ConsentDate = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dbContext.Users.Add(user);
-            await _dbContext.SaveChangesAsync(); // Need User ID for Employee mapping
-
-            // 4. Create Linked Employee Record (NEW FEATURE)
-            var employee = new Employee
-            {
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                WorkEmail = user.Email,
-                MobileNumber = user.MobileNumber,
-                EmployeeCode = $"EMP-{DateTime.Now.Date:yyyyMMdd}-001",
-                DateOfJoining = DateTime.UtcNow.Date,
-                OrganizationId = organization.Id,
-                UserId = user.Id,
-                EmployeeRoleId = adminRole?.Id,
-                IsActive = true,
-                Status = EmployeeStatus.Active,
-                EmploymentType = EmploymentType.FullTime,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dbContext.Employees.Add(employee);
-
-            // 5. Mark Pending as Deleted
-            _dbContext.PendingRegistrations.Remove(pending);
-
-            // 6. Seed Default Admin Permissions (FROM MENU MASTER)
-            var allMenus = await _dbContext.MenuMasters.Where(m => m.IsActive).ToListAsync();
-            foreach (var menu in allMenus)
-            {
-                _dbContext.MenuPermissions.Add(new MenuPermission
+                // 1. Create Organization
+                var organization = new SchoolERP.Domain.Entities.Organization
                 {
-                    RoleName = "Admin",
-                    MenuKey = menu.Key,
-                    IsVisible = true,
-                    OrganizationId = organization.Id,
+                    Name = schoolName,
+                    Domain = schoolDomain,
                     CreatedAt = DateTime.UtcNow
-                });
-            }
-            
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
+                };
+                _dbContext.Organizations.Add(organization);
+                await _dbContext.SaveChangesAsync();
 
-            return await GenerateAuthenticationResultForUserAsync(user);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return new AuthResult { Success = false, Errors = new[] { "Finalization failed: " + ex.Message } };
-        }
+                // 2. Create Employee Roles Master
+                var roleNames = new[] { "Admin", "Teacher", "Accountant", "Staff" };
+                EmployeeRole? adminRole = null;
+                foreach (var roleName in roleNames)
+                {
+                    var er = new EmployeeRole { Name = roleName, OrganizationId = organization.Id, CreatedAt = DateTime.UtcNow };
+                    _dbContext.EmployeeRoles.Add(er);
+                    if (roleName == "Admin") adminRole = er;
+                }
+                await _dbContext.SaveChangesAsync();
+
+                // 3. Create Admin User
+                var names = pending.Name.Split(' ', 2);
+                var user = new User
+                {
+                    Email = pending.Email,
+                    MobileNumber = pending.Mobile ?? "",
+                    PasswordHash = pending.PasswordHash,
+                    FirstName = names[0],
+                    LastName = names.Length > 1 ? names[1] : "",
+                    Role = "Admin",
+                    OrganizationId = organization.Id,
+                    IsEmailVerified = true,
+                    IsMobileVerified = true,
+                    HasConsentedToTerms = true,
+                    ConsentDate = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _dbContext.Users.Add(user);
+                await _dbContext.SaveChangesAsync();
+
+                // 4. Create Linked Employee Record
+                var employee = new Employee
+                {
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    WorkEmail = user.Email,
+                    MobileNumber = user.MobileNumber,
+                    EmployeeCode = $"EMP-{DateTime.Now.Date:yyyyMMdd}-001",
+                    DateOfJoining = DateTime.UtcNow.Date,
+                    OrganizationId = organization.Id,
+                    UserId = user.Id,
+                    EmployeeRoleId = adminRole?.Id,
+                    IsActive = true,
+                    IsLoginEnabled = true,
+                    Status = EmployeeStatus.Active,
+                    EmploymentType = EmploymentType.FullTime,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _dbContext.Employees.Add(employee);
+
+                // 5. Mark Pending as Deleted
+                _dbContext.PendingRegistrations.Remove(pending);
+
+                // 6. Seed Default Admin Permissions (FROM MENU MASTER)
+                var allMenus = await _dbContext.MenuMasters.Where(m => m.IsActive).ToListAsync();
+                foreach (var menu in allMenus)
+                {
+                    _dbContext.MenuPermissions.Add(new MenuPermission
+                    {
+                        RoleName = "Admin",
+                        MenuKey = menu.Key,
+                        IsVisible = true,
+                        OrganizationId = organization.Id,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                await _dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return await GenerateAuthenticationResultForUserAsync(user);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return new AuthResult { Success = false, Errors = new[] { "Finalization failed: " + ex.Message } };
+            }
+        });
     }
 
     public async Task<AuthResult> LoginAsync(string email, string password, Guid? organizationId)
@@ -232,6 +237,17 @@ public class AuthService : IAuthService
         var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == email );
         if (user == null)
             return new AuthResult { Success = false, Errors = new[] { "Invalid email or password" } };
+
+        // Check Employee linkage and status
+        var employee = await _dbContext.Employees.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.UserId == user.Id);
+        if (employee != null)
+        {
+            if (!employee.IsActive)
+                 return new AuthResult { Success = false, Errors = new[] { "Your account is locked. Please contact HR." } };
+            
+            if (!employee.IsLoginEnabled)
+                 return new AuthResult { Success = false, Errors = new[] { "System access is disabled for your account." } };
+        }
 
         // if (!user.IsEmailVerified)
         //    return new AuthResult { Success = false, Errors = new[] { "Email is not verified. Please verify OTP first." } };
@@ -243,7 +259,7 @@ public class AuthService : IAuthService
         if (!isPasswordValid)
         {
             user.FailedLoginAttempts++;
-            if (user.FailedLoginAttempts >= 3)
+            if (user.FailedLoginAttempts >= 10)
                 user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
             
             _dbContext.Users.Update(user);

@@ -479,20 +479,13 @@ public class ApplicationDbContext : DbContext
                 entry.Entity.UpdatedAt = DateTime.UtcNow;
                 entry.Entity.UpdatedBy = userId;
                 
-                // CRITICAL FAILSAFE: If the entity currently has Guid.Empty but we have a valid orgId, fix it!
-                if (orgId != Guid.Empty && entry.Entity.OrganizationId == Guid.Empty)
+                // If the entity is somehow missing its OrganizationId (e.g. legacy data), fix it.
+                // But only if we are not explicitly trying to change it.
+                var orgProp = entry.Property(x => x.OrganizationId);
+                if (orgId != Guid.Empty && entry.Entity.OrganizationId == Guid.Empty && !orgProp.IsModified)
                 {
                     entry.Entity.OrganizationId = orgId;
-                    entry.Property(x => x.OrganizationId).IsModified = true;
-                }
-                else if (entry.Property(x => x.OrganizationId).IsModified)
-                {
-                   // If it was manually changed (illegal or deliberate migration), allow it
-                }
-                else 
-                {
-                    // Otherwise don't touch the modified state
-                    entry.Property(x => x.OrganizationId).IsModified = false;
+                    orgProp.IsModified = true;
                 }
             }
         }

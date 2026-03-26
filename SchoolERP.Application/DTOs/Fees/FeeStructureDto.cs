@@ -18,7 +18,8 @@ public class FeeStructureDto
 public class CreateFeeStructureRequest
 {
     public Guid FeeHeadId { get; set; }
-    public Guid ClassId { get; set; }
+    public Guid? ClassId { get; set; } // Kept for backward compatibility
+    public List<Guid>? ClassIds { get; set; } // For multi-select support
     public Guid AcademicYearId { get; set; }
     public decimal Amount { get; set; }
     public string Frequency { get; set; } = "Monthly";

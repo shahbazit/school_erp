@@ -170,12 +170,27 @@ export default function StudentImport() {
           };
         });
 
-        setImportData(mapped);
-        setStep(2);
+        // 2. Perform Deep Server-side Validation (Duplicates, Academic Years etc.)
+        studentApi.bulkValidate(mapped).then(results => {
+           const finalData = mapped.map((row, idx) => {
+              const serverResult = results.find(r => r.row === idx + 1);
+              if (serverResult && serverResult.status === 'invalid') {
+                 const mergedErrors = Array.from(new Set([...row.errors, ...serverResult.errors]));
+                 return { ...row, status: 'invalid', errors: mergedErrors };
+              }
+              return row;
+           });
+           setImportData(finalData);
+           setStep(2);
+        }).catch(() => {
+           setError("Server validation failed. Please check your network connection.");
+           setImportData(mapped); // Show client-side results at least
+           setStep(2);
+        }).finally(() => setLoading(false));
+
       } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      console.error('Import failed', err);
+      // Try to extract server errors
       }
     };
     reader.readAsText(file);
@@ -186,11 +201,27 @@ export default function StudentImport() {
     if (validRows.length === 0) return;
 
     setProcessing(true);
+    setError(null);
     try {
       await studentApi.bulkEnroll(validRows);
       setStep(3);
     } catch (err: any) {
-      setError(err.message || "Failed to process bulk import.");
+      const serverMsg = err.response?.data?.Message || err.message;
+      const details = err.response?.data?.Details;
+      
+      if (details && Array.isArray(details)) {
+        // Update statuses in the table based on server feedback
+        setImportData(prev => prev.map((row, idx) => {
+           const rowError = details.find((d: any) => d.Row === idx + 1);
+           if (rowError) {
+              return { ...row, status: 'invalid', errors: rowError.Errors };
+           }
+           return row;
+        }));
+        setError("One or more rows failed final processing. See details below.");
+      } else {
+        setError(serverMsg || "Failed to process bulk import.");
+      }
     } finally {
       setProcessing(false);
     }

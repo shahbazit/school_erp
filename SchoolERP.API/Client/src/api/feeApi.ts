@@ -50,6 +50,9 @@ export const feeApi = {
   generateMonthlyCharges: async (classIds: string[], month: string, feeHeadIds?: string[], academicYearId?: string) => {
     await apiClient.post('/masters/fee/generate-charges', { classIds, month, feeHeadIds, academicYearId });
   },
+  undoMonthlyCharges: async (classIds: string[], month: string, academicYearId?: string) => {
+    await apiClient.post('/masters/fee/undo-generation', { classIds, month, academicYearId });
+  },
   getHistory: async (classId?: string, academicYearId?: string) => {
     let url = '/masters/fee/history?';
     if (classId) url += `classId=${classId}&`;

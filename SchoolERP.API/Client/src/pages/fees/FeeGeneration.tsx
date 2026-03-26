@@ -7,8 +7,9 @@ import {
   Loader2, 
   GraduationCap, 
   Calendar,
-  Zap,
-  FileText
+  RotateCcw,
+  ShieldCheck,
+  Info
 } from 'lucide-react';
 import { masterApi } from '../../api/masterApi';
 import { feeApi } from '../../api/feeApi';
@@ -21,14 +22,17 @@ export default function FeeGeneration() {
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
-    return `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+    return d.toLocaleString('default', { month: 'long' });
   });
   
   const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    masterApi.getAll('classes').then(setClasses).catch(console.error);
+    masterApi.getAll('classes').then(data => {
+      const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      setClasses(sorted);
+    }).catch(console.error);
     masterApi.getAll('academic-years').then(years => {
       setAcademicYears(years);
       const current = years.find((y: any) => y.isCurrent);
@@ -50,8 +54,6 @@ export default function FeeGeneration() {
     );
   };
 
-
-
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedClasses.length === 0) return;
@@ -63,253 +65,314 @@ export default function FeeGeneration() {
       setStatus('SUCCESS');
       fetchHistory();
     } catch (err: any) {
-      setError(err.response?.data || 'Process failed. Verify academic session status.');
+      const errorData = err.response?.data;
+      const errorMessage = typeof errorData === 'object' ? errorData.Message : (errorData || 'Process failed. Verify academic session status.');
+      setError(errorMessage);
+      setStatus('ERROR');
+    }
+  };
+
+  const handleUndo = async () => {
+    if (selectedClasses.length === 0) {
+        alert("Please select at least one class.");
+        return;
+    }
+    if (!window.confirm(`Are you sure you want to REVERT and DELETE all fee charges for ${selectedMonth} across ${selectedClasses.length} selected classes? This cannot be undone.`)) return;
+
+    setStatus('LOADING');
+    setError(null);
+    try {
+      await feeApi.undoMonthlyCharges(selectedClasses, selectedMonth, selectedYear);
+      setStatus('SUCCESS');
+      fetchHistory();
+    } catch (err: any) {
+      const errorData = err.response?.data;
+      const errorMessage = typeof errorData === 'object' ? errorData.Message : (errorData || 'Revert failed.');
+      setError(errorMessage);
       setStatus('ERROR');
     }
   };
 
   const months = [
-    "January", "February", "March", "April", "May", "June", 
-    "July", "August", "September", "October", "November", "December"
+    "April", "May", "June", "July", "August", "September", 
+    "October", "November", "December", "January", "February", "March"
   ];
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear - 1, currentYear, currentYear + 1];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Zap className="h-8 w-8 text-amber-500 fill-amber-500/10" />
-            Bulk Fee Generator
-          </h1>
-          <p className="text-slate-500 font-medium mt-1">Push academic charges from structure to student ledgers in seconds.</p>
-        </div>
-        <div className="hidden md:flex flex-col items-end">
-           <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-200">System Ready</span>
-           <p className="text-[10px] text-slate-400 mt-1 font-mono">{new Date().toLocaleDateString()} Ledger Time</p>
+    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
+      {/* Premium Header */}
+      <div className="relative">
+        <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-500 to-primary-200 rounded-full" />
+        <div className="flex items-center justify-between px-2">
+          <div>
+            <div className="flex items-center gap-2 text-primary-600 font-bold text-[10px] tracking-[0.25em] uppercase mb-2">
+              <ShieldCheck className="h-4 w-4" />
+              <span>Administrative Control Center</span>
+            </div>
+            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight flex items-center gap-4">
+              Financial Batch Engine
+              <div className="flex items-center gap-1 px-2 py-1 bg-primary-50 text-primary-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-primary-100">
+                v2.0 Stable
+              </div>
+            </h1>
+            <p className="text-slate-500 font-medium mt-2 max-w-xl">
+              Automated ledger posting system for school-wide fee allocation and adjustments.
+            </p>
+          </div>
+          <div className="hidden lg:flex flex-col items-end text-right">
+             <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-xs font-bold text-slate-600 tracking-tight">Ledger Instance: {academicYears.find(y => y.id === selectedYear)?.name || 'Ready'}</span>
+             </div>
+             <p className="text-[10px] text-slate-400 mt-2 font-mono uppercase tracking-widest">{new Date().toDateString()}</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass-card p-8 border-t-4 border-t-primary-600 relative overflow-hidden group">
-            <div className="absolute -right-12 -top-12 h-40 w-40 bg-primary-50 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-700" />
+      <div className="grid grid-cols-1 gap-10">
+        {/* Main Interface */}
+        <div className="space-y-8">
+          <div className="glass-card p-10 border-none shadow-2xl shadow-slate-200/40 relative overflow-hidden group/main">
+            {/* Design accents */}
+            <div className="absolute -right-20 -top-20 h-64 w-64 bg-primary-50 rounded-full opacity-40 blur-3xl group-hover/main:scale-125 transition-transform duration-1000" />
+            <div className="absolute -left-20 -bottom-20 h-64 w-64 bg-indigo-50 rounded-full opacity-40 blur-3xl group-hover/main:scale-125 transition-transform duration-1000" />
             
-            <form onSubmit={handleGenerate} className="relative z-10 space-y-6">
-               <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                      <GraduationCap className="h-3.5 w-3.5" /> Target Classes
-                    </label>
-                    <button 
-                      type="button"
-                      onClick={() => setSelectedClasses(selectedClasses.length === classes.length ? [] : classes.map(c => c.id))}
-                      className="text-[10px] font-bold text-primary-600 hover:text-primary-700"
-                    >
-                      {selectedClasses.length === classes.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {classes.map(c => (
-                      <label key={c.id} className={`flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer ${
-                        selectedClasses.includes(c.id) 
-                          ? 'bg-primary-50 border-primary-200 text-primary-900' 
-                          : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200'
-                      }`}>
-                        <input 
-                          type="checkbox"
-                          className="w-3.5 h-3.5 rounded border-slate-300 text-primary-600"
-                          checked={selectedClasses.includes(c.id)}
-                          onChange={() => toggleClass(c.id)}
-                        />
-                        <span className="text-xs font-bold truncate">{c.name}</span>
+            <form onSubmit={handleGenerate} className="relative z-10 space-y-10">
+               <div className="space-y-8">
+                  {/* Class Selection Grid */}
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-primary-500" /> 
+                        Identify Target Groups
                       </label>
-                    ))}
+                      <button 
+                        type="button"
+                        onClick={() => setSelectedClasses(selectedClasses.length === classes.length ? [] : classes.map(c => c.id))}
+                        className="text-[10px] font-bold text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-all"
+                      >
+                        {selectedClasses.length === classes.length ? 'Deselect Everything' : 'Include All Classes'}
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {classes.map(c => (
+                        <label key={c.id} className={`flex items-center gap-2.5 p-3.5 rounded-2xl border transition-all cursor-pointer group ${
+                          selectedClasses.includes(c.id) 
+                            ? 'bg-gradient-to-br from-primary-50 to-white border-primary-200 text-primary-900 shadow-md shadow-primary-500/5 ring-1 ring-primary-100' 
+                            : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200 hover:shadow-sm'
+                        }`}>
+                          <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                            selectedClasses.includes(c.id) ? 'bg-primary-500 border-primary-500' : 'bg-slate-50 border-slate-200 group-hover:border-primary-300'
+                          }`}>
+                            <input 
+                              type="checkbox"
+                              className="hidden"
+                              checked={selectedClasses.includes(c.id)}
+                              onChange={() => toggleClass(c.id)}
+                            />
+                            {selectedClasses.includes(c.id) && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                          </div>
+                          <span className="text-[13px] font-bold truncate tracking-tight">{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="space-y-2 pt-2">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" /> Billing Month
-                    </label>
-                    <select 
-                      required
-                      value={selectedMonth} 
-                      onChange={e => setSelectedMonth(e.target.value)}
-                      className="form-input text-sm bg-white border-slate-200/60 focus:ring-4 focus:ring-primary-500/10 h-12"
-                    >
-                      {years.map(y => months.map(m => (
-                        <option key={`${m} ${y}`} value={`${m} ${y}`}>{m} {y}</option>
-                      )))}
-                    </select>
+                  {/* Operational Settings */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-3xl border border-slate-100 group/config hover:bg-slate-50 transition-all">
+                    <div className="space-y-2.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <Settings2 className="h-4 w-4 text-indigo-500" /> Academic Session
+                      </label>
+                      <div className="relative">
+                        <select 
+                          required
+                          value={selectedYear} 
+                          onChange={e => setSelectedYear(e.target.value)}
+                          className="w-full h-14 pl-5 pr-10 bg-white border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary-500/10 transition-all appearance-none cursor-pointer"
+                        >
+                          {academicYears.map(y => (
+                            <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Active)' : ''}</option>
+                          ))}
+                        </select>
+                        <Settings2 className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-rose-500" /> Billing Cycle (Month)
+                      </label>
+                      <div className="relative">
+                        <select 
+                          required
+                          value={selectedMonth} 
+                          onChange={e => setSelectedMonth(e.target.value)}
+                          className="w-full h-14 pl-5 pr-10 bg-white border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary-500/10 transition-all appearance-none cursor-pointer"
+                        >
+                          {months.map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 pointer-events-none" />
+                      </div>
+                    </div>
                   </div>
                </div>
 
-
-
-               <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 flex items-start gap-4">
-                  <div className="p-2 bg-indigo-100 rounded-xl text-indigo-600">
-                    <Settings2 className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-indigo-900">Posting Scope</h4>
-                    <p className="text-xs text-indigo-700 mt-1 leading-relaxed opacity-80">
-                      The process will apply all configured <b>Monthly</b>, <b>Yearly</b> (if month 1), and <b>Quarterly</b> fees matching the class structure.
-                    </p>
-                  </div>
-               </div>
-
+               {/* Notifications */}
                {status === 'SUCCESS' && (
-                 <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    <p className="text-sm font-bold text-emerald-800">Fees successfully pushed for {selectedClasses.length} classes!</p>
+                 <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-3xl flex items-center gap-4 animate-in fade-in zoom-in-95 duration-300 shadow-sm shadow-emerald-500/5">
+                    <div className="p-2 bg-emerald-500 rounded-xl text-white shadow-lg shadow-emerald-500/20">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-emerald-900 leading-none">Operation Successful</h4>
+                      <p className="text-xs font-medium text-emerald-700 mt-1 opacity-80">Ledger balance updated for {selectedClasses.length} class segments.</p>
+                    </div>
                  </div>
                )}
 
                {status === 'ERROR' && (
-                 <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                    <AlertCircle className="h-5 w-5 text-rose-600" />
-                    <p className="text-sm font-bold text-rose-800">{error}</p>
+                 <div className="p-5 bg-rose-50 border border-rose-100 rounded-3xl flex items-center gap-4 animate-in fade-in shake-in-50 duration-300 shadow-sm shadow-rose-500/5">
+                    <div className="p-2 bg-rose-500 rounded-xl text-white shadow-lg shadow-rose-500/20">
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-rose-900 leading-none">Posting Interrupted</h4>
+                      <p className="text-xs font-medium text-rose-700 mt-1 opacity-80">{error}</p>
+                    </div>
                  </div>
                )}
 
-               <button 
-                 type="submit" 
-                 disabled={status === 'LOADING' || selectedClasses.length === 0}
-                 className="w-full h-14 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-2xl shadow-xl shadow-primary-500/20 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale transition-all duration-300"
-               >
-                 {status === 'LOADING' ? (
-                   <>
-                     <Loader2 className="h-6 w-6 animate-spin" />
-                     <span>Processing Ledger...</span>
-                   </>
-                 ) : (
-                   <>
-                     <Play className="h-6 w-6 fill-white" />
-                     <span>Generate & Post Charges</span>
-                   </>
-                 ) }
-               </button>
+               {/* Dual Action Buttons */}
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button 
+                    type="submit" 
+                    disabled={status === 'LOADING' || selectedClasses.length === 0}
+                    className="md:col-span-2 h-16 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-black rounded-3xl shadow-xl shadow-primary-500/25 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale transition-all duration-300 relative overflow-hidden group/btn"
+                  >
+                    <div className="absolute inset-0 bg-white/10 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300" />
+                    {status === 'LOADING' ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="tracking-tight">Processing Transactions...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-6 w-6 fill-white" />
+                        <span className="tracking-tight uppercase text-sm">Post Charges to Ledger</span>
+                      </>
+                    ) }
+                  </button>
 
-               <div className="pt-6 border-t border-slate-100/50">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" /> Generation Status ({academicYears.find(y => y.id === selectedYear)?.name})
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                    {months.map(m => {
-                      // Simple logic: if month is Jan-Mar, it's next year part of session, else same year.
-                      // But the selector saves "Month Year". 
-                      // For now, let's just check if ANY history exists for this month in classHistory
-                      const hasGeneration = classHistory.some(h => h.month.startsWith(m));
-                      return (
-                        <div key={m} className={`p-2.5 rounded-xl border text-center transition-all ${
-                          hasGeneration 
-                            ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
-                            : 'bg-rose-50 border-rose-100 text-rose-600 opacity-60'
-                        }`}>
-                          <p className="text-[10px] font-black uppercase tracking-tight">{m.substring(0, 3)}</p>
-                          <div className={`h-1 w-1 mx-auto rounded-full mt-1 ${hasGeneration ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={status === 'LOADING' || selectedClasses.length === 0}
+                    className="h-16 bg-white hover:bg-rose-50 border-2 border-slate-100 hover:border-rose-100 text-slate-400 hover:text-rose-600 font-bold rounded-3xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-30 transition-all duration-300"
+                  >
+                    <RotateCcw className="h-5 w-5" />
+                    <span className="text-sm">Revert Batch</span>
+                  </button>
                </div>
-
-             </form>
+               
+               <div className="pt-2 px-4 flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">
+                 <Info className="h-3.5 w-3.5" />
+                 Duplicate charges for the same student, head, and month will be auto-ignored.
+               </div>
+            </form>
           </div>
         </div>
 
-        {/* Global Session Config */}
+        {/* Matrix Visualization */}
         <div className="space-y-6">
-           <div className="glass-card p-6 bg-slate-900 text-white relative overflow-hidden group">
-              <div className="absolute -right-8 -bottom-8 h-24 w-24 bg-primary-500/10 rounded-full blur-2xl" />
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <Settings2 className="h-3.5 w-3.5 text-primary-400" /> Target Session
-              </label>
-              <select 
-                value={selectedYear}
-                onChange={e => setSelectedYear(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-xl text-xs py-3 px-4 focus:ring-2 focus:ring-primary-500/50 transition-all outline-none"
-              >
-                {academicYears.map(y => (
-                  <option key={y.id} value={y.id} className="text-slate-900">{y.name} {y.isCurrent ? '(Current)' : ''}</option>
-                ))}
-              </select>
-              <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/5">
-                 <p className="text-[10px] text-slate-400 leading-relaxed uppercase font-bold tracking-tighter">Current Session View Only</p>
-                 <p className="text-[9px] text-slate-500 mt-0.5 italic">* Charges will be tagged to the selected academic session ID for accounting consistency.</p>
+          <div className="flex items-center justify-between px-2">
+             <div>
+               <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                  <CheckCircle2 className="h-7 w-7 text-primary-500" />
+                  Generation Visibility Grid
+               </h3>
+               <p className="text-xs text-slate-500 font-medium mt-1">Cross-check processing status across all class segments.</p>
+             </div>
+             <div className="flex gap-6">
+                <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100/50">
+                   <div className="h-2.5 w-2.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                   <span className="text-[10px] font-black text-emerald-800 uppercase tracking-tight">Generated</span>
+                </div>
+                <div className="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-100/50">
+                   <div className="h-2.5 w-2.5 bg-rose-500 rounded-full" />
+                   <span className="text-[10px] font-black text-rose-800 uppercase tracking-tight">Pending</span>
+                 </div>
+                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100/50">
+                    <div className="h-2.5 w-2.5 bg-slate-300 rounded-full" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">No Students</span>
+                 </div>
               </div>
-           </div>
-
-           <div className="p-6 rounded-3xl bg-amber-50 border border-amber-100 space-y-3">
-            <h4 className="text-amber-900 font-bold text-sm">Cautionary Note</h4>
-            <p className="text-amber-800 text-[11px] leading-relaxed">
-              Batch generation cannot be undone automatically. All posted charges will reflect in student ledgers immediately.
-            </p>
           </div>
-        </div>
-      </div>
 
-      {/* History Section - Full Width Bottom */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-           <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <FileText className="h-6 w-6 text-primary-600" />
-              Transactional Batch History
-           </h3>
-           <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">{classHistory.length} batches found</span>
-        </div>
-
-        <div className="glass-card overflow-hidden border border-slate-200/60 shadow-xl shadow-slate-200/20">
-           <table className="w-full text-left border-collapse">
-              <thead>
-                 <tr className="bg-slate-50/80 border-b border-slate-200/60">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Post Date</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Class</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Month/Ref</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Students</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Batch Amount</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                 {classHistory.length === 0 ? (
-                    <tr>
-                       <td colSpan={5} className="px-6 py-12 text-center text-sm text-slate-400 italic">No batches posting found for this session.</td>
-                    </tr>
-                 ) : (
-                    classHistory.map((h, i) => (
-                       <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-4">
-                             <span className="text-xs font-bold text-slate-900">{new Date(h.lastPostedDate).toLocaleDateString()}</span>
-                             <p className="text-[10px] text-slate-400">{new Date(h.lastPostedDate).toLocaleTimeString()}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                             <span className="text-xs font-black text-primary-600 uppercase tracking-tight">{h.className}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-900">{h.month}</span>
-                                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-mono">#{i + 1001}</span>
+          <div className="glass-card p-2 border-none shadow-xl shadow-slate-200/30 overflow-hidden">
+             <div className="overflow-x-auto custom-scrollbar">
+               <table className="w-full text-left border-collapse min-w-[1000px]">
+                  <thead>
+                     <tr className="bg-slate-50/50 rounded-2xl">
+                        <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] sticky left-0 bg-white/80 backdrop-blur-md z-20 border-r border-slate-100/50">Class Model</th>
+                        {months.map(m => (
+                          <th key={m} className="px-3 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] text-center font-mono">{m.substring(0, 3)}</th>
+                        ))}
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/50">
+                     {classes.map(c => (
+                       <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-6 py-4 sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 border-r border-slate-100">
+                             <div className="flex items-center gap-3">
+                               <div className="w-1.5 h-1.5 rounded-full bg-primary-100 group-hover:bg-primary-500 transition-colors" />
+                               <span className="text-xs font-black text-slate-700 uppercase tracking-tight">{c.name}</span>
                              </div>
                           </td>
-                          <td className="px-6 py-4 text-xs font-medium text-slate-600">
-                             {h.studentCount} Pupils
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                             <span className="text-sm font-black text-slate-900">₹{h.totalAmount.toLocaleString()}</span>
-                          </td>
+                          {months.map(m => {
+                            const hasGen = classHistory.some(h => h.classId === c.id && h.month.includes(m));
+                            const isEmpty = c.studentCount === 0;
+
+                            return (
+                              <td key={m} className="px-3 py-4 text-center">
+                                 <div className={`mx-auto h-7 w-7 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                                   hasGen 
+                                    ? 'bg-emerald-50 text-emerald-600 scale-100 rotate-0 shadow-sm shadow-emerald-200/50' 
+                                    : (isEmpty 
+                                        ? 'bg-slate-50 text-slate-200 scale-75 border border-slate-100/50 opacity-40' 
+                                        : 'bg-rose-50 text-rose-400 scale-95 group-hover:scale-100 border border-rose-100/50'
+                                      )
+                                 }`}>
+                                    {hasGen ? (
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    ) : (
+                                      isEmpty ? <div className="h-1 w-1 rounded-full bg-slate-300" /> : <AlertCircle className="h-3.5 w-3.5 opacity-60" />
+                                    )}
+                                 </div>
+                              </td>
+                            );
+                          })}
                        </tr>
-                    ))
-                 )}
-              </tbody>
-           </table>
+                     ))}
+                     {classes.length === 0 && (
+                       <tr>
+                         <td colSpan={13} className="px-6 py-20 text-center">
+                            <div className="flex flex-col items-center gap-3">
+                              <Info className="h-10 w-10 text-slate-200" />
+                              <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Awaiting class structure...</p>
+                            </div>
+                         </td>
+                       </tr>
+                     )}
+                  </tbody>
+               </table>
+             </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

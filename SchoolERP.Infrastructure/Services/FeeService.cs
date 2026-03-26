@@ -124,19 +124,39 @@ public class FeeService : IFeeService
 
     public async Task<FeeStructureDto> CreateFeeStructureAsync(CreateFeeStructureRequest request)
     {
-        var structure = new FeeStructure
+        var classIds = new List<Guid>();
+        if (request.ClassIds != null && request.ClassIds.Any())
         {
-            FeeHeadId = request.FeeHeadId,
-            ClassId = request.ClassId,
-            AcademicYearId = request.AcademicYearId,
-            Amount = request.Amount,
-            Frequency = request.Frequency,
-            ApplicableMonth = (request.Frequency == "Yearly" || request.Frequency == "One-time" || request.Frequency == "One-Time") ? request.ApplicableMonth : null,
-            Description = request.Description
-        };
-        await _unitOfWork.Repository<FeeStructure>().AddAsync(structure);
+            classIds.AddRange(request.ClassIds);
+        }
+        else if (request.ClassId.HasValue)
+        {
+            classIds.Add(request.ClassId.Value);
+        }
+
+        if (!classIds.Any()) throw new Exception("At least one Class must be selected.");
+
+        FeeStructure lastStructure = null!;
+        foreach (var classId in classIds)
+        {
+            var structure = new FeeStructure
+            {
+                FeeHeadId = request.FeeHeadId,
+                ClassId = classId,
+                AcademicYearId = request.AcademicYearId,
+                Amount = request.Amount,
+                Frequency = request.Frequency,
+                ApplicableMonth = (request.Frequency == "Yearly" || request.Frequency == "One-time" || request.Frequency == "One-Time") ? request.ApplicableMonth : null,
+                Description = request.Description
+            };
+            await _unitOfWork.Repository<FeeStructure>().AddAsync(structure);
+            lastStructure = structure;
+        }
+
         await _unitOfWork.CompleteAsync();
-        return (await GetFeeStructuresAsync()).First(x => x.Id == structure.Id);
+        
+        // Return the last one or re-fetch (GetFeeStructuresAsync uses includes)
+        return (await GetFeeStructuresAsync()).First(x => x.Id == lastStructure.Id);
     }
 
     public async Task UpdateFeeStructureAsync(Guid id, CreateFeeStructureRequest request)
@@ -145,7 +165,7 @@ public class FeeService : IFeeService
         if (structure != null)
         {
             structure.FeeHeadId = request.FeeHeadId;
-            structure.ClassId = request.ClassId;
+            structure.ClassId = request.ClassId ?? Guid.Empty; // Fixed Guid? conversion
             structure.AcademicYearId = request.AcademicYearId;
             structure.Amount = request.Amount;
             structure.Frequency = request.Frequency;
@@ -307,6 +327,9 @@ public class FeeService : IFeeService
             
         if (currentYear == null) throw new Exception("No active academic session found for the provided ID or current configuration.");
 
+        var orgId = _organizationService.GetOrganizationId();
+        var monthName = month.Split(' ')[0];
+
         foreach (var classId in classIds)
         {
             var structuresQuery = _unitOfWork.Repository<FeeStructure>().GetQueryable()
@@ -320,37 +343,60 @@ public class FeeService : IFeeService
 
             var structures = await structuresQuery.ToListAsync();
 
-            var students = await _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+            var studentAcademics = await _unitOfWork.Repository<StudentAcademic>().GetQueryable()
                 .Include(sa => sa.Student)
                 .Where(sa => sa.ClassId == classId && sa.IsCurrent && sa.Student.IsActive)
-                .Select(sa => sa.Student)
                 .ToListAsync();
 
+            var students = studentAcademics.Select(sa => sa.Student).ToList();
             if (!students.Any()) continue;
+
+            var studentIds = students.Select(s => s.Id).ToList();
+
+            // Fetch all existing accounts for these students in bulk
+            var existingAccounts = await _unitOfWork.Repository<StudentFeeAccount>().GetQueryable()
+                .Where(a => studentIds.Contains(a.StudentId))
+                .ToListAsync();
+
+            // Fetch existing transactions to prevent duplicates in bulk
+            // We search for type "Charge" and description containing the month or relevant head name
+            var existingTransactions = await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
+                .Where(t => studentIds.Contains(t.StudentId) && t.Type == "Charge" && t.AcademicYearId == currentYear.Id)
+                .ToListAsync();
 
             // Fetch all selective fee subscriptions
             var subscriptions = await _unitOfWork.Repository<StudentFeeSubscription>().GetQueryable()
-                .Where(sub => students.Select(s => s.Id).Contains(sub.StudentId) && sub.IsActive)
+                .Where(sub => studentIds.Contains(sub.StudentId) && sub.IsActive)
                 .ToListAsync();
 
             // Fetch all discount assignments for the current academic session
             var discountAssignments = await _unitOfWork.Repository<FeeDiscountAssignment>().GetQueryable()
                 .Include(a => a.Discount)
-                .Where(a => students.Select(s => s.Id).Contains(a.StudentId) && a.AcademicYearId == currentYear.Id && a.IsActive)
+                .Where(a => studentIds.Contains(a.StudentId) && a.AcademicYearId == currentYear.Id && a.IsActive)
                 .ToListAsync();
 
             foreach (var student in students)
             {
                 var studentSubs = subscriptions.Where(s => s.StudentId == student.Id).ToList();
                 var studentDiscounts = discountAssignments.Where(a => a.StudentId == student.Id).ToList();
-                var account = await _unitOfWork.Repository<StudentFeeAccount>().GetQueryable()
-                    .FirstOrDefaultAsync(a => a.StudentId == student.Id);
-
+                
+                var account = existingAccounts.FirstOrDefault(a => a.StudentId == student.Id);
                 if (account == null)
                 {
-                    account = new StudentFeeAccount { StudentId = student.Id };
+                    account = new StudentFeeAccount 
+                    { 
+                        StudentId = student.Id,
+                        OrganizationId = orgId,
+                        TotalAllocated = 0,
+                        TotalPaid = 0,
+                        TotalDiscount = 0,
+                        LastTransactionDate = DateTime.UtcNow
+                    };
                     await _unitOfWork.Repository<StudentFeeAccount>().AddAsync(account);
+                    existingAccounts.Add(account); // Add to local list to handle potential duplicates in memory if any
                 }
+
+                var studentExistingTxs = existingTransactions.Where(t => t.StudentId == student.Id).ToList();
 
                 foreach (var fee in structures)
                 {
@@ -361,14 +407,11 @@ public class FeeService : IFeeService
                     if (feeHead.IsSelective)
                     {
                         var subscription = studentSubs.FirstOrDefault(s => s.FeeHeadId == fee.FeeHeadId);
-                        if (subscription == null) continue; // Student not opted in for this elective fee (Bus, Hobby, etc.)
+                        if (subscription == null) continue; // Student not opted in for this elective fee
                         
                         if (subscription.CustomAmount.HasValue)
                            chargeAmount = subscription.CustomAmount.Value;
                     }
-
-                    var monthName = month.Split(' ')[0];
-                    bool shouldCharge = false;
 
                     // Applicable Month Check (For Yearly/One-time)
                     if (fee.Frequency == "Yearly" || fee.Frequency == "One-time" || fee.Frequency == "One-Time")
@@ -380,7 +423,7 @@ public class FeeService : IFeeService
                         }
                     }
 
-                    // Quarterly Logic (Standard: April, July, October, January)
+                    // Quarterly Logic
                     if (fee.Frequency == "Quarterly")
                     {
                         var standardQuarters = new[] { "April", "July", "October", "January" };
@@ -396,28 +439,26 @@ public class FeeService : IFeeService
                         }
                     }
 
+                    bool alreadyCharged = false;
                     if (fee.Frequency == "Monthly" || fee.Frequency == "Quarterly") 
                     {
-                        shouldCharge = !await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
-                            .AnyAsync(t => t.StudentId == student.Id && t.Type == "Charge" && t.Description!.Contains(month) && t.Description.Contains(feeHead.Name));
+                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(month) && t.Description.Contains(feeHead.Name));
                     }
                     else if (fee.Frequency == "Yearly")
                     {
-                        shouldCharge = !await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
-                            .AnyAsync(t => t.StudentId == student.Id && t.Type == "Charge" && t.Description!.Contains(feeHead.Name) && t.TransactionDate > DateTime.UtcNow.AddMonths(-10));
+                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(feeHead.Name) && t.TransactionDate > DateTime.UtcNow.AddMonths(-10));
                     }
                     else if (fee.Frequency == "One-Time" || fee.Frequency == "One-time")
                     {
-                        shouldCharge = !await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
-                            .AnyAsync(t => t.StudentId == student.Id && t.Type == "Charge" && t.Description!.Contains(feeHead.Name));
+                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(feeHead.Name));
                     }
 
-                    if (shouldCharge)
+                    if (!alreadyCharged)
                     {
                         var chargeTx = new FeeTransaction
                         {
                             StudentId = student.Id,
-                            OrganizationId = _organizationService.GetOrganizationId(),
+                            OrganizationId = orgId,
                             TransactionDate = DateTime.UtcNow,
                             Type = "Charge",
                             Amount = chargeAmount,
@@ -426,8 +467,9 @@ public class FeeService : IFeeService
                         };
                         await _unitOfWork.Repository<FeeTransaction>().AddAsync(chargeTx);
                         account.TotalAllocated += chargeAmount;
+                        studentExistingTxs.Add(chargeTx); // Update local list
 
-                        // Check if any discounts apply to this specific Fee Head or to all heads
+                        // Discounts
                         var applicableDiscounts = studentDiscounts
                             .Where(d => d.RestrictedFeeHeadId == null || d.RestrictedFeeHeadId == feeHead.Id)
                             .ToList();
@@ -436,7 +478,7 @@ public class FeeService : IFeeService
                         {
                             var discount = assignment.Discount;
                             var frequency = assignment.CustomFrequency ?? discount.Frequency;
-                            if (frequency != fee.Frequency) continue; // Match frequency (Monthly/Yearly)
+                            if (frequency != fee.Frequency) continue;
 
                             decimal discountAmount = 0;
                             var calculationType = assignment.CustomCalculationType ?? discount.CalculationType;
@@ -452,7 +494,7 @@ public class FeeService : IFeeService
                                 var discountTx = new FeeTransaction
                                 {
                                     StudentId = student.Id,
-                                    OrganizationId = _organizationService.GetOrganizationId(),
+                                    OrganizationId = orgId,
                                     TransactionDate = DateTime.UtcNow,
                                     Type = "Discount",
                                     Amount = discountAmount,
@@ -466,7 +508,56 @@ public class FeeService : IFeeService
                     }
                 }
                 account.LastTransactionDate = DateTime.UtcNow;
-                _unitOfWork.Repository<StudentFeeAccount>().Update(account);
+            }
+        }
+
+        await _unitOfWork.CompleteAsync();
+    }
+    public async Task UndoMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, Guid? academicYearId = null)
+    {
+        var yearQuery = _unitOfWork.Repository<AcademicYear>().GetQueryable();
+        var currentYear = academicYearId.HasValue 
+            ? await yearQuery.FirstOrDefaultAsync(y => y.Id == academicYearId.Value)
+            : await yearQuery.FirstOrDefaultAsync(y => y.IsCurrent && y.IsActive);
+            
+        if (currentYear == null) throw new Exception("No active academic session found.");
+
+        foreach (var classId in classIds)
+        {
+            var studentIds = await _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                .Where(sa => sa.ClassId == classId && sa.IsCurrent)
+                .Select(sa => sa.StudentId)
+                .ToListAsync();
+
+            if (!studentIds.Any()) continue;
+
+            // Find all matching "Charge" or "Discount" transactions for this month and class
+            var transactions = await _unitOfWork.Repository<FeeTransaction>().GetQueryable()
+                .Where(t => studentIds.Contains(t.StudentId) 
+                         && (t.Type == "Charge" || t.Type == "Discount") 
+                         && t.AcademicYearId == currentYear.Id 
+                         && t.Description != null && t.Description.Contains(month))
+                .ToListAsync();
+
+            if (!transactions.Any()) continue;
+
+            var accounts = await _unitOfWork.Repository<StudentFeeAccount>().GetQueryable()
+                .Where(a => studentIds.Contains(a.StudentId))
+                .ToListAsync();
+
+            foreach (var tx in transactions)
+            {
+                var account = accounts.FirstOrDefault(a => a.StudentId == tx.StudentId);
+                if (account != null)
+                {
+                    if (tx.Type == "Charge") 
+                        account.TotalAllocated -= tx.Amount;
+                    else if (tx.Type == "Discount") 
+                        account.TotalDiscount -= tx.Amount;
+                    
+                    account.LastTransactionDate = DateTime.UtcNow;
+                }
+                _unitOfWork.Repository<FeeTransaction>().Delete(tx);
             }
         }
 
@@ -476,7 +567,6 @@ public class FeeService : IFeeService
     public async Task<IEnumerable<ClassFeeHistoryDto>> GetFeeHistoryAsync(Guid? classId = null, Guid? academicYearId = null)
     {
         var query = _unitOfWork.Repository<FeeTransaction>().GetQueryable()
-            .Include(t => t.Student)
             .Where(t => t.Type == "Charge" && t.Description != null);
 
         if (academicYearId.HasValue)
@@ -484,28 +574,46 @@ public class FeeService : IFeeService
             query = query.Where(t => t.AcademicYearId == academicYearId.Value);
         }
 
-        if (classId.HasValue)
-        {
-            // Join with StudentAcademic to filter by class
-            query = query.Where(t => _unitOfWork.Repository<StudentAcademic>().GetQueryable()
-                .Any(sa => sa.StudentId == t.StudentId && sa.ClassId == classId.Value && sa.AcademicYear == (t.AcademicYear != null ? t.AcademicYear.Name : "")));
-        }
+        // Project to what we need first to avoid complex object grouping
+        var flatData = await query
+            .Select(t => new {
+                t.Description,
+                t.Amount,
+                t.StudentId,
+                t.TransactionDate,
+                // Try to get class name via join/subquery that EF can translate
+                ClassName = _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                    .Where(sa => sa.StudentId == t.StudentId && sa.IsCurrent)
+                    .Select(sa => sa.Class.Name)
+                    .FirstOrDefault(),
+                ClassId = _unitOfWork.Repository<StudentAcademic>().GetQueryable()
+                    .Where(sa => sa.StudentId == t.StudentId && sa.IsCurrent)
+                    .Select(sa => sa.ClassId)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
 
-        var history = await query
-            .GroupBy(t => new { t.Description, AcademicRecord = _unitOfWork.Repository<StudentAcademic>().GetQueryable().OrderByDescending(sa => sa.CreatedAt).FirstOrDefault(sa => sa.StudentId == t.StudentId) })
+        // Apply class filtering in memory if needed (safest for cross-repo queries)
+        var filteredData = classId.HasValue 
+            ? flatData.Where(x => x.ClassId == classId.Value) 
+            : flatData;
+
+        // Group in memory
+        var history = filteredData
+            .GroupBy(x => new { x.Description, x.ClassName, x.ClassId })
             .Select(g => new ClassFeeHistoryDto
             {
-                ClassId = g.Key.AcademicRecord != null ? g.Key.AcademicRecord.ClassId : Guid.Empty,
-                ClassName = g.Key.AcademicRecord != null && g.Key.AcademicRecord.Class != null ? g.Key.AcademicRecord.Class.Name : "Unknown",
+                ClassId = g.Key.ClassId,
+                ClassName = g.Key.ClassName ?? "General",
                 Month = g.Key.Description ?? "Unknown",
                 FeeHeadName = "Batch Generation",
-                TotalAmount = g.Sum(t => t.Amount),
-                StudentCount = g.Select(t => t.StudentId).Distinct().Count(),
-                LastPostedDate = g.Max(t => t.TransactionDate)
+                TotalAmount = g.Sum(x => x.Amount),
+                StudentCount = g.Select(x => x.StudentId).Distinct().Count(),
+                LastPostedDate = g.Max(x => x.TransactionDate)
             })
             .OrderByDescending(h => h.LastPostedDate)
             .Take(50)
-            .ToListAsync();
+            .ToList();
 
         return history;
     }

@@ -49,6 +49,7 @@ public class Employee : BaseEntity
     // 4. Status
     public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
     public bool IsActive { get; set; } = true;
+    public bool IsLoginEnabled { get; set; } = true;
     public string? DeactivationReason { get; set; }
 
     // 5. Optional Login Linkage

@@ -56,6 +56,7 @@ export interface EmployeeDto {
   status: number;
   statusName: string;
   deactivationReason?: string;
+  hasTeacherProfile: boolean;
   userId?: string;
   createdAt: string;
   updatedAt?: string;
@@ -93,6 +94,8 @@ export interface CreateEmployeeDto {
   dateOfJoining: string;
   employmentType: EmploymentType;
   workLocation?: string;
+  createSystemUser?: boolean;
+  systemPassword?: string;
   userId?: string;
 }
 
