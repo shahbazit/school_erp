@@ -66,9 +66,9 @@ export default function StudentImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    masterApi.getAll('classes').then(setClasses);
-    masterApi.getAll('sections').then(setSections);
-    masterApi.getAll('academic-years').then(setAcademicYears);
+    masterApi.getAll('classes').then(cls => setClasses(cls.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))));
+    masterApi.getAll('sections').then(sec => setSections(sec.sort((a: any, b: any) => a.name.localeCompare(b.name))));
+    masterApi.getAll('academic-years').then(years => setAcademicYears(years.sort((a: any, b: any) => b.name.localeCompare(a.name))));
   }, []);
 
   const copyToClipboard = (text: string, id: string) => {

@@ -75,7 +75,18 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
 
   const handleOpenEditModal = (master: any) => {
     setEditingMaster(master);
-    setFormData(master);
+    const formattedData = { ...master };
+    formFields.forEach(f => {
+      if (f.type === 'date' && master[f.name]) {
+        // Handle ISO string or Date object and convert to yyyy-MM-dd
+        try {
+          formattedData[f.name] = new Date(master[f.name]).toISOString().substring(0, 10);
+        } catch {
+          formattedData[f.name] = master[f.name];
+        }
+      }
+    });
+    setFormData(formattedData);
     setIsModalOpen(true);
   };
 

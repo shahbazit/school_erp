@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
   GraduationCap, Settings, LogOut, Bell, Menu, ChevronDown, 
-  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack
+  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -284,19 +284,19 @@ function App() {
               </div>
             )}
 
-            {/* 7. System Configuration */}
+            {/* 7. Masters Menu */}
             {hasPermission('settings') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('setup')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Settings className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button onClick={() => sidebarOpen && toggleSubMenu('masters')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
+                  <Database className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">System Setup</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['setup'] ? 'rotate-180' : ''}`} />
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Masters Menu</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['masters'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
                 </button>
-                {sidebarOpen && openMenus['setup'] && (
+                {sidebarOpen && openMenus['masters'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
                     <Link to="/masters/academic-years" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Academic Sessions</Link>
                     <Link to="/masters/classes" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Class Master</Link>
@@ -305,7 +305,27 @@ function App() {
                     <Link to="/masters/departments" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Departments</Link>
                     <Link to="/masters/designations" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Designations</Link>
                     <Link to="/masters/rooms" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Infrastructure Rooms</Link>
+                    <Link to="/masters/labs" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Lab Master</Link>
                     <Link to="/lookups" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">General Lookups</Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 8. Settings */}
+            {hasPermission('settings') && (
+              <div className="space-y-1">
+                <button onClick={() => sidebarOpen && toggleSubMenu('setup')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
+                  <Settings className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                  {sidebarOpen && (
+                    <>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Settings</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['setup'] ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+                {sidebarOpen && openMenus['setup'] && (
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
                     <Link to="/settings/permissions" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Menu Controls</Link>
                     <Link to="/settings/users" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">User Management</Link>
                     <Link to="/settings/setup" className="block py-1.5 text-sm text-primary-600 font-bold hover:text-primary-700 transition-colors">System Quick Setup</Link>
@@ -480,7 +500,12 @@ function App() {
               <Route path="/masters/academic-years" element={
                 <MasterDataPage 
                   title="Academic Year" subtitle="Manage school sessions" endpoint="academic-years"
-                  columns={[ { key: 'name', label: 'Year' }, { key: 'startDate', label: 'Starts' }, { key: 'endDate', label: 'Ends' }, { key: 'isCurrent', label: 'Current?' } ]}
+                  columns={[ 
+                    { key: 'name', label: 'Year' }, 
+                    { key: 'startDate', label: 'Starts', render: (v) => <span className="text-slate-600 font-medium">{new Date(v).toLocaleDateString()}</span> }, 
+                    { key: 'endDate', label: 'Ends', render: (v) => <span className="text-slate-600 font-medium">{new Date(v).toLocaleDateString()}</span> }, 
+                    { key: 'isCurrent', label: 'Current?', render: (v) => <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${v ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{v ? 'YES' : 'NO'}</span> } 
+                  ]}
                   formFields={[ 
                     { name: 'name', label: 'Session Name', type: 'text', required: true },
                     { name: 'startDate', label: 'Start Date', type: 'date', required: true },

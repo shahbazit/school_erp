@@ -221,6 +221,8 @@ public class ApplicationDbContext : DbContext
         builder.Entity<Subject>().HasIndex(e => e.OrganizationId);
         builder.Entity<AcademicStream>().HasIndex(e => e.OrganizationId);
         builder.Entity<AcademicYear>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AcademicYear>().Property(e => e.StartDate).HasColumnType("date");
+        builder.Entity<AcademicYear>().Property(e => e.EndDate).HasColumnType("date");
         builder.Entity<Department>().HasIndex(e => e.OrganizationId);
         builder.Entity<Designation>().HasIndex(e => e.OrganizationId);
         builder.Entity<EmployeeRole>().HasIndex(e => e.OrganizationId);

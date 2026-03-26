@@ -83,11 +83,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
         masterApi.getAll('fee/discounts'),
         masterApi.getAll('academic-years'),
       ]);
-      setClasses(cls);
-      setSections(sec);
-      setFeeHeads(heads.filter((h: any) => h.isSelective));
-      setAvailableDiscounts(discs);
-      setAcademicYears(years);
+      setClasses(cls.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
+      setSections(sec.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setFeeHeads(heads.filter((h: any) => h.isSelective).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setAvailableDiscounts(discs.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setAcademicYears(years.sort((a: any, b: any) => b.name.localeCompare(a.name))); // For years, usually want newest first
       
       const currentYear = years.find((y: any) => y.isCurrent);
       if (currentYear && !initialData) {
