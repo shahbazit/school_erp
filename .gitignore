@@ -539,3 +539,8 @@ mobile/
 PropCRM/wwwroot/uploads/**
 wwwroot/uploads/**
 [Uu]ploads/
+
+# Publish output
+publish_output/
+publish_output_new/
+publish_output_v2/

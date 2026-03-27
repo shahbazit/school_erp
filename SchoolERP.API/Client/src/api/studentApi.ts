@@ -35,12 +35,12 @@ export const studentApi = {
   },
 
   update: async (id: string, data: UpdateStudentDto): Promise<Student> => {
-    const response = await apiClient.put<Student>(`/student/${id}`, data);
+    const response = await apiClient.post<Student>(`/student/${id}/update`, data);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/student/${id}`);
+    await apiClient.post(`/student/${id}/delete`);
   },
 
   bulkEnroll: async (students: any[]) => {

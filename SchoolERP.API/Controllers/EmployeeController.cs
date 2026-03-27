@@ -226,7 +226,7 @@ public class EmployeeController : ControllerBase
     // ─────────────────────────────────────────────────────
     // PUT /api/employee/{id}
     // ─────────────────────────────────────────────────────
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateEmployeeDto dto)
     {
@@ -365,7 +365,7 @@ public class EmployeeController : ControllerBase
     // ─────────────────────────────────────────────────────
     // DELETE /api/employee/{id}   – Soft deactivate
     // ─────────────────────────────────────────────────────
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> Deactivate(Guid id, [FromQuery] string? reason = null)
     {
@@ -432,7 +432,7 @@ public class EmployeeController : ControllerBase
     // ─────────────────────────────────────────────────────
     // DELETE /api/employee/{id}/documents/{docId}
     // ─────────────────────────────────────────────────────
-    [HttpDelete("{id}/documents/{docId}")]
+    [HttpPost("{id}/documents/{docId}/delete")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> RemoveDocument(Guid id, Guid docId)
     {

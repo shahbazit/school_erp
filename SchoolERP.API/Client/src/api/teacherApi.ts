@@ -104,7 +104,7 @@ export const teacherApi = {
   },
   
   delete: async (employeeId: string): Promise<void> => {
-    await apiClient.delete(`/teacher/${employeeId}`);
+    await apiClient.post(`/teacher/${employeeId}/delete-profile`);
   },
 
   assignSubject: async (employeeId: string, data: AssignSubjectDto): Promise<{ message: string; assignmentId: string }> => {
@@ -113,7 +113,7 @@ export const teacherApi = {
   },
 
   removeSubject: async (employeeId: string, assignmentId: string): Promise<void> => {
-    await apiClient.delete(`/teacher/${employeeId}/subjects/${assignmentId}`);
+    await apiClient.post(`/teacher/${employeeId}/subjects/${assignmentId}/delete`);
   },
 
   assignClass: async (employeeId: string, data: AssignClassDto): Promise<{ message: string; assignmentId: string }> => {
@@ -122,11 +122,11 @@ export const teacherApi = {
   },
 
   removeClass: async (employeeId: string, assignmentId: string): Promise<void> => {
-    await apiClient.delete(`/teacher/${employeeId}/classes/${assignmentId}`);
+    await apiClient.post(`/teacher/${employeeId}/classes/${assignmentId}/delete`);
   },
 
   setClassTeacher: async (employeeId: string, assignmentId: string, isClassTeacher: boolean): Promise<{ message: string }> => {
-    const res = await apiClient.patch(`/teacher/${employeeId}/classes/${assignmentId}/set-class-teacher`, null, {
+    const res = await apiClient.post(`/teacher/${employeeId}/classes/${assignmentId}/set-class-teacher`, null, {
       params: { isClassTeacher }
     });
     return res.data;

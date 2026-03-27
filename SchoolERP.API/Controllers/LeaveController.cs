@@ -58,7 +58,7 @@ public class LeaveController : ControllerBase
         return Ok(plan);
     }
 
-    [HttpDelete("plans/{id}")]
+    [HttpPost("plans/{id}/delete")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> DeletePlan(Guid id)
     {
@@ -179,7 +179,7 @@ public class LeaveController : ControllerBase
         return Ok(type);
     }
 
-    [HttpPut("types/{id}")]
+    [HttpPost("types/{id}/update")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> UpdateLeaveType(Guid id, [FromBody] CreateLeaveTypeDto dto)
     {
@@ -329,7 +329,7 @@ public class LeaveController : ControllerBase
         return Ok(new { message = "Leave application submitted successfully.", id = application.Id });
     }
 
-    [HttpPut("applications/{id}/action")]
+    [HttpPost("applications/{id}/action")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> ProcessLeave(Guid id, [FromBody] LeaveActionDto dto)
     {

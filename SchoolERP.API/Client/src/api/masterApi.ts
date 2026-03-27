@@ -18,11 +18,11 @@ export const lookupApi = {
   },
 
   update: async (id: string, data: CreateLookupDto): Promise<void> => {
-    await apiClient.put(`/lookups/${id}`, data);
+    await apiClient.post(`/lookups/${id}/update`, data);
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/lookups/${id}`);
+    await apiClient.post(`/lookups/${id}/delete`);
   }
 };
 
@@ -43,11 +43,11 @@ export const masterApi = {
   },
 
   update: async (endpoint: string, id: string, data: any): Promise<void> => {
-    await apiClient.put(`/masters/${endpoint}/${id}`, data);
+    await apiClient.post(`/masters/${endpoint}/${id}/update`, data);
   },
 
   delete: async (endpoint: string, id: string): Promise<void> => {
-    await apiClient.delete(`/masters/${endpoint}/${id}`);
+    await apiClient.post(`/masters/${endpoint}/${id}/delete`);
   },
 
   // Semantic Helpers

@@ -93,7 +93,7 @@ export const leaveApi = {
   },
 
   deletePlan: async (id: string): Promise<void> => {
-    await apiClient.delete(`/leave/plans/${id}`);
+    await apiClient.post(`/leave/plans/${id}/delete`);
   },
 
   setDefaultPlan: async (id: string): Promise<void> => {
@@ -111,7 +111,7 @@ export const leaveApi = {
   },
 
   updateType: async (id: string, data: Omit<LeaveTypeDto, 'id' | 'isActive'>): Promise<LeaveTypeDto> => {
-    const res = await apiClient.put<LeaveTypeDto>(`/leave/types/${id}`, data);
+    const res = await apiClient.post<LeaveTypeDto>(`/leave/types/${id}/update`, data);
     return res.data;
   },
 
@@ -126,7 +126,7 @@ export const leaveApi = {
   },
 
   processLeave: async (id: string, data: LeaveActionDto): Promise<{ message: string }> => {
-    const res = await apiClient.put<{ message: string }>(`/leave/applications/${id}/action`, data);
+    const res = await apiClient.post<{ message: string }>(`/leave/applications/${id}/action`, data);
     return res.data;
   },
 

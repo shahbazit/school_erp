@@ -49,7 +49,7 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
         return CreatedAtAction(nameof(Get), new { id = entity.Id }, MapToDto(entity));
     }
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     public virtual async Task<ActionResult> Update(Guid id, TUpdateDto dto)
     {
         var entity = await _unitOfWork.Repository<TEntity>().GetByIdAsync(id);
@@ -62,7 +62,7 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public virtual async Task<ActionResult> Delete(Guid id)
     {
         var entity = await _unitOfWork.Repository<TEntity>().GetByIdAsync(id);

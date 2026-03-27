@@ -108,7 +108,7 @@ public class TimetableController : ControllerBase
         return Ok(timetable.Id);
     }
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     public async Task<IActionResult> Update(Guid id, CreateTimetableDto dto)
     {
         var currentOrgId = _context.CurrentOrganizationId;
@@ -173,7 +173,7 @@ public class TimetableController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var currentOrgId = _context.CurrentOrganizationId;

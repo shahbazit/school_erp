@@ -101,7 +101,7 @@ public class LookupsController : ControllerBase
         return CreatedAtAction(nameof(GetLookup), new { id = lookup.Id }, createdDto);
     }
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     public async Task<ActionResult> UpdateLookup(Guid id, UpdateLookupDto dto)
     {
         var lookup = await _unitOfWork.Repository<Lookup>().GetByIdAsync(id);
@@ -130,8 +130,8 @@ public class LookupsController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
-    public async Task<ActionResult> DeleteLookup(Guid id)
+    [HttpPost("{id}/delete")]
+    public async Task<IActionResult> DeleteLookup(Guid id)
     {
         var lookup = await _unitOfWork.Repository<Lookup>().GetByIdAsync(id);
 

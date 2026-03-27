@@ -104,12 +104,12 @@ export const payrollApi = {
   },
   
   updateStructure: async (id: string, data: UpsertSalaryStructureDto): Promise<{ message: string }> => {
-    const res = await apiClient.put<{ message: string }>(`/payroll/structures/${id}`, data);
+    const res = await apiClient.post<{ message: string }>(`/payroll/structures/${id}/update`, data);
     return res.data;
   },
 
   deleteStructure: async (id: string): Promise<{ message: string }> => {
-    const res = await apiClient.delete<{ message: string }>(`/payroll/structures/${id}`);
+    const res = await apiClient.post<{ message: string }>(`/payroll/structures/${id}/delete`);
     return res.data;
   },
 
@@ -154,7 +154,7 @@ export const payrollApi = {
   },
 
   updateAdjustment: async (detailId: string, data: { adjustmentEarnings: number, adjustmentDeductions: number, adjustmentRemarks: string }): Promise<{ message: string }> => {
-    const res = await apiClient.put<{ message: string }>(`/payroll/runs/details/${detailId}/adjust`, data);
+    const res = await apiClient.post<{ message: string }>(`/payroll/runs/details/${detailId}/adjust`, data);
     return res.data;
   },
 

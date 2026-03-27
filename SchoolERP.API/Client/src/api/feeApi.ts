@@ -11,10 +11,10 @@ export const feeApi = {
     return response.data;
   },
   updateHead: async (id: string, data: any) => {
-    await apiClient.put(`/masters/fee/heads/${id}`, data);
+    await apiClient.post(`/masters/fee/heads/${id}/update`, data);
   },
   deleteHead: async (id: string) => {
-    await apiClient.delete(`/masters/fee/heads/${id}`);
+    await apiClient.post(`/masters/fee/heads/${id}/delete`);
   },
 
   // Fee Structures
@@ -27,10 +27,10 @@ export const feeApi = {
     return response.data;
   },
   updateStructure: async (id: string, data: any) => {
-    await apiClient.put(`/masters/fee/structures/${id}`, data);
+    await apiClient.post(`/masters/fee/structures/${id}/update`, data);
   },
   deleteStructure: async (id: string) => {
-    await apiClient.delete(`/masters/fee/structures/${id}`);
+    await apiClient.post(`/masters/fee/structures/${id}/delete`);
   },
   copyStructures: async (fromYearId: string, toYearId: string) => {
     await apiClient.post('/masters/fee/structures/copy', { fromYearId, toYearId });

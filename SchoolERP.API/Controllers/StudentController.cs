@@ -452,7 +452,7 @@ public class StudentController : ControllerBase
         return student;
     }
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStudent(Guid id, [FromBody] UpdateStudentDto dto)
     {
@@ -612,7 +612,7 @@ public class StudentController : ControllerBase
         return Ok(MapToDto(student));
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteStudent(Guid id) // Soft Delete
     {
@@ -631,6 +631,7 @@ public class StudentController : ControllerBase
 
     private StudentDto MapToDto(Student student)
     {
+        var currentAcademic = student.AcademicRecords.FirstOrDefault(a => a.IsCurrent);
         return new StudentDto
         {
             Id = student.Id,
@@ -668,6 +669,10 @@ public class StudentController : ControllerBase
             IsActive = student.IsActive,
             IsMobileVerified = student.IsMobileVerified,
             IsEmailVerified = student.IsEmailVerified,
+            ClassId = currentAcademic?.ClassId,
+            SectionId = currentAcademic?.SectionId,
+            RollNumber = currentAcademic?.RollNumber,
+            AcademicYear = currentAcademic?.AcademicYear,
             EnrolledCourses = student.EnrolledCourses.Select(ec => new StudentCourseDto
             {
                 CourseId = ec.CourseId,

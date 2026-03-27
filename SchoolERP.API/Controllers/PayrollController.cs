@@ -81,7 +81,7 @@ public class PayrollController : ControllerBase
         return Ok(new { message = "Salary Structure created successfully." });
     }
 
-    [HttpPut("structures/{id}")]
+    [HttpPost("structures/{id}/update")]
     public async Task<IActionResult> UpdateStructure(Guid id, [FromBody] UpsertSalaryStructureDto dto)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -129,7 +129,7 @@ public class PayrollController : ControllerBase
         return Ok(new { message = "Salary Structure updated successfully." });
     }
 
-    [HttpDelete("structures/{id}")]
+    [HttpPost("structures/{id}/delete")]
     public async Task<IActionResult> DeleteStructure(Guid id)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -488,7 +488,7 @@ public class PayrollController : ControllerBase
         return Ok(new { message = "Payroll marked as paid and recorded in financials." });
     }
 
-    [HttpPut("runs/details/{detailId}/adjust")]
+    [HttpPost("runs/details/{detailId}/adjust")]
     public async Task<IActionResult> UpdateAdjustment(Guid detailId, [FromBody] UpdateAdjustmentDto dto)
     {
         var detail = await _unitOfWork.Repository<PayrollDetail>().GetQueryable()

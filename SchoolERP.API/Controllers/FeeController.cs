@@ -30,14 +30,14 @@ public class FeeController : ControllerBase
         return Ok(await _feeService.CreateFeeHeadAsync(request));
     }
 
-    [HttpPut("heads/{id}")]
+    [HttpPost("heads/{id}/update")]
     public async Task<IActionResult> UpdateFeeHead(Guid id, CreateFeeHeadRequest request)
     {
         await _feeService.UpdateFeeHeadAsync(id, request);
         return Ok();
     }
 
-    [HttpDelete("heads/{id}")]
+    [HttpPost("heads/{id}/delete")]
     public async Task<IActionResult> DeleteFeeHead(Guid id)
     {
         await _feeService.DeleteFeeHeadAsync(id);
@@ -56,14 +56,14 @@ public class FeeController : ControllerBase
         return Ok(await _feeService.CreateFeeStructureAsync(request));
     }
 
-    [HttpPut("structures/{id}")]
+    [HttpPost("structures/{id}/update")]
     public async Task<IActionResult> UpdateFeeStructure(Guid id, CreateFeeStructureRequest request)
     {
         await _feeService.UpdateFeeStructureAsync(id, request);
         return Ok();
     }
 
-    [HttpDelete("structures/{id}")]
+    [HttpPost("structures/{id}/delete")]
     public async Task<IActionResult> DeleteFeeStructure(Guid id)
     {
         await _feeService.DeleteFeeStructureAsync(id);
@@ -155,14 +155,14 @@ public class FeeController : ControllerBase
         return Ok(await _feeService.CreateSubscriptionAsync(request));
     }
 
-    [HttpPut("student-subscriptions/{id}")]
+    [HttpPost("student-subscriptions/{id}/update")]
     public async Task<IActionResult> UpdateSubscription(Guid id, CreateStudentFeeSubscriptionRequest request)
     {
         await _feeService.UpdateSubscriptionAsync(id, request);
         return Ok();
     }
 
-    [HttpDelete("student-subscriptions/{id}")]
+    [HttpPost("student-subscriptions/{id}/delete")]
     public async Task<IActionResult> DeleteSubscription(Guid id)
     {
         await _feeService.DeleteSubscriptionAsync(id);

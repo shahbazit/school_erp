@@ -140,12 +140,12 @@ export const employeeApi = {
   },
 
   update: async (id: string, data: UpdateEmployeeDto): Promise<EmployeeDto> => {
-    const response = await apiClient.put<EmployeeDto>(`/employee/${id}`, data);
+    const response = await apiClient.post<EmployeeDto>(`/employee/${id}/update`, data);
     return response.data;
   },
 
   deactivate: async (id: string, reason?: string): Promise<void> => {
-    await apiClient.delete(`/employee/${id}`, { params: { reason } });
+    await apiClient.post(`/employee/${id}/delete`, null, { params: { reason } });
   },
 
   reactivate: async (id: string): Promise<void> => {
@@ -164,6 +164,6 @@ export const employeeApi = {
   },
 
   removeDocument: async (id: string, docId: string): Promise<void> => {
-    await apiClient.delete(`/employee/${id}/documents/${docId}`);
+    await apiClient.post(`/employee/${id}/documents/${docId}/delete`);
   }
 };

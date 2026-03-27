@@ -194,7 +194,7 @@ public class TeacherController : ControllerBase
     // ─────────────────────────────────────────────────────────────────────
     // DELETE /api/teacher/{employeeId}/subjects/{assignmentId}
     // ─────────────────────────────────────────────────────────────────────
-    [HttpDelete("{employeeId}/subjects/{assignmentId}")]
+    [HttpPost("{employeeId}/subjects/{assignmentId}/delete")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> RemoveSubjectAssignment(Guid employeeId, Guid assignmentId)
     {
@@ -258,7 +258,7 @@ public class TeacherController : ControllerBase
     // ─────────────────────────────────────────────────────────────────────
     // DELETE /api/teacher/{employeeId}/classes/{assignmentId}
     // ─────────────────────────────────────────────────────────────────────
-    [HttpDelete("{employeeId}/classes/{assignmentId}")]
+    [HttpPost("{employeeId}/classes/{assignmentId}/delete")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> RemoveClassAssignment(Guid employeeId, Guid assignmentId)
     {
@@ -279,7 +279,7 @@ public class TeacherController : ControllerBase
     // ─────────────────────────────────────────────────────────────────────
     // PATCH /api/teacher/{employeeId}/classes/{assignmentId}/set-class-teacher
     // ─────────────────────────────────────────────────────────────────────
-    [HttpPatch("{employeeId}/classes/{assignmentId}/set-class-teacher")]
+    [HttpPost("{employeeId}/classes/{assignmentId}/set-class-teacher")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> SetClassTeacher(Guid employeeId, Guid assignmentId, [FromQuery] bool isClassTeacher = true)
     {
@@ -311,7 +311,7 @@ public class TeacherController : ControllerBase
     // ─────────────────────────────────────────────────────────────────────
     // DELETE /api/teacher/{employeeId} – Remove only the academic profile
     // ─────────────────────────────────────────────────────────────────────
-    [HttpDelete("{employeeId}")]
+    [HttpPost("{employeeId}/delete-profile")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> DeleteProfile(Guid employeeId)
     {

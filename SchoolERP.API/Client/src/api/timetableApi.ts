@@ -67,11 +67,11 @@ export const timetableApi = {
   },
   
   update: async (id: string, data: CreateTimetableDto) => {
-    await api.put(`/timetable/${id}`, data);
+    await api.post(`/timetable/${id}/update`, data);
   },
   
   delete: async (id: string) => {
-    await api.delete(`/timetable/${id}`);
+    await api.post(`/timetable/${id}/delete`);
   },
   
   getTeacherSchedule: async (employeeId: string, academicYearId?: string) => {
