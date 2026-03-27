@@ -45,6 +45,7 @@ export default function StudentAccount() {
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [isExtraChargeModalOpen, setIsExtraChargeModalOpen] = useState(false);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [selectiveHeads, setSelectiveHeads] = useState<any[]>([]);
   const [assignedDiscounts, setAssignedDiscounts] = useState<any[]>([]);
@@ -131,6 +132,13 @@ export default function StudentAccount() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Collect Payment
+          </button>
+          <button 
+            onClick={() => setIsExtraChargeModalOpen(true)}
+            className="btn-secondary !bg-amber-50 !text-amber-700 !border-amber-200 hover:!bg-amber-100"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Charge
           </button>
         </div>
       </div>
@@ -370,6 +378,143 @@ export default function StudentAccount() {
           }}
         />
       )}
+
+      {isExtraChargeModalOpen && (
+        <ExtraChargeModal 
+          studentId={account.studentId}
+          academicYears={academicYears}
+          onClose={() => setIsExtraChargeModalOpen(false)}
+          onSuccess={() => {
+            setIsExtraChargeModalOpen(false);
+            fetchAccount();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ExtraChargeModal({ studentId, academicYears, onClose, onSuccess }: any) {
+  const currentYear = academicYears.find((y: any) => y.isCurrent);
+  const [formData, setFormData] = useState({
+    amount: '',
+    chargeType: 'Library Fine',
+    academicYearId: currentYear?.id || '',
+    remarks: ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (currentYear && !formData.academicYearId) {
+      setFormData(prev => ({ ...prev, academicYearId: currentYear.id }));
+    }
+  }, [currentYear]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.academicYearId || !formData.amount) return;
+    
+    setLoading(true);
+    try {
+      await masterApi.create('fee/add-extra-charge', {
+        ...formData,
+        amount: Number(formData.amount),
+        studentId
+      });
+      onSuccess();
+    } catch (err) {
+      alert('Failed to add extra charge');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const chargeTypes = [
+    'Library Fine', 
+    'Uniform Charge', 
+    'ID Card Fee', 
+    'Late Fine', 
+    'Exam Fine', 
+    'Lab Breakage', 
+    'Document Processing',
+    'Miscellaneous'
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
+      <div className="relative bg-white shadow-2xl w-full max-w-md rounded-2xl overflow-hidden animate-in zoom-in-95">
+        <div className="bg-amber-600 p-6 text-white text-center">
+          <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-80" />
+          <h2 className="text-xl font-bold">Add Extra Charge</h2>
+          <p className="text-amber-50 text-xs">Post a manual debit to student's account</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Academic Year</label>
+            <select 
+              className="form-input"
+              required
+              value={formData.academicYearId}
+              onChange={(e) => setFormData({...formData, academicYearId: e.target.value})}
+            >
+              <option value="">Select Session...</option>
+              {academicYears.map((y: any) => (
+                <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Current)' : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Charge Type</label>
+              <select 
+                className="form-input"
+                required
+                value={formData.chargeType}
+                onChange={(e) => setFormData({...formData, chargeType: e.target.value})}
+              >
+                {chargeTypes.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Amount</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                <input 
+                  type="number" 
+                  required
+                  className="form-input pl-7"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Remarks / Comment</label>
+            <textarea 
+              className="form-input min-h-[80px]"
+              value={formData.remarks}
+              onChange={(e) => setFormData({...formData, remarks: e.target.value})}
+              placeholder="Detailed reason for this charge..."
+            />
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1 py-2.5">Cancel</button>
+            <button 
+              type="submit" 
+              disabled={loading || !formData.amount}
+              className="btn-primary flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 flex justify-center items-center"
+            >
+              {loading ? <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm Charge'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

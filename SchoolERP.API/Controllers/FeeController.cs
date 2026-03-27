@@ -116,6 +116,12 @@ public class FeeController : ControllerBase
             return BadRequest($"Database error: {inner.Message}");
         }
     }
+    [HttpPost("add-extra-charge")]
+    public async Task<IActionResult> AddExtraCharge(AddExtraChargeRequest request)
+    {
+        await _feeService.AddExtraChargeAsync(request);
+        return Ok();
+    }
 
     [HttpPost("generate-charges")]
     public async Task<IActionResult> GenerateMonthlyCharges(GenerateChargesRequest request)

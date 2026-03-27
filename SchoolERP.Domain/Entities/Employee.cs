@@ -65,4 +65,5 @@ public class Employee : BaseEntity
 
     // Teacher-specific profile (null when employee is not a teacher)
     public virtual TeacherProfile? TeacherProfile { get; set; }
+    public virtual EmployeeSalary? EmployeeSalary { get; set; }
 }

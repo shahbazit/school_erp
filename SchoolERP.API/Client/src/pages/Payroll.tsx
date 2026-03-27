@@ -1,600 +1,1211 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  DollarSign, Calculator, History, Plus, Loader2, Search,
+  IndianRupee, Calculator, History, Plus, Loader2, Search,
   CheckCircle2, Clock, Settings, X,
-  Trash2, ArrowRight, UserCheck, TrendingUp, TrendingDown
+  Trash2, ArrowRight, UserCheck, Printer
 } from 'lucide-react';
 import {
   payrollApi,
   PayrollStatus,
-  SalaryComponentType,
-  type SalaryStructureDto,
-  type PayrollRunDto,
-  type UpsertSalaryStructureDto
+  PayrollRunDto,
+  PayrollDetailDto,
+  SalaryStructureDto,
+  SalaryComponentType
 } from '../api/payrollApi';
-import { extractError } from '../utils/errorUtils';
 
 const statusConfig = {
   [PayrollStatus.Draft]: { label: 'Draft', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: <Clock className="w-4 h-4" /> },
   [PayrollStatus.Processed]: { label: 'Processed', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: <Calculator className="w-4 h-4" /> },
   [PayrollStatus.Approved]: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: <CheckCircle2 className="w-4 h-4" /> },
-  [PayrollStatus.Paid]: { label: 'Paid', color: 'bg-violet-100 text-violet-700 border-violet-200', icon: <DollarSign className="w-4 h-4" /> },
+  [PayrollStatus.Paid]: { label: 'Paid', color: 'bg-primary-100 text-primary-700 border-primary-200', icon: <CheckCircle2 className="w-4 h-4" /> },
+  [PayrollStatus.Rejected]: { label: 'Rejected', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: <X className="w-4 h-4" /> },
 };
 
 export default function Payroll() {
-  const [activeTab, setActiveTab] = useState<'runs' | 'structures' | 'process'>('runs');
+  const [activeTab, setActiveTab] = useState<'runs' | 'structures' | 'process' | 'ledger'>('runs');
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Payroll Management</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Manage salary structures and process monthly payroll</p>
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-lg shadow-primary-200">
+            <IndianRupee className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Payroll Management</h1>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Generate, Review & Disburse Monthly Salaries</p>
+          </div>
         </div>
-        
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit shadow-inner">
+        <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1">
           <button onClick={() => setActiveTab('runs')} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'runs' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Payroll History</button>
           <button onClick={() => setActiveTab('process')} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'process' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Process Monthly</button>
           <button onClick={() => setActiveTab('structures')} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'structures' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Structures</button>
+          <button onClick={() => setActiveTab('ledger')} className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === 'ledger' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Employee Ledger</button>
         </div>
       </div>
 
       {activeTab === 'runs' && <PayrollRuns />}
       {activeTab === 'process' && <ProcessPayroll onSuccess={() => setActiveTab('runs')} />}
       {activeTab === 'structures' && <SalaryStructures />}
+      {activeTab === 'ledger' && <EmployeeLedger />}
     </div>
   );
 }
 
-// ── Tab 1: Payroll Runs ───────────────────────────────────────────────────
-function PayrollRuns() {
-  const [runs, setRuns] = useState<PayrollRunDto[]>([]);
+function EmployeeLedger() {
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [isMiscModalOpen, setIsMiscModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const loadRuns = useCallback(async () => {
+  const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await payrollApi.getRuns();
-      setRuns(data);
+      const data = await payrollApi.getEmployeeSalaries();
+      setEmployees(data);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadRuns(); }, [loadRuns]);
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
 
-  const handleApprove = async (id: string) => {
-    if (!confirm("Are you sure you want to approve this payroll? This will lock the records.")) return;
+  const loadLedger = async (emp: any) => {
+    setSelectedEmp(emp);
+    setIsLoading(true);
     try {
-      await payrollApi.approvePayroll(id);
-      loadRuns();
-    } catch (err) {
-      alert("Failed to approve payroll.");
+      const data = await payrollApi.getEmployeeLedger(emp.employeeId);
+      setHistory(data);
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const [viewingSlip, setViewingSlip] = useState<any | null>(null);
+
+  const filtered = employees.filter(e => 
+    e.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    e.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="grid grid-cols-1 gap-4">
-      {isLoading ? (
-        <div className="p-10 text-center text-slate-400">Loading payroll history...</div>
-      ) : runs.length === 0 ? (
-        <div className="bg-white p-20 rounded-2xl border border-dashed border-slate-200 text-center text-slate-400 flex flex-col items-center gap-4">
-           <History className="w-12 h-12 opacity-10" />
-           <p className="font-medium">No payroll runs found. Start by processing monthly payroll.</p>
-        </div>
-      ) : (
-        runs.map(run => (
-          <div key={run.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-lg transition-all group overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
-            <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-center gap-5">
-                 <div className="h-14 w-14 rounded-2xl bg-slate-900 text-white flex flex-col items-center justify-center font-black">
-                    <span className="text-[10px] opacity-60 uppercase">{new Date(0, run.month - 1).toLocaleString('default', { month: 'short' })}</span>
-                    <span className="text-xl leading-none">{run.year.toString().slice(-2)}</span>
-                 </div>
-                 <div>
-                    <h3 className="font-bold text-slate-800 text-lg">Payroll for {new Date(0, run.month - 1).toLocaleString('default', { month: 'long' })} {run.year}</h3>
-                    <div className="flex items-center gap-3 mt-1 text-sm text-slate-400 font-medium">
-                       <span className="flex items-center gap-1"><UserCheck className="w-4 h-4" /> {run.employeeCount} Employees</span>
-                       <span>•</span>
-                       <span>Processed on {new Date(run.processedDate).toLocaleDateString()}</span>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="flex flex-row md:flex-col items-end gap-2 md:gap-1">
-                 <p className="text-2xl font-black text-slate-900">₹{run.totalAmount.toLocaleString()}</p>
-                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-black uppercase tracking-wider ${statusConfig[run.status].color}`}>
-                    {statusConfig[run.status].icon} {run.statusName}
-                 </span>
-              </div>
-
-              <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
-                <button onClick={() => setSelectedRunId(run.id)} className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-100">
-                  View Slips
-                </button>
-                {run.status === PayrollStatus.Draft && (
-                  <button onClick={() => handleApprove(run.id)} className="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition shadow-lg shadow-primary-100">
-                    Approve
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            {run.remarks && <p className="mt-4 text-xs text-slate-400 italic bg-slate-50/50 p-2 rounded-lg border border-slate-100 border-dashed inline-block">Remark: {run.remarks}</p>}
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-10 min-h-[600px] shadow-sm overflow-hidden">
+       {/* Header */}
+       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+          <div className="flex items-center gap-5">
+             <div className="h-14 w-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl">
+                <History className="w-7 h-7" />
+             </div>
+             <div>
+                <h3 className="font-black text-slate-800 text-2xl tracking-tight">Staff Financial Ledger</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Transaction History & Plans</p>
+             </div>
           </div>
-        ))
-      )}
 
-      {selectedRunId && (
-        <RunDetailsModal runId={selectedRunId} onClose={() => setSelectedRunId(null)} />
-      )}
+          {!selectedEmp ? (
+            <div className="relative w-full md:w-80">
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+               <input 
+                 className="w-full pl-12 pr-4 py-4 bg-slate-50 border-0 rounded-2xl font-bold text-slate-700 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition" 
+                 placeholder="Search by name or code..."
+                 value={searchTerm}
+                 onChange={e => setSearchTerm(e.target.value)}
+               />
+            </div>
+          ) : (
+            <button 
+              onClick={() => setSelectedEmp(null)}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition"
+            >
+               &larr; Back to Staff List
+            </button>
+          )}
+       </div>
+
+       {isLoading && !selectedEmp ? (
+          <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+             <Loader2 className="w-12 h-12 animate-spin mb-4" />
+             <p className="font-black text-xs tracking-widest uppercase animate-pulse">Loading Records...</p>
+          </div>
+       ) : selectedEmp ? (
+          /* Drill-down: Individual Transactions */
+          <div className="animate-in slide-in-from-bottom-5 duration-500">
+             <div className="bg-slate-900 rounded-[2rem] p-8 mb-10 text-white flex items-center justify-between shadow-2xl shadow-slate-200">
+                <div className="flex items-center gap-6">
+                   <div className="h-14 w-14 rounded-2xl bg-white/10 flex items-center justify-center font-black text-xl">
+                      {selectedEmp.employeeName.split(' ').map((n:any) => n[0]).join('')}
+                   </div>
+                   <div>
+                      <h4 className="text-xl font-black">{selectedEmp.employeeName}</h4>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Code: {selectedEmp.employeeCode} | Plan: {selectedEmp.salaryStructureName}</p>
+                   </div>
+                </div>
+                <button 
+                   onClick={() => setIsMiscModalOpen(true)}
+                   className="px-6 py-4 bg-primary-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary-500 transition flex items-center gap-2"
+                >
+                   <Plus className="w-4 h-4" /> Record Misc Payout
+                </button>
+             </div>
+
+             {isLoading ? (
+                <div className="p-24 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-slate-200" /></div>
+             ) : (
+                <div className="overflow-x-auto border border-slate-100 rounded-3xl">
+                   <table className="w-full text-left">
+                      <thead>
+                         <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type / Month</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Net Payout</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Reference / Remarks</th>
+                            <th className="px-6 py-4"></th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                         {history.map((h: any) => (
+                            <tr key={h.id} className="hover:bg-slate-50/50 transition duration-200">
+                               <td className="px-6 py-5">
+                                  <div className="flex items-center gap-2">
+                                     <span className={`w-2 h-2 rounded-full ${h.type === 'Salary' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                     <p className="text-sm font-black text-slate-800">{h.type}</p>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{new Date(h.date).toLocaleDateString()} &bull; {new Date(0, h.month-1).toLocaleString('default', { month: 'long' })} {h.year}</p>
+                               </td>
+                               <td className="px-6 py-5 text-right">
+                                  <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-lg inline-block">₹{h.netSalary.toLocaleString()}</p>
+                               </td>
+                               <td className="px-6 py-5 max-w-sm">
+                                  <p className="text-xs text-slate-500 font-semibold leading-relaxed italic">{h.remarks || '--'}</p>
+                               </td>
+                               <td className="px-6 py-5 text-right">
+                                  {h.type === 'Salary' && (
+                                     <button onClick={() => setViewingSlip(h)} className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                                        <Printer className="w-4 h-4" />
+                                     </button>
+                                  )}
+                               </td>
+                            </tr>
+                         ))}
+                      </tbody>
+                   </table>
+                </div>
+             )}
+          </div>
+       ) : (
+          /* Master List View */
+          <div className="space-y-6 animate-in fade-in duration-500">
+             <div className="overflow-x-auto border border-slate-100 rounded-[2rem]">
+                <table className="w-full text-left">
+                   <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                         <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Staff Member</th>
+                         <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Plan</th>
+                         <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Est. Monthly Payout</th>
+                         <th className="px-8 py-5"></th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-50">
+                      {filtered.map((e: any) => (
+                         <tr key={e.id} className="hover:bg-slate-50/50 transition">
+                            <td className="px-8 py-5">
+                               <p className="text-sm font-black text-slate-800 leading-none">{e.employeeName}</p>
+                               <p className="text-[10px] text-slate-400 font-bold mt-1.5 uppercase tracking-widest">Code: {e.employeeCode}</p>
+                            </td>
+                            <td className="px-8 py-5 text-sm font-bold text-slate-600">
+                               <div className="flex items-center gap-2">
+                                  <Settings className="w-3.5 h-3.5 text-primary-400" />
+                                  {e.salaryStructureName}
+                               </div>
+                            </td>
+                            <td className="px-8 py-5 text-right font-mono font-black text-slate-800">
+                               ₹{e.netSalary.toLocaleString()}
+                            </td>
+                            <td className="px-8 py-5 text-right">
+                               <button 
+                                 onClick={() => loadLedger(e)}
+                                 className="px-5 py-2.5 bg-slate-900 border border-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 hover:border-primary-600 transition duration-300 shadow-lg shadow-slate-200 hover:shadow-primary-100"
+                               >
+                                  Show Ledger
+                               </button>
+                            </td>
+                         </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+       )}
+
+       {isMiscModalOpen && selectedEmp && (
+          <MiscPayoutModal 
+             employeeId={selectedEmp.employeeId} 
+             employeeName={selectedEmp.employeeName}
+             onClose={() => setIsMiscModalOpen(false)} 
+             onSuccess={() => { setIsMiscModalOpen(false); loadLedger(selectedEmp); }} 
+          />
+       )}
+
+       {viewingSlip && selectedEmp && (
+          <SalarySlipModal 
+            detail={viewingSlip} 
+            employeeName={selectedEmp.employeeName}
+            employeeCode={selectedEmp.employeeCode}
+            onClose={() => setViewingSlip(null)} 
+          />
+       )}
     </div>
   );
 }
 
-// ── Shared Modal Component ────────────────────────────────────────────────
-function RunDetailsModal({ runId, onClose }: { runId: string, onClose: () => void }) {
-  const [run, setRun] = useState<PayrollRunDto | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+function MiscPayoutModal({ employeeId, employeeName, onClose, onSuccess }: { employeeId: string, employeeName: string, onClose: () => void, onSuccess: () => void }) {
+  const [data, setData] = useState({ type: 'Bonus', amount: 0, paymentMethod: 'Bank Transfer', remarks: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    payrollApi.getRun(runId).then(setRun).finally(() => setIsLoading(false));
-  }, [runId]);
-
-  const filteredDetails = run?.details?.filter(d => 
-    d.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    d.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const handleSave = async () => {
+    if (data.amount <= 0) return alert("Please enter a valid amount.");
+    setIsSaving(true);
+    try {
+      await payrollApi.recordMiscPayout({ ...data, employeeId });
+      onSuccess();
+    } catch (err) {
+      alert("Failed to record payout.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white shadow-2xl w-full lg:w-[60%] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-           <div>
-             <h3 className="text-xl font-black text-slate-800">Payroll Run Details</h3>
-             {run && <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">{new Date(0, run.month - 1).toLocaleString('default', { month: 'long' })} {run.year}</p>}
-           </div>
-           <button onClick={onClose} className="p-2 border border-slate-200 hover:bg-slate-200 rounded-xl text-slate-400 transition">
-             <X className="w-5 h-5" />
-           </button>
-        </div>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+          <h4 className="text-xl font-black text-slate-800 mb-1">Miscellaneous Payout</h4>
+          <p className="text-xs text-slate-400 uppercase font-black tracking-widest mb-8">Recording extra payment for {employeeName}</p>
+          
+          <div className="space-y-6">
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Payout Category</label>
+                <select 
+                  className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-bold text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition"
+                  value={data.type}
+                  onChange={e => setData(d => ({...d, type: e.target.value}))}
+                >
+                   <option value="Bonus">Performance Bonus</option>
+                   <option value="Incentive">Special Incentive</option>
+                   <option value="Advance">Salary Advance (Loan)</option>
+                   <option value="Arrears">Salary Arrears</option>
+                   <option value="Reimbursement">Other Reimbursement</option>
+                </select>
+             </div>
 
-        <div className="flex-grow overflow-hidden flex flex-col p-6">
-          {isLoading ? (
-            <div className="flex-grow flex items-center justify-center text-slate-400">Loading details...</div>
-          ) : !run ? (
-             <div className="flex-grow flex items-center justify-center text-rose-400">Failed to load run data.</div>
-          ) : (
-            <>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                 <div className="flex items-center gap-6">
-                    <div className="text-center">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Employees</p>
-                       <p className="text-xl font-black text-slate-800">{run.employeeCount}</p>
-                    </div>
-                    <div className="h-8 w-px bg-slate-100" />
-                    <div className="text-center">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Payout</p>
-                       <p className="text-xl font-black text-primary-600">₹{run.totalAmount.toLocaleString()}</p>
-                    </div>
-                 </div>
-                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                    <input 
-                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-100 w-full md:w-64"
-                      placeholder="Search employees..."
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                    />
-                 </div>
-              </div>
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Amount (₹)</label>
+                <input 
+                  type="number" 
+                  className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-black text-primary-600 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition text-xl" 
+                  value={data.amount}
+                  onChange={e => setData(d => ({...d, amount: parseFloat(e.target.value) || 0}))}
+                />
+             </div>
 
-              <div className="flex-grow overflow-y-auto border border-slate-100 rounded-2xl">
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Remarks / Note</label>
+                <textarea 
+                  className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-semibold text-slate-700 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition resize-none h-24" 
+                  placeholder="Details about the payment..."
+                  value={data.remarks}
+                  onChange={e => setData(d => ({...d, remarks: e.target.value}))}
+                />
+             </div>
+             
+             <div className="flex gap-4 pt-4">
+                <button onClick={onClose} className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition">Cancel</button>
+                <button 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                  className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-xl shadow-slate-200"
+                >
+                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Record Payment'}
+                </button>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function PayrollRuns() {
+  const [runs, setRuns] = useState<PayrollRunDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<PayrollRunDto | null>(null);
+
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    payrollApi.getRuns().then(setRuns).finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  if (isLoading) return (
+     <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+        <Loader2 className="w-12 h-12 animate-spin mb-4" />
+        <p className="font-black text-xs uppercase tracking-widest animate-pulse">Loading Histories...</p>
+     </div>
+  );
+
+  return (
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 overflow-hidden shadow-sm">
+       <div className="p-8 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">Financial Cycles</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Review & Manage Processed Runs</p>
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-4 py-2 rounded-xl border border-slate-200">Total Runs: {runs.length}</p>
+       </div>
+
+       <div className="overflow-x-auto">
+          <table className="w-full text-left">
+             <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-100 uppercase">
+                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 tracking-[0.2em]">Pay Period</th>
+                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 tracking-[0.2em]">Processing Date</th>
+                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 tracking-[0.2em]">Status</th>
+                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 tracking-[0.2em] text-center">Staff Count</th>
+                   <th className="px-8 py-5 text-[10px] font-black text-slate-400 tracking-[0.2em] text-right">Total Payout</th>
+                   <th className="px-8 py-5"></th>
+                </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-50">
+                {runs.map(run => (
+                   <tr key={run.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                         <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-xl bg-slate-900 border border-slate-800 text-white flex items-center justify-center font-black text-[10px]">
+                               {run.month}/{run.year.toString().slice(-2)}
+                            </div>
+                            <div>
+                               <p className="font-extrabold text-slate-800 text-sm">{new Date(0, run.month - 1).toLocaleString('default', { month: 'long' })} {run.year}</p>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Ref: {run.id.slice(0, 8)}</p>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-sm font-bold text-slate-500">
+                         {new Date(run.processedDate).toLocaleDateString()}
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className={`px-4 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 ${statusConfig[run.status].color}`}>
+                            {statusConfig[run.status].icon}
+                            {statusConfig[run.status].label}
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-center text-sm font-black text-slate-800">
+                         <div className="inline-flex items-center justify-center h-8 w-12 bg-slate-100 rounded-lg border border-slate-200/50">
+                            {run.employeeCount}
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                         <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-4 py-1.5 rounded-xl inline-block">₹{run.totalAmount.toLocaleString()}</p>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                         <button 
+                            onClick={() => setSelectedRun(run)}
+                            className="px-6 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white hover:border-slate-900 transition duration-300 shadow-sm"
+                         >
+                            View Details
+                         </button>
+                      </td>
+                   </tr>
+                ))}
+             </tbody>
+          </table>
+       </div>
+
+       {selectedRun && <RunDetailsModal run={selectedRun} onClose={() => setSelectedRun(null)} onUpdate={loadData} />}
+    </div>
+  );
+}
+
+function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClose: () => void, onUpdate: () => void }) {
+  const [details, setDetails] = useState<PayrollDetailDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Adjustment State
+  const [adjustingSlip, setAdjustingSlip] = useState<PayrollDetailDto | null>(null);
+  const [adjData, setAdjData] = useState({ earning: 0, deduction: 0, remarks: '' });
+  const [isSavingAdj, setIsSavingAdj] = useState(false);
+  const [viewingSlip, setViewingSlip] = useState<PayrollDetailDto | null>(null);
+
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    payrollApi.getRun(run.id).then(res => setDetails(res.details)).finally(() => setIsLoading(false));
+  }, [run.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleStartAdjust = (d: PayrollDetailDto) => {
+     setAdjustingSlip(d);
+     setAdjData({ 
+        earning: d.adjustmentEarnings || 0, 
+        deduction: d.adjustmentDeductions || 0, 
+        remarks: d.adjustmentRemarks || '' 
+     });
+  };
+
+  const handleSaveAdjustment = async () => {
+     if (!adjustingSlip) return;
+     setIsSavingAdj(true);
+     try {
+        await payrollApi.updateAdjustment(adjustingSlip.id, {
+           adjustmentEarnings: adjData.earning,
+           adjustmentDeductions: adjData.deduction,
+           adjustmentRemarks: adjData.remarks
+        });
+        setAdjustingSlip(null);
+        loadData();
+        onUpdate(); // Update the header totals too
+     } finally {
+        setIsSavingAdj(false);
+     }
+  };
+
+  const handleReject = async () => {
+    if (!confirm('Are you sure you want to reject this payroll? It will need reprocessing.')) return;
+    await payrollApi.rejectPayroll(run.id);
+    onClose();
+    onUpdate();
+  };
+
+  const handleDisburse = async () => {
+    if (!confirm('Mark as PAID? This will record a final expense in the system.')) return;
+    await payrollApi.markPaidPayroll(run.id);
+    onClose();
+    onUpdate();
+  };
+
+  const filtered = details.filter(d => 
+    d.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
+        <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+             <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl">
+                   <Calculator className="w-8 h-8" />
+                </div>
+                <div>
+                   <h2 className="text-2xl font-black text-slate-800">{new Date(0, run.month - 1).toLocaleString('default', { month: 'long' })} {run.year}</h2>
+                   <div className="flex items-center gap-3 mt-1">
+                      <span className={`px-3 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest ${statusConfig[run.status].color}`}>
+                        {statusConfig[run.status].label}
+                      </span>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Payout: <span className="text-primary-600 ml-1 font-black">₹{run.totalAmount.toLocaleString()}</span></p>
+                   </div>
+                </div>
+             </div>
+             
+             <div className="flex items-center gap-2">
+                {run.status === PayrollStatus.Approved && (
+                  <button onClick={handleDisburse} className="px-6 py-3 bg-primary-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-primary-700 transition flex items-center gap-2">
+                    <UserCheck className="w-4 h-4" /> Disburse Payment
+                  </button>
+                )}
+                {run.status === PayrollStatus.Processed && (
+                   <>
+                    <button onClick={handleReject} className="px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-rose-100 transition whitespace-nowrap">Reject</button>
+                    <button onClick={() => payrollApi.approvePayroll(run.id).then(() => {onClose(); onUpdate();})} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition">Approve Payroll</button>
+                   </>
+                )}
+                <button onClick={onClose} className="p-3 text-slate-400 hover:bg-slate-100 rounded-2xl transition">&times;</button>
+             </div>
+          </div>
+
+          <div className="p-6 bg-slate-50/50 border-b border-slate-100">
+             <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-primary-400 outline-none transition" 
+                  placeholder="Search staff by name or code..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+             </div>
+          </div>
+
+          <div className="flex-grow overflow-y-auto p-4">
+            {isLoading ? (
+               <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-slate-300" /></div>
+            ) : (
+              <div className="border border-slate-100 rounded-3xl overflow-hidden">
                  <table className="w-full text-left">
-                    <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
-                       <tr>
+                    <thead>
+                       <tr className="bg-slate-50/80 border-b border-slate-100">
                           <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
                           <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Gross</th>
                           <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Deductions</th>
+                          <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Adjustments</th>
                           <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Net Payout</th>
+                          <th className="px-5 py-3"></th>
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                       {filteredDetails.map(d => (
-                         <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+                       {filtered.map(d => (
+                         <tr key={d.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-5 py-3">
-                               <p className="text-sm font-bold text-slate-800">{d.employeeName}</p>
-                               <p className="text-[10px] text-slate-400 font-bold">{d.employeeCode}</p>
+                               <p className="font-black text-slate-800 text-sm leading-none">{d.employeeName}</p>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{d.employeeCode}</p>
                             </td>
+                            <td className="px-5 py-3 text-right text-sm font-mono text-slate-600">₹{d.grossSalary.toLocaleString()}</td>
+                            <td className="px-5 py-3 text-right text-sm font-mono text-rose-500">-₹{d.totalDeductions.toLocaleString()}</td>
                             <td className="px-5 py-3 text-right">
-                               <p className="text-sm font-mono font-bold text-slate-600">₹{d.grossSalary.toLocaleString()}</p>
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                               <p className="text-sm font-mono font-bold text-rose-500">₹{d.totalDeductions.toLocaleString()}</p>
+                               <div className="flex flex-col items-end">
+                                  {d.adjustmentEarnings > 0 && <span className="text-[10px] font-bold text-emerald-500">+{d.adjustmentEarnings.toLocaleString()}</span>}
+                                  {d.adjustmentDeductions > 0 && <span className="text-[10px] font-bold text-rose-500">-{d.adjustmentDeductions.toLocaleString()}</span>}
+                                  {d.adjustmentEarnings === 0 && d.adjustmentDeductions === 0 && <span className="text-[10px] text-slate-300">--</span>}
+                               </div>
                             </td>
                             <td className="px-5 py-3 text-right">
                                <p className="text-sm font-mono font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg inline-block">₹{d.netSalary.toLocaleString()}</p>
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                               <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => setViewingSlip(d)} title="View Salary Slip" className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
+                                     <Printer className="w-4 h-4" />
+                                  </button>
+                                  {(run.status === PayrollStatus.Draft || run.status === PayrollStatus.Rejected) && (
+                                     <button 
+                                       onClick={() => handleStartAdjust(d)} 
+                                       title="Edit / Adjust Slip" 
+                                       className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-primary-600 bg-slate-100 hover:bg-primary-50 rounded-xl transition-all border border-slate-200 hover:border-primary-200"
+                                     >
+                                        <Plus className="w-3.5 h-3.5" /> Adjust
+                                     </button>
+                                  )}
+                               </div>
                             </td>
                          </tr>
                        ))}
                     </tbody>
                  </table>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+
+        {viewingSlip && (
+           <SalarySlipModal detail={viewingSlip} run={run} onClose={() => setViewingSlip(null)} />
+        )}
+
+        {/* Inline Adjustment Drawer/Overlay */}
+        {adjustingSlip && (
+           <div className="absolute inset-0 z-20 flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setAdjustingSlip(null)} />
+              <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-150">
+                 <h4 className="text-xl font-black text-slate-800 mb-1">Adjust Payout</h4>
+                 <p className="text-xs text-slate-400 uppercase font-black tracking-widest mb-8">{adjustingSlip.employeeName}</p>
+                 
+                 <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-emerald-600 uppercase ml-1">Extra Earnings</label>
+                          <input 
+                            type="number" 
+                            className="w-full px-4 py-3 bg-emerald-50 border-0 rounded-2xl font-black text-emerald-600 shadow-inner focus:ring-2 focus:ring-emerald-400 outline-none transition" 
+                            value={adjData.earning}
+                            onChange={e => setAdjData(prev => ({...prev, earning: parseFloat(e.target.value) || 0}))}
+                          />
+                       </div>
+                       <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-rose-600 uppercase ml-1">Extra Cuts</label>
+                          <input 
+                            type="number" 
+                            className="w-full px-4 py-3 bg-rose-50 border-0 rounded-2xl font-black text-rose-600 shadow-inner focus:ring-2 focus:ring-rose-400 outline-none transition" 
+                            value={adjData.deduction}
+                            onChange={e => setAdjData(prev => ({...prev, deduction: parseFloat(e.target.value) || 0}))}
+                          />
+                       </div>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Adjustment Remarks</label>
+                       <textarea 
+                         className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-semibold text-slate-600 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition resize-none h-24" 
+                         placeholder="Reason for adjustment..."
+                         value={adjData.remarks}
+                         onChange={e => setAdjData(prev => ({...prev, remarks: e.target.value}))}
+                       />
+                    </div>
+                    
+                    <div className="flex gap-4 pt-4">
+                       <button onClick={() => setAdjustingSlip(null)} className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition">Discard</button>
+                       <button 
+                         onClick={handleSaveAdjustment} 
+                         disabled={isSavingAdj}
+                         className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition flex items-center justify-center gap-2"
+                       >
+                          {isSavingAdj ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                       </button>
+                    </div>
+                 </div>
+              </div>
+           </div>
+        )}
     </div>
   );
 }
 
-// ── Tab 2: Salary Structures ──────────────────────────────────────────────
 function SalaryStructures() {
   const [structures, setStructures] = useState<SalaryStructureDto[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const initialFormData: UpsertSalaryStructureDto = {
-    name: '',
-    description: '',
-    isActive: true,
-    components: [
-      { name: 'Basic Salary', type: SalaryComponentType.Earning, amount: 0 },
-      { name: 'HRA', type: SalaryComponentType.Earning, amount: 0 },
-      { name: 'PF', type: SalaryComponentType.Deduction, amount: 0 }
-    ]
-  };
-
-  const [formData, setFormData] = useState<UpsertSalaryStructureDto>(initialFormData);
-  const [deleteTarget, setDeleteTarget] = useState<SalaryStructureDto | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const loadStructures = useCallback(async () => {
-    try {
-      const data = await payrollApi.getStructures();
-      setStructures(data);
-    } catch (err) {
-       console.error("Failed to load structures", err);
-    }
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    payrollApi.getStructures().then(setStructures).finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => { loadStructures(); }, [loadStructures]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const handleAddComponent = () => {
-    setFormData(prev => ({ 
-      ...prev, 
-      components: [...prev.components, { name: '', type: SalaryComponentType.Earning, amount: 0 }] 
-    }));
-  };
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingStructure, setEditingStructure] = useState<SalaryStructureDto | null>(null);
 
-  const handleRemoveComponent = (index: number) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      components: prev.components.filter((_, i) => i !== index) 
-    }));
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this structure?')) {
+      payrollApi.deleteStructure(id).then(loadData);
+    }
   };
 
   const handleEdit = (ss: SalaryStructureDto) => {
-    setEditId(ss.id);
-    setFormData({
-      name: ss.name,
-      description: ss.description || '',
-      isActive: ss.isActive,
-      components: ss.components.map(c => ({
-        name: c.name,
-        type: c.type,
-        amount: c.amount
-      }))
-    });
-    setShowModal(true);
+    setEditingStructure(ss);
+    setIsModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editId) {
-        await payrollApi.updateStructure(editId, formData);
-      } else {
-        await payrollApi.createStructure(formData);
-      }
-      setShowModal(false);
-      setEditId(null);
-      setFormData(initialFormData);
-      loadStructures();
-    } catch (err: any) { 
-       const msg = extractError(err, "Failed to save structure.");
-       alert(msg); 
-    }
+  const handleAddNew = () => {
+    setEditingStructure(null);
+    setIsModalOpen(true);
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    try {
-      await payrollApi.deleteStructure(deleteTarget.id);
-      setDeleteTarget(null);
-      loadStructures();
-    } catch (err: any) {
-      alert(err.response?.data || "Failed to delete structure.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  if (isLoading) return (
+     <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+        <Loader2 className="w-12 h-12 animate-spin mb-4" />
+        <p className="font-black text-xs uppercase tracking-widest animate-pulse">Fetching Schemes...</p>
+     </div>
+  );
 
   return (
-    <div className="space-y-4">
-       <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest pl-1">Standard Templates</h3>
-          <button 
-            onClick={() => { setEditId(null); setFormData(initialFormData); setShowModal(true); }} 
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition"
-          >
-            <Plus className="w-4 h-4" /> New Structure
-          </button>
-       </div>
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800">Salary Configurations</h2>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">Define pay scales and component breakdowns</p>
+        </div>
+        <button 
+          onClick={handleAddNew}
+          className="px-8 py-4 bg-slate-900 text-white rounded-[1.5rem] text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition flex items-center gap-3 shadow-2xl shadow-slate-200 group"
+        >
+          <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" /> New Structure
+        </button>
+      </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {structures.map(ss => (
-            <div key={ss.id} className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-primary-200 transition relative overflow-hidden flex flex-col h-full shadow-sm">
-               <div className="flex items-start justify-between">
-                   <h4 className="font-black text-slate-800 text-lg leading-tight">{ss.name}</h4>
-                   <div className="flex items-center gap-2">
-                     <Settings 
-                       onClick={() => handleEdit(ss)}
-                       className="w-4 h-4 text-slate-300 hover:text-primary-600 transition cursor-pointer" 
-                     />
-                     <Trash2 
-                       onClick={() => setDeleteTarget(ss)}
-                       className="w-4 h-4 text-slate-300 hover:text-rose-600 transition cursor-pointer" 
-                     />
-                   </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {structures.map(ss => (
+          <div key={ss.id} className="relative bg-white rounded-[2.5rem] border border-slate-100 p-8 hover:shadow-2xl hover:shadow-slate-200/50 transition-all group overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 flex gap-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                <button onClick={() => handleEdit(ss)} className="p-3 bg-white shadow-lg rounded-xl text-slate-400 hover:text-primary-600 transition">
+                   <Settings className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(ss.id)} className="p-3 bg-white shadow-lg rounded-xl text-slate-400 hover:text-rose-500 transition">
+                   <Trash2 className="w-4 h-4" />
+                </button>
+             </div>
+
+             <div className="flex items-center gap-4 mb-8">
+                <div className={`h-3 w-3 rounded-full ${ss.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                <h3 className="text-xl font-black text-slate-800">{ss.name}</h3>
+             </div>
+
+             <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pay</p>
+                   <p className="text-xl font-black text-slate-800">₹{ss.netTotal.toLocaleString()}</p>
                 </div>
-               <p className="text-sm text-slate-400 mt-1 mb-6 flex-grow">{ss.description || 'No description provided'}</p>
-               
-               <div className="space-y-2 mb-6">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
-                     <span>Components Breakdown</span>
-                     <span>Amt</span>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto pr-1 thin-scrollbar space-y-1">
-                    {ss.components.map(c => (
-                      <div key={c.id} className="flex items-center justify-between text-sm group">
-                        <span className="text-slate-600 flex items-center gap-1.5">
-                           {c.type === SalaryComponentType.Earning ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-rose-500" />}
-                           {c.name}
-                        </span>
-                        <span className={`font-mono text-xs font-bold ${c.type === SalaryComponentType.Earning ? 'text-emerald-600' : 'text-rose-600'}`}>
-                           {c.type === SalaryComponentType.Deduction && '-'}₹{c.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-               </div>
-
-               <div className="pt-4 border-t border-slate-100 mt-auto flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Monthly Net</p>
-                    <p className="text-xl font-black text-primary-600">₹{ss.netTotal.toLocaleString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase">Gross</p>
-                    <p className="text-sm font-bold text-slate-500">₹{ss.totalEarnings.toLocaleString()}</p>
-                  </div>
-               </div>
-            </div>
-          ))}
-       </div>
-
-       {showModal && (
-         <div className="fixed inset-0 z-50 flex justify-end">
-           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-           <div className="relative bg-white shadow-2xl w-full lg:w-[60%] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <h3 className="text-xl font-black text-slate-800">{editId ? 'Update' : 'Configure'} Salary Structure</h3>
-                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 transition">&times;</button>
-              </div>
-              <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-grow custom-scrollbar">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                       <label className="text-xs font-black text-slate-400 uppercase ml-1">Structure Name</label>
-                       <input 
-                         required 
-                         className="w-full px-4 py-2.5 bg-slate-50 border-0 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary-400 focus:bg-white transition shadow-inner" 
-                         placeholder="e.g., Senior Secondary Teacher"
-                         value={formData.name}
-                         onChange={e => setFormData(p => ({...p, name: e.target.value}))}
-                       />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-xs font-black text-slate-400 uppercase ml-1">Brief Description</label>
-                       <input 
-                         className="w-full px-4 py-2.5 bg-slate-50 border-0 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary-400 focus:bg-white transition shadow-inner" 
-                         placeholder="Description for HR records..."
-                         value={formData.description}
-                         onChange={e => setFormData(p => ({...p, description: e.target.value}))}
-                       />
-                    </div>
-                 </div>
-
-                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                       <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Breakdown Components</h4>
-                       <button type="button" onClick={handleAddComponent} className="text-xs font-bold text-primary-600 flex items-center gap-1 hover:underline">
-                          <Plus className="w-3 h-3" /> Add Component
-                       </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {formData.components.map((comp, idx) => (
-                        <div key={idx} className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 group">
-                           <div className="flex-1 space-y-1">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase">Label</label>
-                              <input 
-                                required className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium" 
-                                value={comp.name}
-                                onChange={e => {
-                                  const newComps = [...formData.components];
-                                  newComps[idx].name = e.target.value;
-                                  setFormData(p => ({...p, components: newComps}));
-                                }}
-                              />
-                           </div>
-                           <div className="w-32 space-y-1">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-                              <select 
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium"
-                                value={comp.type}
-                                onChange={e => {
-                                  const newComps = [...formData.components];
-                                  newComps[idx].type = parseInt(e.target.value);
-                                  setFormData(p => ({...p, components: newComps}));
-                                }}
-                              >
-                                 <option value={SalaryComponentType.Earning}>Earning</option>
-                                 <option value={SalaryComponentType.Deduction}>Deduction</option>
-                              </select>
-                           </div>
-                           <div className="w-32 space-y-1">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase">Amount (₹)</label>
-                              <input 
-                                type="number" required className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700" 
-                                value={comp.amount}
-                                onChange={e => {
-                                  const newComps = [...formData.components];
-                                  newComps[idx].amount = parseFloat(e.target.value) || 0;
-                                  setFormData(p => ({...p, components: newComps}));
-                                }}
-                              />
-                           </div>
-                           <div className="flex items-end pb-1">
-                              <button type="button" onClick={() => handleRemoveComponent(idx)} className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition opacity-0 group-hover:opacity-100">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                           </div>
-                        </div>
-                      ))}
-                    </div>
-                 </div>
-                 <div className="p-6 border-t border-slate-100 flex gap-4 bg-slate-50/50 -mx-6 -mb-6 mt-auto">
-                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl text-sm font-black hover:bg-slate-50 transition">Cancel</button>
-                    <button type="submit" className="flex-2 px-10 py-3 bg-primary-600 text-white rounded-2xl text-sm font-black hover:bg-primary-700 transition shadow-xl shadow-primary-100">Save Configuration</button>
-                 </div>
-              </form>
-           </div>
-         </div>
-       )}
-
-       {/* Delete Confirmation Modal */}
-       {deleteTarget && (
-         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isDeleting && setDeleteTarget(null)} />
-           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
-             <div className="h-16 w-16 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 text-rose-600">
-               <Trash2 className="w-8 h-8" />
+                <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-50">
+                   <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Earnings</p>
+                   <p className="text-xl font-black text-emerald-600">₹{ss.totalEarnings.toLocaleString()}</p>
+                </div>
+                <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-50">
+                   <p className="text-[10px] font-black text-rose-600/60 uppercase tracking-widest mb-1">Deductions</p>
+                   <p className="text-xl font-black text-rose-600">₹{ss.totalDeductions.toLocaleString()}</p>
+                </div>
              </div>
-             <h3 className="text-2xl font-black text-slate-800 mb-2">Delete Structure?</h3>
-             <p className="text-slate-500 mb-8 font-medium">Are you sure you want to delete <span className="text-slate-800 font-bold">"{deleteTarget.name}"</span>? This action cannot be undone and will fail if employees are still assigned to it.</p>
-             
-             <div className="flex gap-4">
-               <button 
-                 onClick={() => setDeleteTarget(null)}
-                 disabled={isDeleting}
-                 className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-               >
-                 Cancel
-               </button>
-               <button 
-                 onClick={handleDelete}
-                 disabled={isDeleting}
-                 className="flex-1 py-3 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-rose-200"
-               >
-                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                 Delete Permanent
-               </button>
+
+             <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Components Breakdown</p>
+                <div className="flex flex-wrap gap-2">
+                   {ss.components.slice(0, 4).map((c, idx) => (
+                      <span key={idx} className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold flex items-center gap-1.5 border ${c.type === SalaryComponentType.Earning ? 'bg-emerald-50/50 text-emerald-700 border-emerald-100' : 'bg-rose-50/50 text-rose-700 border-rose-100'}`}>
+                         {c.name}: ₹{c.amount.toLocaleString()}
+                      </span>
+                   ))}
+                   {ss.components.length > 4 && (
+                      <span className="px-3 py-1.5 rounded-xl text-[10px] font-extrabold bg-slate-50 text-slate-400 border border-slate-100">
+                         +{ss.components.length - 4} More
+                      </span>
+                   )}
+                </div>
              </div>
-           </div>
-         </div>
-       )}
+
+             <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">{ss.description || 'No description provided'}</p>
+                <button onClick={() => handleEdit(ss)} className="text-[10px] font-black text-primary-600 uppercase tracking-[0.2em] flex items-center gap-1 hover:gap-2 transition-all">
+                   Manage Scale <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+             </div>
+          </div>
+        ))}
+        
+        <button 
+          onClick={handleAddNew}
+          className="border-2 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center p-12 text-slate-300 hover:border-primary-200 hover:text-primary-300 hover:bg-primary-50/20 transition-all group"
+        >
+          <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+             <Plus className="w-8 h-8" />
+          </div>
+          <p className="font-black text-sm uppercase tracking-widest">Add New Pay Scale</p>
+        </button>
+      </div>
+
+      {isModalOpen && (
+        <UpsertSalaryStructureModal 
+          structure={editingStructure} 
+          onClose={() => setIsModalOpen(false)} 
+          onSuccess={() => { setIsModalOpen(false); loadData(); }} 
+        />
+      )}
     </div>
   );
 }
 
-// ── Tab 3: Process Payroll ────────────────────────────────────────────────
 function ProcessPayroll({ onSuccess }: { onSuccess: () => void }) {
-  const [data, setData] = useState({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-    remarks: ''
-  });
+  const [data, setData] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() + 1, remarks: '' });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleProcess = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const handleProcess = async () => {
     setIsProcessing(true);
     try {
       await payrollApi.processPayroll(data);
-      alert("Payroll processed successfully!");
       onSuccess();
     } catch (err: any) {
-      const msg = extractError(err, "Processing failed. Make sure salary structures are assigned to employees.");
-      alert(msg);
+      alert(err.response?.data || "Failed to process payroll.");
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto py-10">
-       <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm text-center">
-          <div className="h-20 w-20 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center mx-auto mb-6">
+    <div className="max-w-2xl mx-auto bg-white rounded-[2.5rem] border border-slate-100 p-12 shadow-2xl shadow-slate-200">
+       <div className="text-center mb-10">
+          <div className="h-20 w-20 rounded-[2rem] bg-primary-600 text-white flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary-200 animate-bounce-subtle">
              <Calculator className="w-10 h-10" />
           </div>
-          <h3 className="text-2xl font-black text-slate-800 tracking-tight">Generate Monthly Payroll</h3>
-          <p className="text-slate-400 text-sm mt-2 max-w-sm mx-auto font-medium leading-relaxed">This will calculate salaries for all active employees based on their assigned structures for the selected period.</p>
-          
-          <form onSubmit={handleProcess} className="mt-10 space-y-6 text-left">
-             <div className="grid grid-cols-2 gap-4">
-               <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Financial Year</label>
-                  <input 
-                    type="number" required className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-bold text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none" 
-                    value={data.year}
-                    onChange={e => setData(p => ({...p, year: parseInt(e.target.value)}))}
-                  />
-               </div>
-               <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Target Month</label>
-                  <select 
-                    required className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-bold text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none"
-                    value={data.month}
-                    onChange={e => setData(p => ({...p, month: parseInt(e.target.value)}))}
-                  >
-                     {[...Array(12)].map((_, i) => (
-                       <option key={i+1} value={i+1}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>
-                     ))}
-                  </select>
-               </div>
-             </div>
-             <div>
-                <label className="block text-xs font-black text-slate-400 uppercase mb-2 ml-1">Internal Note (Optional)</label>
-                <textarea 
-                  rows={3} className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-semibold text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none placeholder:text-slate-300"
-                  placeholder="Reason for running, or specific instructions..."
-                  value={data.remarks}
-                  onChange={e => setData(p => ({...p, remarks: e.target.value}))}
-                />
-             </div>
-             <button disabled={isProcessing} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-slate-800 transition shadow-xl flex items-center justify-center gap-3">
-                {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowRight className="w-6 h-6" />}
-                {isProcessing ? 'Processing Calculations...' : 'Kick-off Payroll Run'}
-             </button>
-          </form>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Run Monthly Payroll</h2>
+          <p className="text-sm font-bold text-slate-400 mt-2 uppercase tracking-[0.2em]">Automated Salary Generator</p>
        </div>
+
+       <div className="space-y-8">
+          <div className="grid grid-cols-2 gap-6">
+             <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Select Year</label>
+                <select className="w-full px-5 py-4 bg-slate-50 border-0 rounded-[1.5rem] font-black text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition" value={data.year} onChange={e => setData({...data, year: parseInt(e.target.value)})}>
+                  {[0,1,2].map(i => <option key={i} value={2026-i}>{2026-i}</option>)}
+                </select>
+             </div>
+             <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Select Month</label>
+                <select className="w-full px-5 py-4 bg-slate-50 border-0 rounded-[1.5rem] font-black text-slate-800 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition" value={data.month} onChange={e => setData({...data, month: parseInt(e.target.value)})}>
+                  {months.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+                </select>
+             </div>
+          </div>
+
+          <div className="space-y-2">
+             <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Process Remarks</label>
+             <textarea 
+               className="w-full px-6 py-4 bg-slate-50 border-0 rounded-[1.5rem] font-bold text-slate-600 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition resize-none h-32" 
+               placeholder="Example: March 2026 Full Cycle..."
+               value={data.remarks}
+               onChange={e => setData({...data, remarks: e.target.value})}
+             />
+          </div>
+
+          <button 
+            onClick={handleProcess} 
+            disabled={isProcessing}
+            className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.3em] hover:bg-slate-800 transition shadow-2xl shadow-slate-300 flex items-center justify-center gap-3 active:scale-95 duration-100"
+          >
+             {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Plus className="w-5 h-5" /> Initialize Run</>}
+          </button>
+       </div>
+    </div>
+  );
+}
+
+function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: { detail: any, run?: any, employeeName?: string, employeeCode?: string, onClose: () => void }) {
+  const components = JSON.parse(detail.componentBreakdownDetails || '[]');
+  const earnings = components.filter((c: any) => c.Type === 'Earning');
+  const deductions = components.filter((c: any) => c.Type === 'Deduction');
+
+  const print = () => window.print();
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 no-print">
+       <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={onClose} />
+       <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-3xl h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 slip-print-container">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+             <div className="flex items-center gap-3">
+                <div className="h-10 w-10 bg-primary-600 text-white rounded-xl flex items-center justify-center">
+                   <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                   <h4 className="font-black text-slate-800">Salary Slip Preview</h4>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">Ready for Print or PDF Export</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-3">
+                <button onClick={print} className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition flex items-center gap-2">
+                   <Printer className="w-4 h-4" /> Print now
+                </button>
+                <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition">&times;</button>
+             </div>
+          </div>
+
+          <div className="p-10 flex-grow overflow-y-auto bg-white slip-inner">
+             <div className="text-center mb-10 pb-10 border-b border-slate-100 border-dashed">
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Salary Statement</h2>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <span className="h-1 w-1 bg-primary-400 rounded-full" />
+                  <p className="text-sm text-slate-400 font-bold uppercase tracking-[0.2em]">{new Date(0, (run?.month || detail.month) - 1).toLocaleString('default', { month: 'long' })} {run?.year || detail.year}</p>
+                  <span className="h-1 w-1 bg-primary-400 rounded-full" />
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-10 mb-12">
+                <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Staff Details</p>
+                   <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-0.5">Name</p>
+                        <p className="text-lg font-black text-slate-800 leading-none">{employeeName || detail.employeeName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-0.5">Staff Code</p>
+                        <p className="text-sm font-bold text-slate-600 leading-none">{employeeCode || detail.employeeCode}</p>
+                      </div>
+                   </div>
+                </div>
+                <div className="p-6">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Payment Summary</p>
+                   <div className="space-y-3">
+                      <div className="flex justify-between">
+                         <span className="text-sm font-medium text-slate-500">Statement #</span>
+                         <span className="text-sm font-bold text-slate-800">{detail.id.split('-')[0].toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                         <span className="text-sm font-medium text-slate-500">Payment Mode</span>
+                         <span className="text-sm font-bold text-slate-800">Bank Transfer</span>
+                      </div>
+                      <div className="flex justify-between">
+                         <span className="text-sm font-medium text-slate-500">Gross Amount</span>
+                         <span className="text-sm font-bold text-slate-800">₹{detail.grossSalary.toLocaleString()}</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-2 gap-12 mb-12">
+                <div className="space-y-4">
+                   <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest border-b border-emerald-100 pb-2">Earnings (+)</h5>
+                   <div className="space-y-3 pr-4">
+                      {earnings.map((e: any, i: number) => (
+                         <div key={i} className="flex justify-between items-center text-sm font-medium">
+                            <span className="text-slate-600">{e.Name}</span>
+                            <span className="text-emerald-600 font-bold">₹{e.Amount.toLocaleString()}</span>
+                         </div>
+                      ))}
+                      {detail.adjustmentEarnings > 0 && (
+                        <div className="flex justify-between items-center text-sm font-medium bg-emerald-50/50 p-2 rounded-lg -mx-2 border border-emerald-50">
+                           <span className="text-emerald-700 font-bold">Adjustments / Reimb.</span>
+                           <span className="text-emerald-600 font-bold">₹{detail.adjustmentEarnings.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between font-black">
+                         <span className="text-slate-800">Total Earnings</span>
+                         <span className="text-slate-800">₹{(detail.grossSalary + detail.adjustmentEarnings).toLocaleString()}</span>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-4">
+                   <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-widest border-b border-rose-100 pb-2">Deductions (-)</h5>
+                   <div className="space-y-3 pr-4">
+                      {deductions.map((d: any, i: number) => (
+                         <div key={i} className="flex justify-between items-center text-sm font-medium">
+                            <span className="text-slate-600">{d.Name}</span>
+                            <span className="text-rose-600 font-bold">₹{d.Amount.toLocaleString()}</span>
+                         </div>
+                      ))}
+                      {detail.adjustmentDeductions > 0 && (
+                        <div className="flex justify-between items-center text-sm font-medium bg-rose-50/50 p-2 rounded-lg -mx-2 border border-rose-50">
+                           <span className="text-rose-700 font-bold">Adjustments / Cuts</span>
+                           <span className="text-rose-600 font-bold">₹{detail.adjustmentDeductions.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between font-black">
+                         <span className="text-slate-800">Total Deductions</span>
+                         <span className="text-slate-800">₹{(detail.totalDeductions + detail.adjustmentDeductions).toLocaleString()}</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="bg-primary-600 p-8 rounded-[2rem] text-white shadow-2xl shadow-primary-200">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                   <div>
+                      <p className="text-[10px] font-black text-primary-200 uppercase tracking-widest mb-1">Net Monthly Payout</p>
+                      <h4 className="text-4xl font-black tracking-tighter">₹{detail.netSalary.toLocaleString()}</h4>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[10px] font-black text-primary-200 uppercase tracking-widest mb-1">In Words</p>
+                      <p className="text-sm font-bold opacity-90 break-words">{detail.netSalary.toLocaleString()} Rupees Only</p>
+                   </div>
+                </div>
+             </div>
+
+             {detail.adjustmentRemarks && (
+               <div className="mt-10 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-500 italic text-xs leading-relaxed">
+                  Note: {detail.adjustmentRemarks}
+               </div>
+             )}
+
+             <div className="mt-16 flex justify-between pt-10 border-t border-slate-100">
+                <div className="text-center">
+                   <div className="h-0.5 w-32 bg-slate-200 mb-2 mx-auto" />
+                   <p className="text-[10px] font-bold text-slate-400 uppercase uppercase tracking-widest">Office Stamp</p>
+                </div>
+                <div className="text-center">
+                   <div className="h-0.5 w-32 bg-slate-200 mb-2 mx-auto" />
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signature of Receiver</p>
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function UpsertSalaryStructureModal({ structure, onClose, onSuccess }: { structure: SalaryStructureDto | null, onClose: () => void, onSuccess: () => void }) {
+  const [name, setName] = useState(structure?.name || '');
+  const [description, setDescription] = useState(structure?.description || '');
+  const [isActive, setIsActive] = useState(structure?.isActive ?? true);
+  const [components, setComponents] = useState<{name: string, type: number, amount: number}[]>(() => {
+    if (structure?.components && structure.components.length > 0) {
+      return structure.components.map(c => ({ name: c.name, type: c.type, amount: c.amount }));
+    }
+    return [{ name: 'Basic Salary', type: SalaryComponentType.Earning, amount: 0 }];
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const addComponent = (type: number) => setComponents([...components, { name: '', type, amount: 0 }]);
+  const removeComponent = (index: number) => setComponents(components.filter((_, i) => i !== index));
+  const updateComponent = (index: number, field: string, value: any) => {
+    const updated = [...components];
+    (updated[index] as any)[field] = value;
+    setComponents(updated);
+  };
+
+  const handleSave = async () => {
+    if (!name) return alert("Please enter a structure name.");
+    setIsSaving(true);
+    try {
+      const data = { name, description, isActive, components };
+      if (structure) {
+        await payrollApi.updateStructure(structure.id, data);
+      } else {
+        await payrollApi.createStructure(data);
+      }
+      onSuccess();
+    } catch (err: any) {
+      alert(err.response?.data || "Failed to save structure.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const totalEarnings = components.filter(c => c.type === SalaryComponentType.Earning).reduce((sum, c) => sum + (c.amount || 0), 0);
+  const totalDeductions = components.filter(c => c.type === SalaryComponentType.Deduction).reduce((sum, c) => sum + (c.amount || 0), 0);
+  const netTotal = totalEarnings - totalDeductions;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+        
+        {/* Compact Header */}
+        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg">
+              <Settings className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-800 tracking-tight">{structure ? 'Edit' : 'New'} Pay Scale</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Configure earnings & deductions</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-300 hover:text-slate-900 transition-colors font-black text-xl">&times;</button>
+        </div>
+
+        <div className="flex-grow overflow-y-auto p-8 space-y-8">
+          
+          <div className="grid grid-cols-4 gap-6">
+            <div className="col-span-3 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Scheme Name</label>
+              <input 
+                className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-primary-400 outline-none transition" 
+                placeholder="Senior Staff Scale..." 
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+              <button 
+                onClick={() => setIsActive(!isActive)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}
+              >
+                {isActive ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                {isActive ? 'Active' : 'Paused'}
+              </button>
+            </div>
+          </div>
+
+          {/* Breakdown Section */}
+          <div className="grid grid-cols-2 gap-8">
+            
+            {/* Earnings */}
+            <div className="space-y-4">
+               <div className="flex items-center justify-between bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">
+                  <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Earnings (+)</h4>
+                  <button onClick={() => addComponent(SalaryComponentType.Earning)} className="text-emerald-600 hover:scale-110 transition"><Plus className="w-4 h-4" /></button>
+               </div>
+
+               <div className="space-y-3">
+                  {components.filter(c => c.type === SalaryComponentType.Earning).map((c) => {
+                     const realIdx = components.indexOf(c);
+                     return (
+                        <div key={realIdx} className="group flex gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all">
+                           <input 
+                              className="flex-grow px-3 py-1.5 bg-transparent border-0 font-bold text-slate-700 text-xs outline-none" 
+                              placeholder="Label" 
+                              value={c.name}
+                              onChange={e => updateComponent(realIdx, 'name', e.target.value)}
+                           />
+                           <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-[10px]">₹</span>
+                              <input 
+                                 type="number"
+                                 className="w-24 pl-5 pr-3 py-2 bg-white rounded-lg font-black text-emerald-600 text-right text-xs outline-none border border-slate-100"
+                                 value={c.amount}
+                                 onChange={e => updateComponent(realIdx, 'amount', parseFloat(e.target.value) || 0)}
+                              />
+                           </div>
+                           <button onClick={() => removeComponent(realIdx)} className="p-2 text-slate-200 hover:text-rose-400 transition">
+                             <Trash2 className="w-3.5 h-3.5" />
+                           </button>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+
+            {/* Deductions */}
+            <div className="space-y-4">
+               <div className="flex items-center justify-between bg-rose-50/30 p-4 rounded-xl border border-rose-100/50">
+                  <h4 className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Deductions (-)</h4>
+                  <button onClick={() => addComponent(SalaryComponentType.Deduction)} className="text-rose-600 hover:scale-110 transition"><Plus className="w-4 h-4" /></button>
+               </div>
+
+               <div className="space-y-3">
+                  {components.filter(c => c.type === SalaryComponentType.Deduction).map((c) => {
+                     const realIdx = components.indexOf(c);
+                     return (
+                        <div key={realIdx} className="group flex gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100 hover:border-rose-200 transition-all">
+                           <input 
+                              className="flex-grow px-3 py-1.5 bg-transparent border-0 font-bold text-slate-700 text-xs outline-none" 
+                              placeholder="Label" 
+                              value={c.name}
+                              onChange={e => updateComponent(realIdx, 'name', e.target.value)}
+                           />
+                           <div className="relative">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-[10px]">₹</span>
+                              <input 
+                                 type="number"
+                                 className="w-24 pl-5 pr-3 py-2 bg-white rounded-lg font-black text-rose-600 text-right text-xs outline-none border border-slate-100"
+                                 value={c.amount}
+                                 onChange={e => updateComponent(realIdx, 'amount', parseFloat(e.target.value) || 0)}
+                              />
+                           </div>
+                           <button onClick={() => removeComponent(realIdx)} className="p-2 text-slate-200 hover:text-rose-400 transition">
+                             <Trash2 className="w-3.5 h-3.5" />
+                           </button>
+                        </div>
+                     );
+                  })}
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Clean & Compact Footer */}
+        <div className="px-8 py-6 bg-white border-t border-slate-100 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+              <div className="px-4 py-2 bg-slate-900 rounded-xl text-white">
+                 <p className="text-[8px] font-black opacity-40 uppercase tracking-widest">Net Payout</p>
+                 <p className="text-lg font-black tracking-tight">₹{netTotal.toLocaleString()}</p>
+              </div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
+                 {components.length} Items
+              </div>
+           </div>
+
+           <div className="flex items-center gap-4">
+              <button onClick={onClose} className="px-5 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600">Cancel</button>
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-8 py-3 bg-primary-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-700 transition shadow-lg shadow-primary-200 flex items-center gap-2"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Structure'}
+              </button>
+           </div>
+        </div>
+      </div>
     </div>
   );
 }

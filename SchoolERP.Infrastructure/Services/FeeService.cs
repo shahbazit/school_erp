@@ -318,6 +318,33 @@ public class FeeService : IFeeService
         await _unitOfWork.CompleteAsync();
     }
 
+    public async Task AddExtraChargeAsync(AddExtraChargeRequest request)
+    {
+        var account = await _unitOfWork.Repository<StudentFeeAccount>().GetQueryable()
+            .FirstOrDefaultAsync(a => a.StudentId == request.StudentId);
+
+        if (account == null) throw new Exception("Student Fee Account not found");
+
+        var chargeTx = new FeeTransaction
+        {
+            StudentId = request.StudentId,
+            OrganizationId = _organizationService.GetOrganizationId(),
+            AcademicYearId = request.AcademicYearId,
+            TransactionDate = DateTime.UtcNow,
+            Type = "Charge",
+            Amount = request.Amount,
+            Description = request.Remarks?.Trim() != null 
+                ? $"{request.ChargeType} - {request.Remarks}" 
+                : request.ChargeType
+        };
+
+        await _unitOfWork.Repository<FeeTransaction>().AddAsync(chargeTx);
+        account.TotalAllocated += request.Amount;
+        account.LastTransactionDate = DateTime.UtcNow;
+        _unitOfWork.Repository<StudentFeeAccount>().Update(account);
+        await _unitOfWork.CompleteAsync();
+    }
+
     public async Task GenerateMonthlyChargesAsync(IEnumerable<Guid> classIds, string month, IEnumerable<Guid>? feeHeadIds = null, Guid? academicYearId = null)
     {
         var yearQuery = _unitOfWork.Repository<AcademicYear>().GetQueryable();

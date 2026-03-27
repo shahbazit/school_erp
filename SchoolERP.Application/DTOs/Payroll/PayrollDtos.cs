@@ -43,6 +43,7 @@ public class EmployeeSalaryDto
 {
     public Guid Id { get; set; }
     public Guid EmployeeId { get; set; }
+    public string EmployeeCode { get; set; } = string.Empty;
     public string EmployeeName { get; set; } = string.Empty;
     public Guid SalaryStructureId { get; set; }
     public string SalaryStructureName { get; set; } = string.Empty;
@@ -64,6 +65,9 @@ public class PayrollDetailDto
     public string EmployeeName { get; set; } = string.Empty;
     public decimal GrossSalary { get; set; }
     public decimal TotalDeductions { get; set; }
+    public decimal AdjustmentEarnings { get; set; }
+    public decimal AdjustmentDeductions { get; set; }
+    public string? AdjustmentRemarks { get; set; }
     public decimal NetSalary { get; set; }
     public string ComponentBreakdownDetails { get; set; } = "[]";
 }

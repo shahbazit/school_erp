@@ -398,8 +398,8 @@ public class ApplicationDbContext : DbContext
 
         builder.Entity<EmployeeSalary>()
             .HasOne(es => es.Employee)
-            .WithMany()
-            .HasForeignKey(es => es.EmployeeId)
+            .WithOne(e => e.EmployeeSalary)
+            .HasForeignKey<EmployeeSalary>(es => es.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<EmployeeSalary>()

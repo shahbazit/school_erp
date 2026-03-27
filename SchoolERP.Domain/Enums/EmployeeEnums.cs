@@ -54,7 +54,8 @@ public enum PayrollStatus
     Draft = 1,
     Processed = 2,
     Approved = 3,
-    Paid = 4
+    Paid = 4,
+    Rejected = 5
 }
 
 public enum LeaveDayType

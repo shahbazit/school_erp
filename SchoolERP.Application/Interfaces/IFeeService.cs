@@ -21,6 +21,7 @@ public interface IFeeService
     // Student Fee Operations
     Task<StudentFeeAccountDto> GetStudentFeeAccountAsync(Guid studentId);
     Task ProcessPaymentAsync(ProcessPaymentRequest request);
+    Task AddExtraChargeAsync(AddExtraChargeRequest request);
 
     // Student Fee Subscriptions (Elective Fees)
     Task<IEnumerable<StudentFeeSubscriptionDto>> GetStudentSubscriptionsAsync(Guid studentId);

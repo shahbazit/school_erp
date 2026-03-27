@@ -203,6 +203,29 @@ public class PayrollController : ControllerBase
         return Ok(new { message = "Salary assigned successfully." });
     }
 
+    [HttpGet("salaries")]
+    public async Task<IActionResult> GetEmployeeSalaries()
+    {
+        var employees = await _unitOfWork.Repository<Employee>().GetQueryable()
+            .Include(e => e.EmployeeSalary)
+                .ThenInclude(es => es!.SalaryStructure)
+            .Select(e => new EmployeeSalaryDto
+            {
+                EmployeeId = e.Id,
+                EmployeeCode = e.EmployeeCode,
+                EmployeeName = $"{e.FirstName} {e.LastName}",
+                SalaryStructureId = e.EmployeeSalary != null ? e.EmployeeSalary.SalaryStructureId : Guid.Empty,
+                SalaryStructureName = e.EmployeeSalary != null && e.EmployeeSalary.SalaryStructure != null 
+                    ? e.EmployeeSalary.SalaryStructure.Name 
+                    : "No Plan Assigned",
+                GrossSalary = e.EmployeeSalary != null ? e.EmployeeSalary.GrossSalary : 0,
+                NetSalary = e.EmployeeSalary != null ? e.EmployeeSalary.NetSalary : 0
+            })
+            .ToListAsync();
+
+        return Ok(employees);
+    }
+
     [HttpGet("employee/{employeeId}")]
     public async Task<IActionResult> GetEmployeeSalary(Guid employeeId)
     {
@@ -213,6 +236,7 @@ public class PayrollController : ControllerBase
             {
                 Id = es.Id,
                 EmployeeId = es.EmployeeId,
+                EmployeeCode = es.Employee!.EmployeeCode,
                 EmployeeName = $"{es.Employee!.FirstName} {es.Employee!.LastName}",
                 SalaryStructureId = es.SalaryStructureId,
                 SalaryStructureName = es.SalaryStructure!.Name,
@@ -257,6 +281,9 @@ public class PayrollController : ControllerBase
                 EmployeeName = $"{d.Employee?.FirstName} {d.Employee?.LastName}",
                 GrossSalary = d.GrossSalary,
                 TotalDeductions = d.TotalDeductions,
+                AdjustmentEarnings = d.AdjustmentEarnings,
+                AdjustmentDeductions = d.AdjustmentDeductions,
+                AdjustmentRemarks = d.AdjustmentRemarks,
                 NetSalary = d.NetSalary,
                 ComponentBreakdownDetails = d.ComponentBreakdownDetails
             }).ToList()
@@ -290,39 +317,61 @@ public class PayrollController : ControllerBase
     [HttpPost("process")]
     public async Task<IActionResult> ProcessPayroll([FromBody] ProcessPayrollDto dto)
     {
-        var existingRun = await _unitOfWork.Repository<PayrollRun>().GetQueryable()
-            .FirstOrDefaultAsync(r => r.Year == dto.Year && r.Month == dto.Month);
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return BadRequest("Organization identity context not found.");
+
+        // 1. Identify existing run using No-Tracking to avoid polluting the change tracker
+        var existing = await _unitOfWork.Repository<PayrollRun>().GetQueryable()
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(r => r.Year == dto.Year && r.Month == dto.Month && r.OrganizationId == orgId)
+            .Select(r => new { r.Id, r.Status })
+            .FirstOrDefaultAsync();
             
-        if (existingRun != null && existingRun.Status != PayrollStatus.Draft)
+        if (existing != null && existing.Status != PayrollStatus.Draft && existing.Status != PayrollStatus.Rejected)
             return BadRequest("Payroll for this month has already been processed and locked.");
 
-        // Fetch all active employees with assigned salaries
+        Guid runId;
+        if (existing != null)
+        {
+            runId = existing.Id;
+            // 2. Clear old details immediately via Direct SQL (Clean Slate)
+            await _unitOfWork.Repository<PayrollDetail>().GetQueryable()
+                .Where(d => d.PayrollRunId == runId)
+                .ExecuteDeleteAsync();
+        }
+        else
+        {
+            // 3. Create a clean Run header if it doesn't exist
+            var newRun = new PayrollRun
+            {
+                Year = dto.Year,
+                Month = dto.Month,
+                OrganizationId = orgId,
+                Status = PayrollStatus.Draft,
+                ProcessedById = _currentUserService.UserId,
+                ProcessedDate = DateTime.UtcNow,
+                Remarks = dto.Remarks,
+                TotalAmount = 0
+            };
+            await _unitOfWork.Repository<PayrollRun>().AddAsync(newRun);
+            await _unitOfWork.CompleteAsync(); // Commit to DB to ensure header exists
+            runId = newRun.Id;
+        }
+
+        // 4. Fetch work context (Active employees and salaries)
         var employeeSalaries = await _unitOfWork.Repository<EmployeeSalary>().GetQueryable()
             .Include(es => es.SalaryStructure)
                 .ThenInclude(ss => ss!.Components)
             .Include(es => es.Employee)
-            .Where(es => es.Employee!.IsActive)
+            .Where(es => es.Employee!.IsActive && es.OrganizationId == orgId)
             .ToListAsync();
 
         if (!employeeSalaries.Any())
-            return BadRequest("No active employees with assigned salary structures found.");
+            return BadRequest("No active employees with assigned salary structures found for this organization.");
 
-        PayrollRun run = existingRun ?? new PayrollRun
-        {
-            Year = dto.Year,
-            Month = dto.Month,
-            ProcessedById = _currentUserService.UserId,
-            Status = PayrollStatus.Draft,
-            Remarks = dto.Remarks
-        };
-
-        if (existingRun == null)
-            await _unitOfWork.Repository<PayrollRun>().AddAsync(run);
-
-        // Calculate and build details
-        var details = new List<PayrollDetail>();
+        // 5. Calculate and build individual details
         decimal totalAmount = 0;
-
         foreach (var es in employeeSalaries)
         {
             var earningComps = es.SalaryStructure!.Components.Where(c => c.Type == SalaryComponentType.Earning).ToList();
@@ -341,23 +390,35 @@ public class PayrollController : ControllerBase
                  c.Amount
             });
 
-            details.Add(new PayrollDetail
+            var detail = new PayrollDetail
             {
+                PayrollRunId = runId, // Link to the header ID explicitly
                 EmployeeId = es.EmployeeId,
                 GrossSalary = gross,
                 TotalDeductions = deductions,
                 NetSalary = net,
-                ComponentBreakdownDetails = JsonSerializer.Serialize(componentBreakdown)
-            });
+                ComponentBreakdownDetails = JsonSerializer.Serialize(componentBreakdown),
+                OrganizationId = orgId
+            };
+            await _unitOfWork.Repository<PayrollDetail>().AddAsync(detail);
         }
 
-        run.TotalAmount = totalAmount;
-        run.PayrollDetails = details;
-        run.ProcessedDate = DateTime.UtcNow;
-
+        // 6. Commit the new details first
         await _unitOfWork.CompleteAsync();
 
-        return Ok(new { message = "Payroll processed successfully.", runId = run.Id });
+        // 7. Update the main Run Header using Direct SQL (Update)
+        // This ensures zero concurrency issues because we never use a tracked header entity for the update
+        await _unitOfWork.Repository<PayrollRun>().GetQueryable()
+            .IgnoreQueryFilters()
+            .Where(r => r.Id == runId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.TotalAmount, totalAmount)
+                .SetProperty(x => x.Remarks, dto.Remarks)
+                .SetProperty(x => x.ProcessedById, _currentUserService.UserId)
+                .SetProperty(x => x.ProcessedDate, DateTime.UtcNow)
+                .SetProperty(x => x.Status, PayrollStatus.Draft));
+
+        return Ok(new { message = "Payroll processed successfully.", runId = runId });
     }
 
     [HttpPost("runs/{id}/approve")]
@@ -375,4 +436,172 @@ public class PayrollController : ControllerBase
         
         return Ok(new { message = "Payroll approved successfully." });
     }
+
+    [HttpPost("runs/{id}/reject")]
+    public async Task<IActionResult> RejectPayroll(Guid id)
+    {
+        var run = await _unitOfWork.Repository<PayrollRun>().GetByIdAsync(id);
+        if (run == null) return NotFound();
+        
+        if (run.Status != PayrollStatus.Draft && run.Status != PayrollStatus.Processed)
+            return BadRequest("Cannot reject this payroll run.");
+
+        run.Status = PayrollStatus.Rejected;
+        _unitOfWork.Repository<PayrollRun>().Update(run);
+        await _unitOfWork.CompleteAsync();
+        
+        return Ok(new { message = "Payroll rejected successfully." });
+    }
+
+    [HttpPost("runs/{id}/pay")]
+    public async Task<IActionResult> MarkAsPaid(Guid id)
+    {
+        var run = await _unitOfWork.Repository<PayrollRun>().GetByIdAsync(id);
+        if (run == null) return NotFound();
+        
+        if (run.Status != PayrollStatus.Approved)
+            return BadRequest("Only approved payroll runs can be marked as paid.");
+
+        run.Status = PayrollStatus.Paid;
+        _unitOfWork.Repository<PayrollRun>().Update(run);
+
+        // Automatically log as an expense in Financials
+        var academicYear = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+            .FirstOrDefaultAsync(ay => ay.OrganizationId == run.OrganizationId && ay.IsCurrent);
+
+        var expense = new OfficeExpense
+        {
+            Category = "Payroll",
+            Description = $"Salary Disbursed for {new DateTime(run.Year, run.Month, 1):MMMM yyyy}",
+            Amount = run.TotalAmount,
+            Date = DateTime.UtcNow,
+            Status = "Paid",
+            ReferenceNumber = $"PAY-{run.Id.ToString().Split('-')[0].ToUpper()}",
+            PaymentMethod = "Bank Transfer",
+            AcademicYearId = academicYear?.Id,
+            OrganizationId = run.OrganizationId
+        };
+        await _unitOfWork.Repository<OfficeExpense>().AddAsync(expense);
+
+        await _unitOfWork.CompleteAsync();
+        
+        return Ok(new { message = "Payroll marked as paid and recorded in financials." });
+    }
+
+    [HttpPut("runs/details/{detailId}/adjust")]
+    public async Task<IActionResult> UpdateAdjustment(Guid detailId, [FromBody] UpdateAdjustmentDto dto)
+    {
+        var detail = await _unitOfWork.Repository<PayrollDetail>().GetQueryable()
+            .Include(d => d.PayrollRun)
+            .FirstOrDefaultAsync(d => d.Id == detailId);
+            
+        if (detail == null) return NotFound();
+        if (detail.PayrollRun?.Status != PayrollStatus.Draft && detail.PayrollRun?.Status != PayrollStatus.Rejected)
+            return BadRequest("Can only adjust slips for payroll runs in Draft or Rejected status.");
+
+        // Update detail
+        detail.AdjustmentEarnings = dto.AdjustmentEarnings;
+        detail.AdjustmentDeductions = dto.AdjustmentDeductions;
+        detail.AdjustmentRemarks = dto.AdjustmentRemarks;
+        detail.NetSalary = detail.GrossSalary - detail.TotalDeductions + dto.AdjustmentEarnings - dto.AdjustmentDeductions;
+
+        _unitOfWork.Repository<PayrollDetail>().Update(detail);
+        
+        // Update header TotalAmount
+        var runId = detail.PayrollRunId;
+        await _unitOfWork.CompleteAsync(); // Save detail first
+
+        var total = await _unitOfWork.Repository<PayrollDetail>().GetQueryable()
+            .Where(d => d.PayrollRunId == runId)
+            .SumAsync(d => d.NetSalary);
+
+        await _unitOfWork.Repository<PayrollRun>().GetQueryable()
+            .Where(r => r.Id == runId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.TotalAmount, total));
+
+        return Ok(new { message = "Adjustment saved successfully." });
+    }
+
+    [HttpGet("ledgers/{employeeId}")]
+    public async Task<IActionResult> GetEmployeeLedger(Guid employeeId)
+    {
+        // 1. Regular Monthly Payroll History
+        var payrollHistory = await _unitOfWork.Repository<PayrollDetail>().GetQueryable()
+            .Include(d => d.PayrollRun)
+            .Where(d => d.EmployeeId == employeeId && d.PayrollRun!.Status == PayrollStatus.Paid)
+            .Select(d => new 
+            {
+                Type = "Salary",
+                d.Id,
+                Month = d.PayrollRun!.Month,
+                Year = d.PayrollRun!.Year,
+                d.NetSalary,
+                Remarks = (string?)d.AdjustmentRemarks ?? d.PayrollRun.Remarks,
+                Date = d.PayrollRun.ProcessedDate
+            })
+            .ToListAsync();
+
+        // 2. Miscellaneous Payouts (Bonus, Advance, etc.)
+        var miscPayouts = await _unitOfWork.Repository<OfficeExpense>().GetQueryable()
+            .Where(e => e.LinkedEmployeeId == employeeId && e.Category == "Staff Payout")
+            .Select(e => new 
+            {
+                Type = "Misc Payout",
+                e.Id,
+                Month = e.Date.Month,
+                Year = e.Date.Year,
+                NetSalary = e.Amount,
+                Remarks = (string?)e.Description,
+                Date = e.Date
+            })
+            .ToListAsync();
+
+        var combined = payrollHistory.Concat(miscPayouts)
+            .OrderByDescending(x => x.Year)
+            .ThenByDescending(x => x.Month)
+            .ToList();
+
+        return Ok(combined);
+    }
+
+    [HttpPost("misc-payout")]
+    public async Task<IActionResult> RecordMiscPayout([FromBody] MiscPayoutDto dto)
+    {
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return BadRequest();
+
+        var expense = new OfficeExpense
+        {
+            Category = "Staff Payout", // Distinguishable category
+            Description = $"{dto.Type}: {dto.Remarks}",
+            Amount = dto.Amount,
+            Date = DateTime.UtcNow,
+            Status = "Paid",
+            ReferenceNumber = $"STF-{DateTime.UtcNow.Ticks % 1000000}",
+            PaymentMethod = dto.PaymentMethod,
+            OrganizationId = orgId,
+            LinkedEmployeeId = dto.EmployeeId
+        };
+        
+        await _unitOfWork.Repository<OfficeExpense>().AddAsync(expense);
+        await _unitOfWork.CompleteAsync();
+
+        return Ok(new { message = "Miscellaneous payout recorded successfully." });
+    }
+}
+
+public class MiscPayoutDto
+{
+    public Guid EmployeeId { get; set; }
+    public string Type { get; set; } = "Bonus"; // Bonus, Incentive, Advance, Arrears
+    public decimal Amount { get; set; }
+    public string PaymentMethod { get; set; } = "Bank Transfer";
+    public string? Remarks { get; set; }
+}
+
+public class UpdateAdjustmentDto
+{
+    public decimal AdjustmentEarnings { get; set; }
+    public decimal AdjustmentDeductions { get; set; }
+    public string? AdjustmentRemarks { get; set; }
 }

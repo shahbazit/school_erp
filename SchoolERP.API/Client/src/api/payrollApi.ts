@@ -10,6 +10,7 @@ export enum PayrollStatus {
   Processed = 2,
   Approved = 3,
   Paid = 4,
+  Rejected = 5,
 }
 
 export interface SalaryComponentDto {
@@ -64,6 +65,9 @@ export interface PayrollDetailDto {
   employeeName: string;
   grossSalary: number;
   totalDeductions: number;
+  adjustmentEarnings: number;
+  adjustmentDeductions: number;
+  adjustmentRemarks?: string;
   netSalary: number;
   componentBreakdownDetails: string;
 }
@@ -136,6 +140,41 @@ export const payrollApi = {
 
   approvePayroll: async (id: string): Promise<{ message: string }> => {
     const res = await apiClient.post<{ message: string }>(`/payroll/runs/${id}/approve`);
+    return res.data;
+  },
+
+  rejectPayroll: async (id: string): Promise<{ message: string }> => {
+    const res = await apiClient.post<{ message: string }>(`/payroll/runs/${id}/reject`);
+    return res.data;
+  },
+
+  markPaidPayroll: async (id: string): Promise<{ message: string }> => {
+    const res = await apiClient.post<{ message: string }>(`/payroll/runs/${id}/pay`);
+    return res.data;
+  },
+
+  updateAdjustment: async (detailId: string, data: { adjustmentEarnings: number, adjustmentDeductions: number, adjustmentRemarks: string }): Promise<{ message: string }> => {
+    const res = await apiClient.put<{ message: string }>(`/payroll/runs/details/${detailId}/adjust`, data);
+    return res.data;
+  },
+
+  getEmployeeLedger: async (employeeId: string): Promise<any[]> => {
+    const res = await apiClient.get<any[]>(`/payroll/ledgers/${employeeId}`);
+    return res.data;
+  },
+
+  getEmployeesLookup: async (): Promise<any[]> => {
+    // Standard employee list for lookups
+    const res = await apiClient.get<any>('/employee?pageSize=1000');
+    return res.data.data;
+  },
+
+  recordMiscPayout: async (data: { employeeId: string, type: string, amount: number, paymentMethod: string, remarks: string }): Promise<{ message: string }> => {
+    const res = await apiClient.post<{ message: string }>('/payroll/misc-payout', data);
+    return res.data;
+  },
+  getEmployeeSalaries: async (): Promise<EmployeeSalaryDto[]> => {
+    const res = await apiClient.get<EmployeeSalaryDto[]>('/payroll/salaries');
     return res.data;
   },
 };

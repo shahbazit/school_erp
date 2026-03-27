@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using SchoolERP.Domain.Common;
 
 namespace SchoolERP.Domain.Entities;
@@ -10,6 +11,7 @@ public class EmployeeSalary : BaseEntity
     public decimal NetSalary { get; set; }
     
     // Navigation
+    [ForeignKey("EmployeeId")]
     public virtual Employee? Employee { get; set; }
     public virtual SalaryStructure? SalaryStructure { get; set; }
 }

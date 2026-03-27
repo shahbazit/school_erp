@@ -33,3 +33,11 @@ public class ProcessPaymentRequest
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
 }
+public class AddExtraChargeRequest
+{
+    public Guid StudentId { get; set; }
+    public Guid AcademicYearId { get; set; }
+    public decimal Amount { get; set; }
+    public string ChargeType { get; set; } = string.Empty;
+    public string? Remarks { get; set; }
+}
