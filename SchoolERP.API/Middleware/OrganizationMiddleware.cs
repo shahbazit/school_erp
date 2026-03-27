@@ -14,23 +14,30 @@ public class OrganizationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Add OrganizationId from JWT to context items if present
+        Guid? organizationId = null;
+
+        // 1. Try getting from JWT Claims
         if (context.User.Identity?.IsAuthenticated == true)
         {
             var orgClaim = context.User.FindFirst("OrganizationId")?.Value;
-            if (!string.IsNullOrEmpty(orgClaim) && Guid.TryParse(orgClaim, out var organizationId))
+            if (!string.IsNullOrEmpty(orgClaim) && Guid.TryParse(orgClaim, out var parsedOrgId))
             {
-                context.Items["OrganizationId"] = organizationId;
+                organizationId = parsedOrgId;
             }
         }
-        else
+
+        // 2. Fallback to Header (X-Organization-Id) if claim not found OR even if found (header can override for multi-tenant switching)
+        var orgHeader = context.Request.Headers["X-Organization-Id"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(orgHeader) && Guid.TryParse(orgHeader, out var headerOrgId))
         {
-            // For endpoints that don't require auth (Login/Register), parse from header
-            var orgHeader = context.Request.Headers["X-Organization-Id"].FirstOrDefault();
-            if (!string.IsNullOrEmpty(orgHeader) && Guid.TryParse(orgHeader, out var organizationId))
-            {
-                context.Items["OrganizationId"] = organizationId;
-            }
+            // If we have both, we can decide priority. Usually Claim is more secure, Header is more flexible.
+            // For now, let's use Header if it's there, as it's explicitly sent by our frontend interceptor.
+            organizationId = headerOrgId;
+        }
+
+        if (organizationId.HasValue && organizationId.Value != Guid.Empty)
+        {
+            context.Items["OrganizationId"] = organizationId.Value;
         }
 
         await _next(context);

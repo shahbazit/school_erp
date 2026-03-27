@@ -2,30 +2,7 @@ import { useState } from 'react';
 import { authApi } from '../api/authApi';
 import { LoginRequest, RegisterRequest } from '../types';
 
-// Extracts a human-readable error message from any ASP.NET Core / Axios error
-const extractError = (err: any, fallback: string): string => {
-  const data = err?.response?.data;
-  if (!data) return fallback;
-
-  // 1. Custom array: { "Errors": ["msg"] }
-  if (Array.isArray(data.Errors) && data.Errors.length > 0) return data.Errors[0];
-
-  // 2. Lowercase array: { "errors": ["msg"] }
-  if (Array.isArray(data.errors) && data.errors.length > 0) return data.errors[0];
-
-  // 3. ASP.NET validation object: { "errors": { "Field": ["msg"] } }
-  if (data.errors && typeof data.errors === 'object') {
-    const firstKey = Object.keys(data.errors)[0];
-    const firstMessages = data.errors[firstKey];
-    if (Array.isArray(firstMessages) && firstMessages.length > 0) return firstMessages[0];
-  }
-
-  // 4. Simple message or title (Problem Details)
-  if (typeof data.message === 'string') return data.message;
-  if (typeof data.title === 'string') return data.title;
-
-  return fallback;
-};
+import { extractError } from '../utils/errorUtils';
 
 export const useAuth = () => {
   const [loading, setLoading] = useState(false);
@@ -44,8 +21,9 @@ export const useAuth = () => {
           const base64Url = response.token.split('.')[1];
           const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
           const payload = JSON.parse(window.atob(base64));
-          if (payload.OrganizationId) {
-            localStorage.setItem('organizationId', payload.OrganizationId);
+          const orgId = payload.OrganizationId || payload.organizationId || payload.orgId;
+          if (orgId) {
+            localStorage.setItem('organizationId', orgId);
           }
         } catch (e) { console.error("Could not decode orgId", e); }
 

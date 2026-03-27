@@ -9,18 +9,20 @@ using SchoolERP.Domain.Enums;
 
 namespace SchoolERP.API.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/payroll")]
 [ApiController]
 [Authorize(Roles = "Admin,HR")]
 public class PayrollController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IOrganizationService _organizationService;
 
-    public PayrollController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+    public PayrollController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService, IOrganizationService organizationService)
     {
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _organizationService = organizationService;
     }
 
     // ── Salary Structures ──────────────────────────────────────────────────
@@ -28,8 +30,10 @@ public class PayrollController : ControllerBase
     [HttpGet("structures")]
     public async Task<IActionResult> GetStructures()
     {
+        var orgId = _organizationService.GetOrganizationId();
         var structures = await _unitOfWork.Repository<SalaryStructure>().GetQueryable()
             .Include(s => s.Components)
+            .Where(s => s.OrganizationId == orgId)
             .Select(s => new SalaryStructureDto
             {
                 Id = s.Id,
@@ -54,16 +58,20 @@ public class PayrollController : ControllerBase
     [HttpPost("structures")]
     public async Task<IActionResult> CreateStructure([FromBody] UpsertSalaryStructureDto dto)
     {
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return BadRequest("Organization ID context is missing. Please ensure you are logged in and have selected an organization.");
         var structure = new SalaryStructure
         {
             Name = dto.Name,
             Description = dto.Description,
             IsActive = dto.IsActive,
+            OrganizationId = orgId,
             Components = dto.Components.Select(c => new SalaryComponent
             {
                 Name = c.Name,
                 Type = c.Type,
-                Amount = c.Amount
+                Amount = c.Amount,
+                OrganizationId = orgId
             }).ToList()
         };
 
@@ -71,6 +79,86 @@ public class PayrollController : ControllerBase
         await _unitOfWork.CompleteAsync();
 
         return Ok(new { message = "Salary Structure created successfully." });
+    }
+
+    [HttpPut("structures/{id}")]
+    public async Task<IActionResult> UpdateStructure(Guid id, [FromBody] UpsertSalaryStructureDto dto)
+    {
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return BadRequest("Organization ID is missing.");
+
+        // 1. Update the structure directly using Bulk Update to bypass all tracking/filter issues
+        // This also handles repairing legacy records (OrganizationId = Empty) in one go
+        var affected = await _unitOfWork.Repository<SalaryStructure>().GetQueryable()
+            .IgnoreQueryFilters()
+            .Where(s => s.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Name, dto.Name)
+                .SetProperty(x => x.Description, dto.Description)
+                .SetProperty(x => x.IsActive, dto.IsActive)
+                .SetProperty(x => x.OrganizationId, orgId)
+                .SetProperty(x => x.UpdatedAt, DateTime.UtcNow)
+                .SetProperty(x => x.UpdatedBy, _currentUserService.UserId));
+
+        if (affected == 0) return NotFound();
+
+        // 2. Proactively delete old components using Direct SQL (Bulk Delete)
+        await _unitOfWork.Repository<SalaryComponent>().GetQueryable()
+            .IgnoreQueryFilters()
+            .Where(c => c.SalaryStructureId == id)
+            .ExecuteDeleteAsync();
+
+        // 3. Add new components
+        foreach (var c in dto.Components)
+        {
+            var component = new SalaryComponent
+            {
+                Name = c.Name,
+                Type = c.Type,
+                Amount = c.Amount,
+                OrganizationId = orgId,
+                SalaryStructureId = id
+            };
+            await _unitOfWork.Repository<SalaryComponent>().AddAsync(component);
+        }
+
+        // 4. Save the new components
+        // Note: The structure update and old components deletion were already committed to the DB
+        await _unitOfWork.CompleteAsync();
+
+        return Ok(new { message = "Salary Structure updated successfully." });
+    }
+
+    [HttpDelete("structures/{id}")]
+    public async Task<IActionResult> DeleteStructure(Guid id)
+    {
+        var orgId = _organizationService.GetOrganizationId();
+        
+        // Check if assigned to any employee
+        var isAssigned = await _unitOfWork.Repository<EmployeeSalary>().GetQueryable()
+            .AnyAsync(s => s.SalaryStructureId == id);
+            
+        if (isAssigned) return BadRequest("Cannot delete structure because it is currently assigned to employees.");
+
+        // Fetch with IgnoreQueryFilters to handle legacy data
+        var structure = await _unitOfWork.Repository<SalaryStructure>().GetQueryable()
+            .IgnoreQueryFilters()
+            .Include(s => s.Components)
+            .FirstOrDefaultAsync(s => s.Id == id && (s.OrganizationId == orgId || s.OrganizationId == Guid.Empty));
+
+        if (structure == null) return NotFound();
+
+        // Manual delete components (though cascade should handle it)
+        var compRepo = _unitOfWork.Repository<SalaryComponent>();
+        foreach (var comp in structure.Components.ToList())
+        {
+            compRepo.Delete(comp);
+        }
+
+        _unitOfWork.Repository<SalaryStructure>().Delete(structure);
+        await _unitOfWork.CompleteAsync();
+
+        return Ok(new { message = "Salary Structure deleted successfully." });
     }
 
     // ── Assign Salary ──────────────────────────────────────────────────────
@@ -87,8 +175,9 @@ public class PayrollController : ControllerBase
         var totalEarnings = structure.Components.Where(c => c.Type == SalaryComponentType.Earning).Sum(c => c.Amount);
         var totalDeductions = structure.Components.Where(c => c.Type == SalaryComponentType.Deduction).Sum(c => c.Amount);
 
+        var orgId = _organizationService.GetOrganizationId();
         var existing = await _unitOfWork.Repository<EmployeeSalary>().GetQueryable()
-            .FirstOrDefaultAsync(s => s.EmployeeId == dto.EmployeeId);
+            .FirstOrDefaultAsync(s => s.EmployeeId == dto.EmployeeId && s.OrganizationId == orgId);
 
         if (existing != null)
         {
@@ -104,7 +193,8 @@ public class PayrollController : ControllerBase
                 EmployeeId = dto.EmployeeId,
                 SalaryStructureId = dto.SalaryStructureId,
                 GrossSalary = totalEarnings,
-                NetSalary = totalEarnings - totalDeductions
+                NetSalary = totalEarnings - totalDeductions,
+                OrganizationId = orgId
             };
             await _unitOfWork.Repository<EmployeeSalary>().AddAsync(assignment);
         }

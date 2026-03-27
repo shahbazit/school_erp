@@ -98,6 +98,16 @@ export const payrollApi = {
     const res = await apiClient.post<{ message: string }>('/payroll/structures', data);
     return res.data;
   },
+  
+  updateStructure: async (id: string, data: UpsertSalaryStructureDto): Promise<{ message: string }> => {
+    const res = await apiClient.put<{ message: string }>(`/payroll/structures/${id}`, data);
+    return res.data;
+  },
+
+  deleteStructure: async (id: string): Promise<{ message: string }> => {
+    const res = await apiClient.delete<{ message: string }>(`/payroll/structures/${id}`);
+    return res.data;
+  },
 
   assignSalary: async (data: AssignSalaryDto): Promise<{ message: string }> => {
     const res = await apiClient.post<{ message: string }>('/payroll/assign', data);

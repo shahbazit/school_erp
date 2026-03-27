@@ -12,6 +12,7 @@ import {
   type PayrollRunDto,
   type UpsertSalaryStructureDto
 } from '../api/payrollApi';
+import { extractError } from '../utils/errorUtils';
 
 const statusConfig = {
   [PayrollStatus.Draft]: { label: 'Draft', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: <Clock className="w-4 h-4" /> },
@@ -236,8 +237,9 @@ function RunDetailsModal({ runId, onClose }: { runId: string, onClose: () => voi
 function SalaryStructures() {
   const [structures, setStructures] = useState<SalaryStructureDto[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<UpsertSalaryStructureDto>({
+  const initialFormData: UpsertSalaryStructureDto = {
     name: '',
     description: '',
     isActive: true,
@@ -246,7 +248,11 @@ function SalaryStructures() {
       { name: 'HRA', type: SalaryComponentType.Earning, amount: 0 },
       { name: 'PF', type: SalaryComponentType.Deduction, amount: 0 }
     ]
-  });
+  };
+
+  const [formData, setFormData] = useState<UpsertSalaryStructureDto>(initialFormData);
+  const [deleteTarget, setDeleteTarget] = useState<SalaryStructureDto | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadStructures = useCallback(async () => {
     try {
@@ -273,20 +279,61 @@ function SalaryStructures() {
     }));
   };
 
+  const handleEdit = (ss: SalaryStructureDto) => {
+    setEditId(ss.id);
+    setFormData({
+      name: ss.name,
+      description: ss.description || '',
+      isActive: ss.isActive,
+      components: ss.components.map(c => ({
+        name: c.name,
+        type: c.type,
+        amount: c.amount
+      }))
+    });
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await payrollApi.createStructure(formData);
+      if (editId) {
+        await payrollApi.updateStructure(editId, formData);
+      } else {
+        await payrollApi.createStructure(formData);
+      }
       setShowModal(false);
+      setEditId(null);
+      setFormData(initialFormData);
       loadStructures();
-    } catch (err) { alert("Failed to save structure."); }
+    } catch (err: any) { 
+       const msg = extractError(err, "Failed to save structure.");
+       alert(msg); 
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await payrollApi.deleteStructure(deleteTarget.id);
+      setDeleteTarget(null);
+      loadStructures();
+    } catch (err: any) {
+      alert(err.response?.data || "Failed to delete structure.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
     <div className="space-y-4">
        <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest pl-1">Standard Templates</h3>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition">
+          <button 
+            onClick={() => { setEditId(null); setFormData(initialFormData); setShowModal(true); }} 
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-700 transition"
+          >
             <Plus className="w-4 h-4" /> New Structure
           </button>
        </div>
@@ -295,9 +342,18 @@ function SalaryStructures() {
           {structures.map(ss => (
             <div key={ss.id} className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-primary-200 transition relative overflow-hidden flex flex-col h-full shadow-sm">
                <div className="flex items-start justify-between">
-                  <h4 className="font-black text-slate-800 text-lg leading-tight">{ss.name}</h4>
-                  <Settings className="w-4 h-4 text-slate-300 group-hover:text-primary-400 transition cursor-pointer" />
-               </div>
+                   <h4 className="font-black text-slate-800 text-lg leading-tight">{ss.name}</h4>
+                   <div className="flex items-center gap-2">
+                     <Settings 
+                       onClick={() => handleEdit(ss)}
+                       className="w-4 h-4 text-slate-300 hover:text-primary-600 transition cursor-pointer" 
+                     />
+                     <Trash2 
+                       onClick={() => setDeleteTarget(ss)}
+                       className="w-4 h-4 text-slate-300 hover:text-rose-600 transition cursor-pointer" 
+                     />
+                   </div>
+                </div>
                <p className="text-sm text-slate-400 mt-1 mb-6 flex-grow">{ss.description || 'No description provided'}</p>
                
                <div className="space-y-2 mb-6">
@@ -339,7 +395,7 @@ function SalaryStructures() {
            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
            <div className="relative bg-white shadow-2xl w-full lg:w-[60%] h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <h3 className="text-xl font-black text-slate-800">Configure Salary Structure</h3>
+                 <h3 className="text-xl font-black text-slate-800">{editId ? 'Update' : 'Configure'} Salary Structure</h3>
                  <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-200 rounded-xl text-slate-400 transition">&times;</button>
               </div>
               <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-grow custom-scrollbar">
@@ -424,11 +480,43 @@ function SalaryStructures() {
                       ))}
                     </div>
                  </div>
+                 <div className="p-6 border-t border-slate-100 flex gap-4 bg-slate-50/50 -mx-6 -mb-6 mt-auto">
+                    <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl text-sm font-black hover:bg-slate-50 transition">Cancel</button>
+                    <button type="submit" className="flex-2 px-10 py-3 bg-primary-600 text-white rounded-2xl text-sm font-black hover:bg-primary-700 transition shadow-xl shadow-primary-100">Save Configuration</button>
+                 </div>
               </form>
-              <div className="p-6 border-t border-slate-100 flex gap-4 bg-slate-50/50">
-                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl text-sm font-black hover:bg-slate-50 transition">Cancel</button>
-                 <button onClick={handleSubmit} className="flex-2 px-10 py-3 bg-primary-600 text-white rounded-2xl text-sm font-black hover:bg-primary-700 transition shadow-xl shadow-primary-100">Save Configuration</button>
-              </div>
+           </div>
+         </div>
+       )}
+
+       {/* Delete Confirmation Modal */}
+       {deleteTarget && (
+         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isDeleting && setDeleteTarget(null)} />
+           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+             <div className="h-16 w-16 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 text-rose-600">
+               <Trash2 className="w-8 h-8" />
+             </div>
+             <h3 className="text-2xl font-black text-slate-800 mb-2">Delete Structure?</h3>
+             <p className="text-slate-500 mb-8 font-medium">Are you sure you want to delete <span className="text-slate-800 font-bold">"{deleteTarget.name}"</span>? This action cannot be undone and will fail if employees are still assigned to it.</p>
+             
+             <div className="flex gap-4">
+               <button 
+                 onClick={() => setDeleteTarget(null)}
+                 disabled={isDeleting}
+                 className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+               >
+                 Cancel
+               </button>
+               <button 
+                 onClick={handleDelete}
+                 disabled={isDeleting}
+                 className="flex-1 py-3 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-rose-200"
+               >
+                 {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                 Delete Permanent
+               </button>
+             </div>
            </div>
          </div>
        )}
@@ -452,8 +540,9 @@ function ProcessPayroll({ onSuccess }: { onSuccess: () => void }) {
       await payrollApi.processPayroll(data);
       alert("Payroll processed successfully!");
       onSuccess();
-    } catch (err) {
-      alert("Processing failed. Make sure salary structures are assigned to active employees.");
+    } catch (err: any) {
+      const msg = extractError(err, "Processing failed. Make sure salary structures are assigned to employees.");
+      alert(msg);
     } finally {
       setIsProcessing(false);
     }

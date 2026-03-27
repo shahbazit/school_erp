@@ -463,6 +463,7 @@ public class ApplicationDbContext : DbContext
         var orgId = _organizationService.GetOrganizationId();
         var userId = _currentUserService.UserId;
 
+        bool hasLegacyData = false;
         foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
             if (entry.State == EntityState.Added)
@@ -474,21 +475,26 @@ public class ApplicationDbContext : DbContext
                 entry.Entity.CreatedAt = DateTime.UtcNow;
                 entry.Entity.CreatedBy = userId;
             }
-            else if (entry.State == EntityState.Modified)
+            else if (entry.State == EntityState.Modified || entry.State == EntityState.Deleted)
             {
-                entry.Entity.UpdatedAt = DateTime.UtcNow;
-                entry.Entity.UpdatedBy = userId;
-                
-                // If the entity is somehow missing its OrganizationId (e.g. legacy data), fix it.
-                // But only if we are not explicitly trying to change it.
-                var orgProp = entry.Property(x => x.OrganizationId);
-                if (orgId != Guid.Empty && entry.Entity.OrganizationId == Guid.Empty && !orgProp.IsModified)
+                if (entry.State == EntityState.Modified)
                 {
-                    entry.Entity.OrganizationId = orgId;
-                    orgProp.IsModified = true;
+                    entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    entry.Entity.UpdatedBy = userId;
+                }
+                
+                if (entry.Entity.OrganizationId == Guid.Empty)
+                {
+                    hasLegacyData = true;
+                    if (orgId != Guid.Empty) {
+                        entry.Entity.OrganizationId = orgId;
+                    }
                 }
             }
         }
+
+        bool originalIgnoreTenant = IgnoreTenant;
+        if (hasLegacyData) IgnoreTenant = true;
 
         try {
             return await base.SaveChangesAsync(cancellationToken);
@@ -501,6 +507,8 @@ public class ApplicationDbContext : DbContext
                  }
              }
              throw;
+        } finally {
+            IgnoreTenant = originalIgnoreTenant;
         }
     }
 }
