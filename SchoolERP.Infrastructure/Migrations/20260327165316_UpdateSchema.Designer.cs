@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SchoolERP.Infrastructure.Persistence;
 
@@ -11,13 +12,14 @@ using SchoolERP.Infrastructure.Persistence;
 namespace SchoolERP.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260327165316_UpdateSchema")]
+    partial class UpdateSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("dbo")
                 .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
@@ -58,7 +60,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("AcademicClasses", "dbo");
+                    b.ToTable("AcademicClasses");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicSection", b =>
@@ -93,7 +95,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("AcademicSections", "dbo");
+                    b.ToTable("AcademicSections");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicStream", b =>
@@ -128,7 +130,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("AcademicStreams", "dbo");
+                    b.ToTable("AcademicStreams");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicYear", b =>
@@ -172,7 +174,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("AcademicYears", "dbo");
+                    b.ToTable("AcademicYears");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.City", b =>
@@ -212,7 +214,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StateId");
 
-                    b.ToTable("Cities", "dbo");
+                    b.ToTable("Cities");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Country", b =>
@@ -250,7 +252,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Countries", "dbo");
+                    b.ToTable("Countries");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Course", b =>
@@ -293,7 +295,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Courses", "dbo");
+                    b.ToTable("Courses");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Department", b =>
@@ -328,7 +330,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Departments", "dbo");
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Designation", b =>
@@ -363,7 +365,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Designations", "dbo");
+                    b.ToTable("Designations");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Employee", b =>
@@ -520,7 +522,7 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "WorkEmail")
                         .IsUnique();
 
-                    b.ToTable("Employees", "dbo");
+                    b.ToTable("Employees");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.EmployeeAttendance", b =>
@@ -571,7 +573,7 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "EmployeeId", "AttendanceDate")
                         .IsUnique();
 
-                    b.ToTable("EmployeeAttendances", "dbo");
+                    b.ToTable("EmployeeAttendances");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.EmployeeDocument", b =>
@@ -624,7 +626,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("EmployeeDocuments", "dbo");
+                    b.ToTable("EmployeeDocuments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.EmployeeRole", b =>
@@ -662,7 +664,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("EmployeeRoles", "dbo");
+                    b.ToTable("EmployeeRoles");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.EmployeeSalary", b =>
@@ -707,7 +709,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("SalaryStructureId");
 
-                    b.ToTable("EmployeeSalaries", "dbo");
+                    b.ToTable("EmployeeSalaries");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Exam", b =>
@@ -753,7 +755,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Exams", "dbo");
+                    b.ToTable("Exams");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeConfiguration", b =>
@@ -804,7 +806,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FeeConfigurations", "dbo");
+                    b.ToTable("FeeConfigurations");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeDiscount", b =>
@@ -857,7 +859,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FeeDiscounts", "dbo");
+                    b.ToTable("FeeDiscounts");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeDiscountAssignment", b =>
@@ -921,7 +923,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("FeeDiscountAssignments", "dbo");
+                    b.ToTable("FeeDiscountAssignments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeHead", b =>
@@ -962,7 +964,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FeeHeads", "dbo");
+                    b.ToTable("FeeHeads");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeStructure", b =>
@@ -1018,7 +1020,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("FeeStructures", "dbo");
+                    b.ToTable("FeeStructures");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeTransaction", b =>
@@ -1075,7 +1077,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("FeeTransactions", "dbo");
+                    b.ToTable("FeeTransactions");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Homework", b =>
@@ -1138,7 +1140,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.ToTable("Homeworks", "dbo");
+                    b.ToTable("Homeworks");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Lab", b =>
@@ -1176,7 +1178,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Labs", "dbo");
+                    b.ToTable("Labs");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveApplication", b =>
@@ -1243,7 +1245,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("LeaveApplications", "dbo");
+                    b.ToTable("LeaveApplications");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveBalance", b =>
@@ -1298,7 +1300,7 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "EmployeeId", "LeaveTypeId", "AcademicYearId")
                         .IsUnique();
 
-                    b.ToTable("LeaveBalances", "dbo");
+                    b.ToTable("LeaveBalances");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeavePlan", b =>
@@ -1337,7 +1339,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("LeavePlan", "dbo");
+                    b.ToTable("LeavePlan");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveType", b =>
@@ -1395,7 +1397,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("LeaveTypes", "dbo");
+                    b.ToTable("LeaveTypes");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Lookup", b =>
@@ -1440,7 +1442,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Lookups", "dbo");
+                    b.ToTable("Lookups");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.MenuMaster", b =>
@@ -1480,7 +1482,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MenuMasters", "dbo");
+                    b.ToTable("MenuMasters");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.MenuPermission", b =>
@@ -1531,7 +1533,7 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[RoleName] IS NOT NULL AND [UserId] IS NOT NULL");
 
-                    b.ToTable("MenuPermissions", "dbo");
+                    b.ToTable("MenuPermissions");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.OfficeExpense", b =>
@@ -1589,7 +1591,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("OfficeExpenses", "dbo");
+                    b.ToTable("OfficeExpenses");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Organization", b =>
@@ -1620,7 +1622,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Organizations", "dbo");
+                    b.ToTable("Organizations");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.OtherIncome", b =>
@@ -1671,7 +1673,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("OtherIncomes", "dbo");
+                    b.ToTable("OtherIncomes");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollDetail", b =>
@@ -1731,7 +1733,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("PayrollRunId");
 
-                    b.ToTable("PayrollDetails", "dbo");
+                    b.ToTable("PayrollDetails");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollRun", b =>
@@ -1782,7 +1784,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("ProcessedById");
 
-                    b.ToTable("PayrollRuns", "dbo");
+                    b.ToTable("PayrollRuns");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PendingRegistration", b =>
@@ -1834,7 +1836,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PendingRegistrations", "dbo");
+                    b.ToTable("PendingRegistrations");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Room", b =>
@@ -1875,7 +1877,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Rooms", "dbo");
+                    b.ToTable("Rooms");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.SalaryComponent", b =>
@@ -1918,7 +1920,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("SalaryStructureId");
 
-                    b.ToTable("SalaryComponents", "dbo");
+                    b.ToTable("SalaryComponents");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.SalaryStructure", b =>
@@ -1956,7 +1958,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("SalaryStructures", "dbo");
+                    b.ToTable("SalaryStructures");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.State", b =>
@@ -1996,7 +1998,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("States", "dbo");
+                    b.ToTable("States");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Student", b =>
@@ -2134,7 +2136,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Students", "dbo");
+                    b.ToTable("Students");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentAcademic", b =>
@@ -2191,7 +2193,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentAcademics", "dbo");
+                    b.ToTable("StudentAcademics");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentAttendance", b =>
@@ -2243,7 +2245,7 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "StudentId", "AttendanceDate")
                         .IsUnique();
 
-                    b.ToTable("StudentAttendances", "dbo");
+                    b.ToTable("StudentAttendances");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentCourse", b =>
@@ -2294,7 +2296,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentCourses", "dbo");
+                    b.ToTable("StudentCourses");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentDocument", b =>
@@ -2339,7 +2341,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentDocuments", "dbo");
+                    b.ToTable("StudentDocuments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentExamResult", b =>
@@ -2397,7 +2399,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.ToTable("StudentExamResults", "dbo");
+                    b.ToTable("StudentExamResults");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentFeeAccount", b =>
@@ -2442,7 +2444,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentFeeAccounts", "dbo");
+                    b.ToTable("StudentFeeAccounts");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.StudentFeeSubscription", b =>
@@ -2486,7 +2488,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("StudentFeeSubscriptions", "dbo");
+                    b.ToTable("StudentFeeSubscriptions");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Subject", b =>
@@ -2525,7 +2527,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Subjects", "dbo");
+                    b.ToTable("Subjects");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherClassAssignment", b =>
@@ -2579,7 +2581,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("TeacherProfileId");
 
-                    b.ToTable("TeacherClassAssignments", "dbo");
+                    b.ToTable("TeacherClassAssignments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherProfile", b =>
@@ -2631,7 +2633,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("TeacherProfiles", "dbo");
+                    b.ToTable("TeacherProfiles");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherSubjectAssignment", b =>
@@ -2683,7 +2685,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("TeacherProfileId");
 
-                    b.ToTable("TeacherSubjectAssignments", "dbo");
+                    b.ToTable("TeacherSubjectAssignments");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Timetable", b =>
@@ -2733,7 +2735,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("SectionId");
 
-                    b.ToTable("Timetables", "dbo");
+                    b.ToTable("Timetables");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TimetableDetail", b =>
@@ -2797,7 +2799,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("TimetableId");
 
-                    b.ToTable("TimetableDetails", "dbo");
+                    b.ToTable("TimetableDetails");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.User", b =>
@@ -2882,7 +2884,7 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.ToTable("Users", "dbo");
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.City", b =>

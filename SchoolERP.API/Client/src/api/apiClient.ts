@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Get base URL from env or fallback to local backend port
 // Get base URL from env or fallback to local backend port
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5120/api';
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_URL,

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 using SchoolERP.Application.Interfaces;
 
 namespace SchoolERP.Infrastructure.Persistence;
@@ -14,10 +15,25 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
     {
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
 
-        // This is used for EF Core Migrations (dotnet ef database update)
-        // Ensure this matches the database in SchoolERP.API/appsettings.json
+        // Build configuration similar to how the WebHost does it.
+        // We look for appsettings.json in the API project directory.
+        var basePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "SchoolERP.API");
+        if (!Directory.Exists(basePath))
+        {
+            // Fallback for cases where CWD is already API or something else
+            basePath = Directory.GetCurrentDirectory();
+        }
+
+        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
+
         optionsBuilder.UseSqlServer(
-            "Server=DESKTOP-I9E18U8;Database=SchoolERP;Integrated Security=True;MultipleActiveResultSets=True;TrustServerCertificate=True",
+            connectionString,
             sqlServerOptionsAction: b => 
             {
                 b.MigrationsAssembly("SchoolERP.Infrastructure");
