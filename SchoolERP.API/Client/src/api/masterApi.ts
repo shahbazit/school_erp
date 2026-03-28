@@ -56,5 +56,9 @@ export const masterApi = {
   getSubjects: () => masterApi.getAll('subjects'),
   getAcademicYears: () => masterApi.getAll('academic-years'),
   getDepartments: () => masterApi.getAll('departments'),
-  getDesignations: () => masterApi.getAll('designations')
+  getDesignations: () => masterApi.getAll('designations'),
+  getEmployeesShort: async () => {
+    const response = await apiClient.get<any[]>('/employee/short-list');
+    return response.data;
+  }
 };

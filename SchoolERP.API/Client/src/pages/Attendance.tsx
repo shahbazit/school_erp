@@ -8,7 +8,10 @@ import {
   AttendanceStatus,
   type EmployeeAttendanceDto,
   type MonthlyAttendanceSummaryDto,
+  type DetailedMonthlyAttendanceDto,
+  type AttendanceDayDetailDto,
 } from '../api/attendanceApi';
+import { masterApi } from '../api/masterApi';
 
 function getInitials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -265,98 +268,196 @@ export default function Attendance() {
 
 // ── Isolated Report Tab Component ──
 function ReportViewer() {
+  const [selectedYearId, setSelectedYearId] = useState('');
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [employeeIdInput, setEmployeeIdInput] = useState(''); // Simple input for now, ideally an autocomplete dropdown in real app
-  const [report, setReport] = useState<MonthlyAttendanceSummaryDto | null>(null);
+  const [employeeIdInput, setEmployeeIdInput] = useState('');
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [report, setReport] = useState<DetailedMonthlyAttendanceDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const [years, emps] = await Promise.all([
+          masterApi.getAcademicYears(),
+          masterApi.getEmployeesShort()
+        ]);
+        setAcademicYears(years);
+        setEmployees(emps);
+        const current = years.find((y: any) => y.isCurrent) || years[0];
+        if (current) {
+          setSelectedYearId(current.id);
+          setYear(new Date(current.startDate).getFullYear());
+        }
+      } catch (e) {
+        console.error("Failed to load report dependencies", e);
+      }
+    };
+    init();
+  }, []);
+
   const fetchReport = async () => {
-    if (!employeeIdInput.trim()) {
-      setError("Please provide an employee ID to view their report.");
+    if (!employeeIdInput) {
+      setError("Please select an employee.");
       return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      const data = await attendanceApi.getMonthlySummary(employeeIdInput, year, month);
+      const data = await attendanceApi.getDetailedReport(employeeIdInput, year, month);
       setReport(data);
     } catch {
-      setError("Failed to load report. Check the employee ID.");
+      setError("Failed to load detailed report.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-4xl">
-      <h3 className="text-lg font-bold text-slate-800 mb-4">Monthly Attendance Report</h3>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-5xl">
+      <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <History className="h-5 w-5 text-primary-600" />
+        Detailed Monthly Attendance
+      </h3>
       
-      <div className="flex flex-wrap items-end gap-4 mb-6">
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Employee ID (GUID)</label>
-          <input 
-            type="text" 
-            placeholder="e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      <div className="flex flex-wrap items-end gap-4 mb-8 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+        <div className="flex-1 min-w-[240px]">
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Select Employee</label>
+          <select 
             value={employeeIdInput}
             onChange={e => setEmployeeIdInput(e.target.value)}
-            className="w-80 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-          />
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-300"
+          >
+            <option value="">-- Select Employee --</option>
+            {employees.map(e => (
+              <option key={e.id} value={e.id}>{e.fullName} ({e.employeeCode})</option>
+            ))}
+          </select>
         </div>
+
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Month</label>
-          <select value={month} onChange={e => setMonth(Number(e.target.value))} className="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+           <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Academic Year</label>
+           <select 
+             value={selectedYearId} 
+             onChange={e => {
+               setSelectedYearId(e.target.value);
+               const y = academicYears.find(ay => ay.id === e.target.value);
+               if (y) setYear(new Date(y.startDate).getFullYear());
+             }}
+             className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-300"
+           >
+             {academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}
+           </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Month</label>
+          <select value={month} onChange={e => setMonth(Number(e.target.value))} className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-300">
             {Array.from({length: 12}, (_, i) => i + 1).map(m => (
               <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}</option>
             ))}
           </select>
         </div>
+
         <div>
-          <label className="block text-xs font-semibold text-slate-500 mb-1.5">Year</label>
-          <input type="number" value={year} onChange={e => setYear(Number(e.target.value))} className="w-24 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" />
+          <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Year</label>
+          <input type="number" value={year} onChange={e => setYear(Number(e.target.value))} className="w-24 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-primary-300" />
         </div>
-        <button onClick={fetchReport} disabled={isLoading} className="px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-semibold hover:bg-slate-700 transition flex items-center gap-2">
+
+        <button onClick={fetchReport} disabled={isLoading} className="btn-primary px-6 py-2.5 flex items-center gap-2 shadow-md">
           {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Get Report
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm mb-6 border border-red-100 flex items-center gap-2">
+        <AlertCircle className="h-4 w-4" /> {error}
+      </div>}
 
       {report && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center gap-4">
-             <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 shadow bg-blue-100 text-blue-700`}>
-                {getInitials(report.employeeName)}
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+             <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl flex items-center justify-center text-lg font-bold shadow-lg bg-primary-600 text-white">
+                   {getInitials(report.employeeName)}
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-xl">{report.employeeName}</h4>
+                  <p className="text-sm text-slate-400 font-semibold tracking-wide uppercase">{report.employeeCode}</p>
+                </div>
              </div>
-             <div>
-               <h4 className="font-bold text-slate-800 text-lg">{report.employeeName}</h4>
-               <p className="text-sm text-slate-500 font-mono">{report.employeeCode}</p>
+             <div className="text-right">
+                <p className="text-sm font-bold text-slate-600 uppercase tracking-tighter">Current Session Report</p>
+                <p className="text-2xl font-black text-primary-600">{new Date(0, report.month-1).toLocaleString('default', {month:'long'})} {report.year}</p>
              </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <StatBox label="Present" value={report.totalPresent} color="emerald" />
-            <StatBox label="Absent" value={report.totalAbsent} color="rose" />
-            <StatBox label="Half Day" value={report.totalHalfDay} color="amber" />
-            <StatBox label="Late" value={report.totalLate} color="orange" />
-            <StatBox label="On Leave" value={report.totalOnLeave} color="blue" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatBox label="Present" value={report.days.filter((d: AttendanceDayDetailDto) => d.attendanceStatus === AttendanceStatus.Present).length} color="emerald" />
+            <StatBox label="Absent" value={report.days.filter((d: AttendanceDayDetailDto) => d.attendanceStatus === AttendanceStatus.Absent || d.isMissing).length} color="rose" />
+            <StatBox label="Leave" value={report.days.filter((d: AttendanceDayDetailDto) => !!d.leaveType).length} color="blue" />
+            <StatBox label="Holidays" value={report.days.filter((d: AttendanceDayDetailDto) => d.dayType !== 'WorkingDay').length} color="slate" />
           </div>
 
           <div>
-            <h4 className="font-semibold text-slate-700 mb-3">Daily Breakdown</h4>
-            {report.dailyRecords.length === 0 ? (
-              <p className="text-sm text-slate-500">No records found for this month.</p>
-            ) : (
-               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                 {report.dailyRecords.map(r => (
-                   <div key={r.attendanceDate} className={`p-2 rounded-lg border text-center ${statusConfig[r.status].color.split(' hover:')[0]}`}>
-                     <p className="text-xs font-bold opacity-70 mb-1">{new Date(r.attendanceDate).getDate()}</p>
-                     <p className="text-[10px] font-bold uppercase tracking-wider">{r.statusName}</p>
-                   </div>
-                 ))}
-               </div>
-            )}
+             <div className="flex items-center justify-between mb-4">
+                <h4 className="font-bold text-slate-800 uppercase text-xs tracking-widest">Attendance Timeline</h4>
+                <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase">
+                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-200"></div> Working</span>
+                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-100"></div> Holiday</span>
+                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-indigo-100"></div> Weekly Off</span>
+                </div>
+             </div>
+             
+             <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {report.days.map((day: AttendanceDayDetailDto, idx: number) => {
+                    const isToday = new Date(day.date).toDateString() === new Date().toDateString();
+                    const isHoliday = day.dayType === 'Holiday';
+                    const isWeeklyOff = day.dayType === 'WeeklyOff';
+                    
+                    let bgColor = 'bg-white';
+                    let borderColor = 'border-slate-200';
+                    let textColor = 'text-slate-700';
+
+                    if (isHoliday) { bgColor = 'bg-red-50'; borderColor = 'border-red-100'; textColor = 'text-red-700'; }
+                    else if (isWeeklyOff) { bgColor = 'bg-indigo-50'; borderColor = 'border-indigo-100'; textColor = 'text-indigo-700'; }
+                    else if (day.leaveType) { bgColor = 'bg-blue-50'; borderColor = 'border-blue-100'; textColor = 'text-blue-700'; }
+                    else if (day.attendanceStatus === AttendanceStatus.Present) { bgColor = 'bg-emerald-50'; borderColor = 'border-emerald-100'; textColor = 'text-emerald-700'; }
+                    else if (day.attendanceStatus === AttendanceStatus.Absent) { bgColor = 'bg-rose-50'; borderColor = 'border-rose-100'; textColor = 'text-rose-700'; }
+
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`p-3 rounded-2xl border ${borderColor} ${bgColor} transition-transform hover:scale-105 shadow-sm relative group`}
+                      >
+                         <div className="flex justify-between items-start mb-1">
+                            <span className={`text-sm font-black ${textColor}`}>{new Date(day.date).getDate()}</span>
+                            <span className="text-[9px] font-bold opacity-40 uppercase">{new Date(day.date).toLocaleDateString('en-US', {weekday: 'short'})}</span>
+                         </div>
+                         <div className="min-h-[20px]">
+                            {day.eventName ? (
+                               <p className="text-[9px] font-bold leading-tight truncate" title={day.eventName}>{day.eventName}</p>
+                            ) : day.leaveType ? (
+                               <p className="text-[9px] font-bold leading-tight text-blue-600">LR: {day.leaveType}</p>
+                            ) : day.attendanceStatus ? (
+                               <p className="text-[9px] font-bold leading-tight uppercase opacity-60">
+                                  {day.attendanceStatus === AttendanceStatus.Present ? 'Present' : 'Absent'}
+                               </p>
+                            ) : day.dayType === 'WorkingDay' && (
+                               <p className="text-[9px] font-bold leading-tight text-slate-300">Working</p>
+                            )}
+                         </div>
+                         {day.isMissing && (
+                            <div className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full border-2 border-white shadow-sm" title="Missing Attendance"></div>
+                         )}
+                      </div>
+                    );
+                  })}
+                </div>
+             </div>
           </div>
         </div>
       )}
@@ -369,9 +470,9 @@ function StatBox({ label, value, color }: { label: string, value: number, color:
   const text = `text-${color}-700`;
   const border = `border-${color}-200`;
   return (
-    <div className={`rounded-xl border ${border} ${bg} p-3 text-center`}>
-      <p className={`text-2xl font-bold ${text}`}>{value}</p>
-      <p className={`text-xs font-semibold uppercase tracking-wider mt-1 opacity-80 ${text}`}>{label}</p>
+    <div className={`rounded-2xl border ${border} ${bg} p-4 text-center shadow-sm`}>
+      <p className={`text-3xl font-black ${text}`}>{value}</p>
+      <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 opacity-70 ${text}`}>{label}</p>
     </div>
   );
 }

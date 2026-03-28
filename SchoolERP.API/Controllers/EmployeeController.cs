@@ -112,6 +112,21 @@ public class EmployeeController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────
+    // GET /api/employee/short-list
+    // ─────────────────────────────────────────────────────
+    [HttpGet("short-list")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> GetShortList()
+    {
+        var employees = await _unitOfWork.Repository<Employee>().GetQueryable()
+            .Where(e => e.IsActive)
+            .Select(e => new { e.Id, FullName = e.FirstName + " " + e.LastName, e.EmployeeCode })
+            .OrderBy(e => e.FullName)
+            .ToListAsync();
+        return Ok(employees);
+    }
+
+    // ─────────────────────────────────────────────────────
     // GET /api/employee/{id}
     // ─────────────────────────────────────────────────────
     [HttpGet("{id}")]

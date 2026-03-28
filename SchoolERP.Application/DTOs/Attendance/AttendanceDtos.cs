@@ -54,3 +54,23 @@ public class BulkMarkAttendanceDto
 {
     [Required] public List<MarkAttendanceDto> Records { get; set; } = new();
 }
+
+public class DetailedMonthlyAttendanceDto
+{
+    public Guid EmployeeId { get; set; }
+    public string EmployeeCode { get; set; } = string.Empty;
+    public string EmployeeName { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public List<AttendanceDayDetailDto> Days { get; set; } = new();
+}
+
+public class AttendanceDayDetailDto
+{
+    public DateTime Date { get; set; }
+    public string DayType { get; set; } = "WorkingDay"; // WorkingDay, Holiday, WeeklyOff
+    public string? EventName { get; set; }
+    public AttendanceStatus? AttendanceStatus { get; set; }
+    public string? LeaveType { get; set; }
+    public bool IsMissing { get; set; }
+}

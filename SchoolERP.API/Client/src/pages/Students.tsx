@@ -269,7 +269,7 @@ export default function Students() {
                       <p className="text-slate-500 text-xs">{student.fatherMobile || student.motherMobile || student.guardianMobile || '—'}</p>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                         student.isActive 
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
                           : 'bg-slate-100 text-slate-500 border border-slate-200'

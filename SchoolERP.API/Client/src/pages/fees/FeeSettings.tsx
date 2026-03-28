@@ -12,9 +12,11 @@ import {
   Info,
   DollarSign
 } from 'lucide-react';
-import { feeApi } from '../../api/feeApi';
+import { feeApi } from '../../api/feeApi'
+import { useLocalization } from '../../contexts/LocalizationContext';
 
 export default function FeeSettings() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [activeTab, setActiveTab] = useState<'policy' | 'discounts'>('policy');
   const [config, setConfig] = useState<any>({
     monthlyDueDay: 10,
@@ -285,7 +287,7 @@ export default function FeeSettings() {
                           className="w-full bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold border-none outline-none appearance-none"
                         >
                           <option value="Percentage">Percentage (%)</option>
-                          <option value="Fixed">Fixed Amount (₹)</option>
+                          <option value="Fixed">Fixed Amount ({settings?.currencySymbol || "₹"})</option>
                         </select>
                       </div>
                       <div className="space-y-1">

@@ -14,7 +14,8 @@ import {
   History,
   CreditCard
 } from 'lucide-react';
-import { masterApi } from '../../api/masterApi';
+import { masterApi } from '../../api/masterApi'
+import { useLocalization } from '../../contexts/LocalizationContext';
 
 interface Transaction {
   id: string;
@@ -38,6 +39,7 @@ interface StudentAccount {
 }
 
 export default function StudentAccount() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const { studentId } = useParams<{ studentId: string }>();
   const [account, setAccount] = useState<StudentAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,7 +153,7 @@ export default function StudentAccount() {
           </div>
           <div className="relative z-10">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Allocated</p>
-            <p className="text-2xl font-black text-slate-800">₹{account.totalAllocated.toLocaleString()}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCurrency(account.totalAllocated)}</p>
             <p className="text-xs text-slate-400 mt-2 flex items-center">
               <Calendar className="h-3 w-3 mr-1" /> Lifetime billing
             </p>
@@ -164,7 +166,7 @@ export default function StudentAccount() {
           </div>
           <div className="relative z-10">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-emerald-600/70">Total Paid</p>
-            <p className="text-2xl font-black text-slate-800">₹{account.totalPaid.toLocaleString()}</p>
+            <p className="text-2xl font-black text-slate-800">{formatCurrency(account.totalPaid)}</p>
             <p className="text-xs text-emerald-600 font-semibold mt-2 flex items-center">
               <TrendingDown className="h-3 w-3 mr-1" /> {((account.totalPaid / (account.totalAllocated || 1)) * 100).toFixed(1)}% cleared
             </p>
@@ -177,7 +179,7 @@ export default function StudentAccount() {
           </div>
           <div className="relative z-10">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-red-600/70">Net Balance</p>
-            <p className="text-2xl font-black text-red-600">₹{account.currentBalance.toLocaleString()}</p>
+            <p className="text-2xl font-black text-red-600">{formatCurrency(account.currentBalance)}</p>
             <p className="text-xs text-red-500 font-semibold mt-2 flex items-center">
               <AlertCircle className="h-3 w-3 mr-1" /> Payment due
             </p>
@@ -213,7 +215,7 @@ export default function StudentAccount() {
                   subscriptions.map((sub: any) => (
                     <tr key={sub.id} className="hover:bg-slate-50/50">
                       <td className="px-6 py-4 font-semibold text-slate-700">{sub.feeHeadName}</td>
-                      <td className="px-6 py-4 text-slate-500">{sub.customAmount ? `₹${sub.customAmount}` : 'Default'}</td>
+                      <td className="px-6 py-4 text-slate-500">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Default'}</td>
                       <td className="px-6 py-4 text-right">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">Active</span>
                       </td>
@@ -256,7 +258,7 @@ export default function StudentAccount() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-bold text-emerald-600">
-                          {ad.calculationType === 'Percentage' ? `${ad.value}%` : `₹${ad.value}`}
+                          {ad.calculationType === 'Percentage' ? `${ad.value}%` : formatCurrency(ad.value)}
                         </span>
                         <span className="text-[10px] text-slate-400 ml-1">({ad.frequency})</span>
                       </td>
@@ -280,7 +282,7 @@ export default function StudentAccount() {
             <h3 className="font-bold text-slate-700">Transaction History</h3>
           </div>
           <div className="text-xs font-medium text-slate-400">
-            Last Updated: {new Date(account.lastTransactionDate).toLocaleDateString()}
+            Last Updated: {formatDate(account.lastTransactionDate)}
           </div>
         </div>
         
@@ -316,7 +318,7 @@ export default function StudentAccount() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500 font-medium">
-                      {new Date(tx.transactionDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {formatDate(tx.transactionDate)}
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-slate-700 font-semibold">{tx.description}</p>
@@ -328,7 +330,7 @@ export default function StudentAccount() {
                     <td className={`px-6 py-4 text-right font-bold tabular-nums ${
                       tx.type === 'Charge' ? 'text-slate-700' : 'text-emerald-600'
                     }`}>
-                      {tx.type === 'Charge' ? '+' : '-'}₹{tx.amount.toLocaleString()}
+                      {tx.type === 'Charge' ? '+' : '-'}{formatCurrency(tx.amount)}
                     </td>
                   </tr>
                 ))
@@ -395,6 +397,7 @@ export default function StudentAccount() {
 }
 
 function ExtraChargeModal({ studentId, academicYears, onClose, onSuccess }: any) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const currentYear = academicYears.find((y: any) => y.isCurrent);
   const [formData, setFormData] = useState({
     amount: '',
@@ -481,7 +484,7 @@ function ExtraChargeModal({ studentId, academicYears, onClose, onSuccess }: any)
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Amount</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{settings?.currencySymbol || "₹"}</span>
                 <input 
                   type="number" 
                   required
@@ -520,6 +523,7 @@ function ExtraChargeModal({ studentId, academicYears, onClose, onSuccess }: any)
 }
 
 function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears, onClose, onSuccess }: any) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const currentYear = academicYears.find((y: any) => y.isCurrent);
   
   const [formData, setFormData] = useState({
@@ -593,7 +597,7 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
             >
               <option value="">Choose Discount...</option>
               {availableDiscounts.map((d: any) => (
-                <option key={d.id} value={d.id}>{d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : `₹${d.value}`})</option>
+                <option key={d.id} value={d.id}>{d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : formatCurrency(d.value)})</option>
               ))}
             </select>
           </div>
@@ -640,6 +644,7 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
 }
 
 function SubscriptionModal({ studentId, selectiveHeads, existingSubscriptions, onClose, onSuccess }: any) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [formData, setFormData] = useState({
     feeHeadId: '',
     customAmount: '',
@@ -701,7 +706,7 @@ function SubscriptionModal({ studentId, selectiveHeads, existingSubscriptions, o
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Custom Amount (Optional)</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{settings?.currencySymbol || "₹"}</span>
               <input 
                 type="number" 
                 className="form-input pl-7"
@@ -741,6 +746,7 @@ function SubscriptionModal({ studentId, selectiveHeads, existingSubscriptions, o
 
 // Sub-component for Payment
 function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, onSuccess }: any) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const currentYear = academicYears.find((y: any) => y.isCurrent);
   
   const [formData, setFormData] = useState({
@@ -793,7 +799,7 @@ function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar pb-24">
           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center mb-6">
             <span className="text-sm font-semibold text-slate-500">Net Outstanding</span>
-            <span className="text-xl font-black text-slate-800">₹{balance.toLocaleString()}</span>
+            <span className="text-xl font-black text-slate-800">{formatCurrency(balance)}</span>
           </div>
 
           <div className="mb-4">

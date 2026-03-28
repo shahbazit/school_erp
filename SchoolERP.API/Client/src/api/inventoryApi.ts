@@ -1,55 +1,81 @@
 import apiClient from './apiClient';
 
+export enum InventoryTransactionType
+{
+    Purchase = 1,
+    Issue = 2,
+    Adjustment = 3,
+    Return = 4
+}
+
+export interface InventoryCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
-  category: string;
+  code?: string;
+  categoryId: string;
+  categoryName?: string;
   unit: string;
+  minQuantity: number;
+  unitPrice: number;
   currentStock: number;
-  reorderLevel: number;
-  pricePerUnit: number;
-  lastPurchaseDate?: string;
-}
-
-export interface InventoryTransaction {
-  id: string;
-  itemId: string;
-  itemName: string;
-  type: 'Purchase' | 'Issue' | 'Adjustment';
-  quantity: number;
-  transactionDate: string;
-  handledBy: string;
-  notes?: string;
-  entityName?: string; // e.g. Student name or Supplier name
 }
 
 export interface InventorySupplier {
   id: string;
   name: string;
-  contactPerson: string;
-  phone: string;
-  email: string;
-  address: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  category?: string;
+}
+
+export interface InventoryTransaction {
+  id: string;
+  itemId: string;
+  itemName?: string;
+  type: InventoryTransactionType;
+  typeName: string;
+  quantity: number;
+  reference?: string;
+  entity?: string;
+  handledBy?: string;
+  transactionDate: string;
+}
+
+export interface CreateInventoryTransactionRequest {
+  itemId: string;
+  type: InventoryTransactionType;
+  quantity: number;
+  reference?: string;
+  entity?: string;
+  handledBy?: string;
 }
 
 export const inventoryApi = {
   // Items
   getItems: () => apiClient.get<InventoryItem[]>('/inventory/items'),
-  createItem: (data: Partial<InventoryItem>) => apiClient.post<InventoryItem>('/inventory/items', data),
-  
+  getItem: (id: string) => apiClient.get<InventoryItem>(`/inventory/items/${id}`),
+  upsertItem: (data: Partial<InventoryItem>) => apiClient.post<InventoryItem>('/inventory/items', data),
+  deleteItem: (id: string) => apiClient.delete(`/inventory/items/${id}`),
+
+  // Transactions
+  getTransactions: () => apiClient.get<InventoryTransaction[]>('/inventory/transactions'),
+  createTransaction: (data: CreateInventoryTransactionRequest) => apiClient.post<InventoryTransaction>('/inventory/transactions', data),
+
   // Suppliers
   getSuppliers: () => apiClient.get<InventorySupplier[]>('/inventory/suppliers'),
-  createSupplier: (data: Partial<InventorySupplier>) => apiClient.post<InventorySupplier>('/inventory/suppliers', data),
-  
-  // Transactions
-  getTransactions: (params?: any) => apiClient.get<InventoryTransaction[]>('/inventory/transactions', { params }),
-  
-  // Stock Actions
-  recordPurchase: (data: { itemId: string; quantity: number; supplierId: string; price: number; notes?: string }) => 
-    apiClient.post('/inventory/purchase', data),
-    
-  issueItem: (data: { itemId: string; quantity: number; receiverIdentifier: string; receiverType: 'Student' | 'Staff' | 'Dept'; notes?: string }) => 
-    apiClient.post('/inventory/issue', data),
-    
-  getDashboardSummary: () => apiClient.get<any>('/inventory/dashboard')
+  upsertSupplier: (data: Partial<InventorySupplier>) => apiClient.post<InventorySupplier>('/inventory/suppliers', data),
+  deleteSupplier: (id: string) => apiClient.delete(`/inventory/suppliers/${id}`),
+
+  // Categories
+  getCategories: () => apiClient.get<InventoryCategory[]>('/inventory/categories'),
+  upsertCategory: (data: Partial<InventoryCategory>) => apiClient.post<InventoryCategory>('/inventory/categories', data),
+  deleteCategory: (id: string) => apiClient.delete(`/inventory/categories/${id}`),
 };

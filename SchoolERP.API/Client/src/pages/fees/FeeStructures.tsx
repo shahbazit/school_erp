@@ -3,9 +3,11 @@ import { useMasters } from '../../hooks/useMasters';
 import { Plus, Edit2, Trash2, Search, ArrowRight, Filter, ChevronDown, ChevronRight, LayoutGrid, Info } from 'lucide-react';
 import { GenericModal } from '../../components/GenericModal';
 import { masterApi } from '../../api/masterApi';
-import { CopyFeeStructureAction } from '../../components/fees/CopyFeeStructureAction';
+import { CopyFeeStructureAction } from '../../components/fees/CopyFeeStructureAction'
+import { useLocalization } from '../../contexts/LocalizationContext';
 
 export default function FeeStructures() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const { masters, loading, fetchMasters, addMaster, updateMaster, removeMaster } = useMasters('fee/structures');
   const [classes, setClasses] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -295,7 +297,7 @@ export default function FeeStructures() {
                     return oneTimeOnly > 0 ? (
                       <div className="text-right border-r border-slate-100 pr-6 mr-0 hidden sm:block">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 text-right">One-Time Fee</p>
-                        <p className="text-sm font-black text-amber-600">₹{oneTimeOnly.toLocaleString()}</p>
+                        <p className="text-sm font-black text-amber-600">{formatCurrency(oneTimeOnly)}</p>
                       </div>
                     ) : null;
                   })()}
@@ -305,7 +307,7 @@ export default function FeeStructures() {
                       Calculated Annual Total
                     </p>
                     <p className="text-2xl font-black text-primary-600 tracking-tight">
-                      ₹{(() => {
+                      {formatCurrency((() => {
                         const annualTotal = group.structures.reduce((sum: number, m: any) => {
                           const freq = (m.frequency || "").toLowerCase();
                           if (freq === 'monthly') return sum + (m.amount * 12);
@@ -313,8 +315,8 @@ export default function FeeStructures() {
                           if (freq === 'yearly') return sum + m.amount;
                           return sum; // One-time excluded from annual sum
                         }, 0);
-                        return annualTotal.toLocaleString();
-                      })()}
+                        return annualTotal;
+                      })())}
                     </p>
                   </div>
                 </div>
@@ -351,7 +353,7 @@ export default function FeeStructures() {
                             <td className="px-6 py-4">
                               <span className="text-xs font-semibold text-slate-600">{fs.academicYearName}</span>
                             </td>
-                            <td className="px-6 py-4 text-right font-black text-slate-800">₹{fs.amount.toLocaleString()}</td>
+                            <td className="px-6 py-4 text-right font-black text-slate-800">{formatCurrency(fs.amount)}</td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end gap-1">
                                 <button 
@@ -452,7 +454,7 @@ export default function FeeStructures() {
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount (₹) *</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount ({settings?.currencySymbol || "₹"}) *</label>
                 <input 
                   type="number"
                   required

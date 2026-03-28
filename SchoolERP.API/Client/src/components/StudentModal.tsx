@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, User, BookOpen, Users, MapPin, ChevronLeft, ChevronRight, Check, CreditCard, Plus, Trash2, Settings, TrendingDown } from 'lucide-react';
 import { Student, CreateStudentDto, UpdateStudentDto, AssignCourseDto } from '../types';
 import { masterApi } from '../api/masterApi';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ const defaultForm = {
 };
 
 export default function StudentModal({ isOpen, onClose, onSave, initialData }: StudentModalProps) {
+  const { formatCurrency, settings } = useLocalization();
   const [activeTab, setActiveTab] = useState('personal');
   const [formData, setFormData] = useState({ ...defaultForm });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -564,7 +566,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
                   formData.feeSubscriptions.map((sub: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50/50">
                       <td className="px-4 py-2 font-medium">{sub.feeHeadName}</td>
-                      <td className="px-4 py-2 text-slate-500">{sub.customAmount ? `₹${sub.customAmount}` : 'Standard'}</td>
+                      <td className="px-4 py-2 text-slate-500">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Standard'}</td>
                       <td className="px-4 py-2 text-right">
                         <button 
                           type="button"
@@ -610,7 +612,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
                 <select id="new-disc-id" className="form-input text-sm border-emerald-200">
                   <option value="">Select Discount...</option>
                   {availableDiscounts.map((d: any) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : `₹${d.value}`})</option>
+                    <option key={d.id} value={d.id}>{d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : formatCurrency(d.value)})</option>
                   ))}
                 </select>
               </div>
@@ -722,7 +724,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }: S
                            <p className="font-bold text-slate-700">{disc.discountName}</p>
                            { (disc.calculationType || disc.value) && (
                              <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                {disc.calculationType === 'Percentage' ? `${disc.value}%` : `₹${disc.value}`}
+                                {disc.calculationType === 'Percentage' ? `${disc.value}%` : formatCurrency(disc.value)}
                              </span>
                            )}
                         </div>

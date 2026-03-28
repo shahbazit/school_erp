@@ -62,7 +62,9 @@ public class EmailService : IEmailService
         email.Body = new TextPart(TextFormat.Html) { Text = body };
 
         using var smtp = new SmtpClient();
-        await smtp.ConnectAsync(_config["EmailSettings:SmtpServer"], int.Parse(_config["EmailSettings:SmtpPort"] ?? "587"), SecureSocketOptions.StartTls);
+        var port = int.Parse(_config["EmailSettings:SmtpPort"] ?? "587");
+        var secureOption = port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
+        await smtp.ConnectAsync(_config["EmailSettings:SmtpServer"], port, secureOption);
         await smtp.AuthenticateAsync(_config["EmailSettings:SmtpUser"], _config["EmailSettings:SmtpPass"]);
         await smtp.SendAsync(email);
         await smtp.DisconnectAsync(true);

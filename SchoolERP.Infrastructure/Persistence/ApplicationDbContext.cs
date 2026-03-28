@@ -81,6 +81,27 @@ public class ApplicationDbContext : DbContext
     public DbSet<OtherIncome> OtherIncomes { get; set; } = null!;
     public DbSet<Timetable> Timetables { get; set; } = null!;
     public DbSet<TimetableDetail> TimetableDetails { get; set; } = null!;
+    public DbSet<AcademicCalendar> AcademicCalendars { get; set; } = null!;
+
+    // Front Office & CRM
+    public DbSet<AdmissionEnquiry> AdmissionEnquiries { get; set; } = null!;
+    public DbSet<VisitorLog> VisitorLogs { get; set; } = null!;
+    public DbSet<CommunicationLog> CommunicationLogs { get; set; } = null!;
+    public DbSet<SchoolSettings> SchoolSettings { get; set; } = null!;
+
+    // Transport & Hostel
+    public DbSet<TransportVehicle> TransportVehicles { get; set; } = null!;
+    public DbSet<TransportRoute> TransportRoutes { get; set; } = null!;
+    public DbSet<TransportAssignment> TransportAssignments { get; set; } = null!;
+    public DbSet<Hostel> Hostels { get; set; } = null!;
+    public DbSet<HostelRoom> HostelRooms { get; set; } = null!;
+    public DbSet<HostelAssignment> HostelAssignments { get; set; } = null!;
+
+    // Inventory
+    public DbSet<InventoryCategory> InventoryCategories { get; set; } = null!;
+    public DbSet<InventoryItem> InventoryItems { get; set; } = null!;
+    public DbSet<InventorySupplier> InventorySuppliers { get; set; } = null!;
+    public DbSet<InventoryTransaction> InventoryTransactions { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -118,6 +139,25 @@ public class ApplicationDbContext : DbContext
         builder.Entity<OtherIncome>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Timetable>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<TimetableDetail>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AcademicCalendar>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AdmissionEnquiry>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<VisitorLog>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<CommunicationLog>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SchoolSettings>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+
+        // Transport & Hostel Filters
+        builder.Entity<TransportVehicle>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TransportRoute>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TransportAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<Hostel>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<HostelRoom>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<HostelAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+
+        // Inventory Filters
+        builder.Entity<InventoryCategory>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<InventoryItem>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<InventorySupplier>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<InventoryTransaction>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
         // Master Query Filters
         builder.Entity<AcademicClass>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
@@ -175,6 +215,25 @@ public class ApplicationDbContext : DbContext
         builder.Entity<OtherIncome>().HasIndex(e => e.OrganizationId);
         builder.Entity<Timetable>().HasIndex(e => e.OrganizationId);
         builder.Entity<TimetableDetail>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AcademicCalendar>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AdmissionEnquiry>().HasIndex(e => e.OrganizationId);
+        builder.Entity<VisitorLog>().HasIndex(e => e.OrganizationId);
+        builder.Entity<CommunicationLog>().HasIndex(e => e.OrganizationId);
+        builder.Entity<SchoolSettings>().HasIndex(e => e.OrganizationId);
+
+        // Transport & Hostel Indexes
+        builder.Entity<TransportVehicle>().HasIndex(e => e.OrganizationId);
+        builder.Entity<TransportRoute>().HasIndex(e => e.OrganizationId);
+        builder.Entity<TransportAssignment>().HasIndex(e => e.OrganizationId);
+        builder.Entity<Hostel>().HasIndex(e => e.OrganizationId);
+        builder.Entity<HostelRoom>().HasIndex(e => e.OrganizationId);
+        builder.Entity<HostelAssignment>().HasIndex(e => e.OrganizationId);
+
+        // Inventory Indexes
+        builder.Entity<InventoryCategory>().HasIndex(e => e.OrganizationId);
+        builder.Entity<InventoryItem>().HasIndex(e => e.OrganizationId);
+        builder.Entity<InventorySupplier>().HasIndex(e => e.OrganizationId);
+        builder.Entity<InventoryTransaction>().HasIndex(e => e.OrganizationId);
         
         // Ensure no duplicate attendance per student per day
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
@@ -224,6 +283,7 @@ public class ApplicationDbContext : DbContext
         builder.Entity<AcademicYear>().HasIndex(e => e.OrganizationId);
         builder.Entity<AcademicYear>().Property(e => e.StartDate).HasColumnType("date");
         builder.Entity<AcademicYear>().Property(e => e.EndDate).HasColumnType("date");
+        builder.Entity<AcademicCalendar>().Property(e => e.Date).HasColumnType("date");
         builder.Entity<Department>().HasIndex(e => e.OrganizationId);
         builder.Entity<Designation>().HasIndex(e => e.OrganizationId);
         builder.Entity<EmployeeRole>().HasIndex(e => e.OrganizationId);
@@ -456,6 +516,53 @@ public class ApplicationDbContext : DbContext
             .HasOne(t => t.AcademicYear)
             .WithMany()
             .HasForeignKey(t => t.AcademicYearId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // AcademicCalendar Many-to-Many
+        builder.Entity<AcademicCalendar>()
+            .HasMany(e => e.TargetClasses)
+            .WithMany();
+
+        builder.Entity<AcademicCalendar>()
+            .HasMany(e => e.TargetDepartments)
+            .WithMany();
+
+        // Transport Relationships
+        builder.Entity<TransportRoute>()
+            .HasOne(tr => tr.Vehicle)
+            .WithMany()
+            .HasForeignKey(tr => tr.VehicleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<TransportAssignment>()
+            .HasOne(ta => ta.Student)
+            .WithMany()
+            .HasForeignKey(ta => ta.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TransportAssignment>()
+            .HasOne(ta => ta.Route)
+            .WithMany()
+            .HasForeignKey(ta => ta.RouteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Hostel Relationships
+        builder.Entity<Hostel>()
+            .HasMany(h => h.Rooms)
+            .WithOne(hr => hr.Hostel)
+            .HasForeignKey(hr => hr.HostelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<HostelAssignment>()
+            .HasOne(ha => ha.Student)
+            .WithMany()
+            .HasForeignKey(ha => ha.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<HostelAssignment>()
+            .HasOne(ha => ha.Room)
+            .WithMany()
+            .HasForeignKey(ha => ha.RoomId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 

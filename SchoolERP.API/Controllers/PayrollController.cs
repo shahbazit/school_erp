@@ -359,7 +359,17 @@ public class PayrollController : ControllerBase
             runId = newRun.Id;
         }
 
-        // 4. Fetch work context (Active employees and salaries)
+        // 4. Validate Attendance if not forced
+        if (!dto.ForceProcess)
+        {
+            var validation = await ValidateMonthlyAttendance(orgId, dto.Year, dto.Month);
+            if (!validation.IsValid)
+            {
+                return Conflict(validation); // 409 Conflict with validation details
+            }
+        }
+
+        // 5. Fetch work context (Active employees and salaries)
         var employeeSalaries = await _unitOfWork.Repository<EmployeeSalary>().GetQueryable()
             .Include(es => es.SalaryStructure)
                 .ThenInclude(ss => ss!.Components)
@@ -370,7 +380,7 @@ public class PayrollController : ControllerBase
         if (!employeeSalaries.Any())
             return BadRequest("No active employees with assigned salary structures found for this organization.");
 
-        // 5. Calculate and build individual details
+        // 6. Calculate and build individual details
         decimal totalAmount = 0;
         foreach (var es in employeeSalaries)
         {
@@ -587,6 +597,79 @@ public class PayrollController : ControllerBase
         await _unitOfWork.CompleteAsync();
 
         return Ok(new { message = "Miscellaneous payout recorded successfully." });
+    }
+
+    private async Task<PayrollValidationResultDto> ValidateMonthlyAttendance(Guid orgId, int year, int month)
+    {
+        var result = new PayrollValidationResultDto { IsValid = true };
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        // 1. Get all active employees
+        var employees = await _unitOfWork.Repository<Employee>().GetQueryable()
+            .Where(e => e.IsActive && e.OrganizationId == orgId)
+            .Select(e => new { e.Id, Name = $"{e.FirstName} {e.LastName}" })
+            .ToListAsync();
+
+        // 2. Get Holidays/WeeklyOffs
+        var holidays = await _unitOfWork.Repository<AcademicCalendar>().GetQueryable()
+            .Where(e => e.Date >= startDate && e.Date <= endDate && e.IsHolidayForStaff)
+            .Select(e => e.Date.Date)
+            .ToListAsync();
+
+        // 3. Get Attendance
+        var attendance = await _unitOfWork.Repository<EmployeeAttendance>().GetQueryable()
+            .Where(a => a.AttendanceDate >= startDate && a.AttendanceDate <= endDate)
+            .Select(a => new { a.EmployeeId, Date = a.AttendanceDate.Date, a.Status })
+            .ToListAsync();
+
+        // 4. Get Leaves
+        var leaves = await _unitOfWork.Repository<LeaveApplication>().GetQueryable()
+            .Where(l => l.Status == LeaveStatus.Approved && l.StartDate <= endDate && l.EndDate >= startDate)
+            .Select(l => new { l.EmployeeId, l.StartDate, l.EndDate })
+            .ToListAsync();
+
+        foreach (var emp in employees)
+        {
+            var missing = new List<DateTime>();
+            var absent = new List<DateTime>();
+
+            for (var date = startDate; date <= endDate; date = date.AddDays(1))
+            {
+                if (holidays.Contains(date.Date)) continue;
+
+                var att = attendance.FirstOrDefault(a => a.EmployeeId == emp.Id && a.Date == date.Date);
+                var leave = leaves.FirstOrDefault(l => l.EmployeeId == emp.Id && date >= l.StartDate.Date && date <= l.EndDate.Date);
+
+                if (att == null && leave == null)
+                {
+                    missing.Add(date);
+                }
+                else if (att != null && att.Status == AttendanceStatus.Absent && leave == null)
+                {
+                    absent.Add(date);
+                }
+            }
+
+            if (missing.Any() || absent.Any())
+            {
+                result.IsValid = false;
+                result.MissingData.Add(new EmployeeMissingDataDto
+                {
+                    EmployeeId = emp.Id,
+                    EmployeeName = emp.Name,
+                    MissingDates = missing,
+                    AbsentDates = absent
+                });
+            }
+        }
+
+        if (!result.IsValid)
+        {
+            result.Errors.Add("Some employees have missing attendance records or unexplained absences.");
+        }
+
+        return result;
     }
 }
 

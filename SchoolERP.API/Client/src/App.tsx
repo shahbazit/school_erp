@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
   GraduationCap, Settings, LogOut, Bell, Menu, ChevronDown, 
-  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database
+  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -36,8 +36,14 @@ import ResetPassword from './pages/ResetPassword';
 import MenuPermissions from './pages/MenuPermissions';
 import UserManagement from './pages/UserManagement';
 import SystemSetup from './pages/SystemSetup';
+import AcademicCalendar from './pages/AcademicCalendar';
+import OrganizationSettings from './pages/OrganizationSettings';
 import { usePermissions } from './hooks/usePermissions';
-import { useEffect as useAppEffect } from 'react';
+import { useEffect as useAppEffect, useMemo } from 'react';
+import { studentApi } from './api/studentApi';
+import { masterApi } from './api/masterApi';
+import { Student } from './types';
+import StudentDetailPanel from './components/StudentDetailPanel';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
@@ -45,6 +51,12 @@ function App() {
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [studentResults, setStudentResults] = useState<Student[]>([]);
+  const [quickViewStudent, setQuickViewStudent] = useState<Student | null>(null);
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [sectionsList, setSectionsList] = useState<any[]>([]);
   const location = useLocation();
 
   useAppEffect(() => {
@@ -82,18 +94,86 @@ function App() {
   useAppEffect(() => {
     if (isAuthenticated) {
       fetchMyPermissions();
+      // Fetch master data for the global search quick view mapping
+      masterApi.getAll('classes').then(setClassesList).catch(console.error);
+      masterApi.getAll('sections').then(setSectionsList).catch(console.error);
+
       // Fetch current academic session
-      import('./api/masterApi').then(({ masterApi }) => {
-        masterApi.getAll('academic-years').then(years => {
-          const current = years.find((y: any) => y.isCurrent);
-          if (current) setCurrentSession(current.name);
-        });
+      masterApi.getAll('academic-years').then(years => {
+        const current = years.find((y: any) => y.isCurrent);
+        if (current) setCurrentSession(current.name);
       });
     }
   }, [isAuthenticated, currentRole, currentUserId, fetchMyPermissions]);
 
+  const classMap = useMemo(() => {
+    return classesList.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {});
+  }, [classesList]);
+
+  const sectionMap = useMemo(() => {
+    return sectionsList.reduce((acc, s) => ({ ...acc, [s.id]: s.name }), {});
+  }, [sectionsList]);
+
   const userName = decodedToken?.Name || 'User';
   const organizationName = decodedToken?.OrganizationName || 'School';
+
+  const menuItems = [
+    { label: 'Dashboard', path: '/', permission: true },
+    { label: 'Student Directory', path: '/students', permission: hasPermission('students') },
+    { label: 'Daily Attendance', path: '/student-attendance', permission: hasPermission('students') },
+    { label: 'Exams & Result', path: '/examinations', permission: hasPermission('students') },
+    { label: 'Promotion & Transfer', path: '/student-promotion', permission: hasPermission('students') },
+    { label: 'Certificate & ID', path: '/certificates', permission: hasPermission('students') },
+    { label: 'Class Timetables', path: '/timetable', permission: hasPermission('students') },
+    { label: 'Academic Calendar', path: '/academic-calendar', permission: hasPermission('students') },
+    { label: 'Bulk Import', path: '/student-import', permission: hasPermission('students') },
+    { label: 'Admission Enquiry', path: '/front-office', permission: hasPermission('front_office') || hasPermission('communication') },
+    { label: 'Communication Hub', path: '/communication', permission: hasPermission('front_office') || hasPermission('communication') },
+    { label: 'General Ledger', path: '/financials', permission: hasPermission('finance') },
+    { label: 'Fee Heads', path: '/fees/heads', permission: hasPermission('finance') },
+    { label: 'Fee Structure', path: '/fees/structures', permission: hasPermission('finance') },
+    { label: 'Fee Allocation', path: '/fees/generate', permission: hasPermission('finance') },
+    { label: 'Fee Policies & Discounts', path: '/fees/settings', permission: hasPermission('finance') },
+    { label: 'Employee List', path: '/employees', permission: hasPermission('hr') },
+    { label: 'Academic Staff', path: '/teachers', permission: hasPermission('hr') },
+    { label: 'Staff Attendance', path: '/attendance', permission: hasPermission('hr') },
+    { label: 'Leave Management', path: '/leaves', permission: hasPermission('hr') },
+    { label: 'Leave Policies', path: '/leave/settings', permission: hasPermission('hr') },
+    { label: 'Staff Payroll', path: '/payroll', permission: hasPermission('hr') },
+    { label: 'Inventory & Store', path: '/inventory', permission: hasPermission('inventory') || hasPermission('infrastructure') },
+    { label: 'Transport & Hostel', path: '/infrastructure', permission: hasPermission('inventory') || hasPermission('infrastructure') },
+    { label: 'Academic Sessions', path: '/masters/academic-years', permission: hasPermission('settings') },
+    { label: 'Class Master', path: '/masters/classes', permission: hasPermission('settings') },
+    { label: 'Section Master', path: '/masters/sections', permission: hasPermission('settings') },
+    { label: 'Subject Master', path: '/masters/subjects', permission: hasPermission('settings') },
+    { label: 'Departments', path: '/masters/departments', permission: hasPermission('settings') },
+    { label: 'Designations', path: '/masters/designations', permission: hasPermission('settings') },
+    { label: 'Infrastructure Rooms', path: '/masters/rooms', permission: hasPermission('settings') },
+    { label: 'Lab Master', path: '/masters/labs', permission: hasPermission('settings') },
+    { label: 'General Lookups', path: '/lookups', permission: hasPermission('settings') },
+    { label: 'Menu Controls', path: '/settings/permissions', permission: hasPermission('settings') },
+    { label: 'User Management', path: '/settings/users', permission: hasPermission('settings') },
+    { label: 'System Quick Setup', path: '/settings/setup', permission: hasPermission('settings') },
+    { label: 'Organization Settings', path: '/settings/organization', permission: hasPermission('settings') },
+  ].filter(item => item.permission === true || item.permission);
+
+  const filteredResults = searchQuery.trim() === '' 
+    ? [] 
+    : menuItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  useAppEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        studentApi.getAll({ search: searchQuery, pageSize: 5 }).then(res => {
+          setStudentResults(res.data || []);
+        });
+      } else {
+        setStudentResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   if (!isAuthenticated) {
     return (
@@ -128,17 +208,26 @@ function App() {
           <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
             {/* 1. Dashboard */}
             <Link to="/" className={`flex items-center py-2 rounded-xl transition-all duration-200 group ${
-              sidebarOpen ? 'px-4 bg-primary-50 text-primary-700' : 'justify-center text-primary-600'
+              location.pathname === '/' 
+                ? (sidebarOpen ? 'px-4 bg-primary-50 text-primary-700 shadow-sm' : 'justify-center bg-primary-50 text-primary-700 scale-105') 
+                : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
             }`}>
-              <LayoutDashboard className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+              <LayoutDashboard className={`h-5 w-5 shrink-0 transition-transform ${location.pathname === '/' ? 'scale-110' : 'group-hover:scale-110'}`} />
               {sidebarOpen && <span className="ml-3 font-semibold text-sm truncate animate-in fade-in">Dashboard</span>}
             </Link>
 
             {/* 2. Academic & Students */}
             {hasPermission('students') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('students')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Backpack className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('students')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/students', '/student-attendance', '/examinations', '/student-promotion', '/certificates', '/timetable', '/academic-calendar', '/student-import'].includes(location.pathname)
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Backpack className={`h-5 w-5 shrink-0 transition-transform ${['/students', '/student-attendance', '/examinations', '/student-promotion', '/certificates', '/timetable', '/academic-calendar', '/student-import'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Academic Hub</span>
@@ -147,14 +236,25 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['students'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/students" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Student Directory</Link>
-                    <Link to="/student-attendance" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Daily Attendance</Link>
-                    <Link to="/examinations" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Exams & Result</Link>
-                    <Link to="/student-promotion" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Promotion & Transfer</Link>
-                    <Link to="/certificates" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Certificate & ID</Link>
-                    <Link to="/timetable" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Class Timetables</Link>
-                    <Link to="/student-import" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Bulk Import</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    {[
+                      { to: '/students', label: 'Student Directory' },
+                      { to: '/student-attendance', label: 'Daily Attendance' },
+                      { to: '/examinations', label: 'Exams & Result' },
+                      { to: '/student-promotion', label: 'Promotion & Transfer' },
+                      { to: '/certificates', label: 'Certificate & ID' },
+                      { to: '/timetable', label: 'Class Timetables' },
+                      { to: '/academic-calendar', label: 'Academic Calendar' },
+                      { to: '/student-import', label: 'Bulk Import' }
+                    ].map(link => (
+                      <Link 
+                        key={link.to} 
+                        to={link.to} 
+                        className={`block py-1.5 text-sm transition-colors ${location.pathname === link.to ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
@@ -163,8 +263,15 @@ function App() {
             {/* 3. Reception & CRM */}
             {(hasPermission('front_office') || hasPermission('communication')) && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('crm')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Building2 className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('crm')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/front-office', '/communication'].includes(location.pathname)
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Building2 className={`h-5 w-5 shrink-0 transition-transform ${['/front-office', '/communication'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Front Desk & CRM</span>
@@ -173,9 +280,9 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['crm'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/front-office" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Admission Enquiry</Link>
-                    <Link to="/communication" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Communication Hub</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/front-office" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/front-office' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Admission Enquiry</Link>
+                    <Link to="/communication" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/communication' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Communication Hub</Link>
                   </div>
                 )}
               </div>
@@ -184,8 +291,15 @@ function App() {
             {/* 4. Accounts & Finance */}
             {hasPermission('finance') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('accounts')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Wallet className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('accounts')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/financials', '/fees/heads', '/fees/structures', '/fees/generate', '/fees/settings'].includes(location.pathname) || location.pathname.startsWith('/fees/student')
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Wallet className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.includes('/fees') || location.pathname === '/financials' ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Accounts & Fees</span>
@@ -194,12 +308,12 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['accounts'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/financials" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">General Ledger</Link>
-                    <Link to="/fees/heads" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Heads</Link>
-                    <Link to="/fees/structures" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Structure</Link>
-                    <Link to="/fees/generate" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Allocation</Link>
-                    <Link to="/fees/settings" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Fee Policies & Discounts</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/financials" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/financials' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>General Ledger</Link>
+                    <Link to="/fees/heads" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/heads' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Heads</Link>
+                    <Link to="/fees/structures" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/structures' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Structure</Link>
+                    <Link to="/fees/generate" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/generate' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Allocation</Link>
+                    <Link to="/fees/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Policies & Discounts</Link>
                   </div>
                 )}
               </div>
@@ -208,8 +322,15 @@ function App() {
             {/* 5. Human Resources */}
             {hasPermission('hr') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('hr')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <UserCog className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('hr')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/employees', '/teachers', '/attendance', '/leaves', '/leave/settings', '/payroll'].includes(location.pathname)
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <UserCog className={`h-5 w-5 shrink-0 transition-transform ${['/employees', '/teachers', '/attendance', '/leaves', '/leave/settings', '/payroll'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Human Resources</span>
@@ -218,13 +339,13 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['hr'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/employees" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Employee List</Link>
-                    <Link to="/teachers" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Academic Staff</Link>
-                    <Link to="/attendance" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Attendance</Link>
-                    <Link to="/leaves" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Leave Management</Link>
-                    <Link to="/leave/settings" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Leave Policies</Link>
-                    <Link to="/payroll" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Staff Payroll</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/employees" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/employees' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Employee List</Link>
+                    <Link to="/teachers" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/teachers' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Academic Staff</Link>
+                    <Link to="/attendance" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/attendance' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Staff Attendance</Link>
+                    <Link to="/leaves" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/leaves' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Leave Management</Link>
+                    <Link to="/leave/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/leave/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Leave Policies</Link>
+                    <Link to="/payroll" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/payroll' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Staff Payroll</Link>
                   </div>
                 )}
               </div>
@@ -233,8 +354,15 @@ function App() {
             {/* 6. Operations & Assets */}
             {(hasPermission('inventory') || hasPermission('infrastructure')) && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('ops')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Package className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('ops')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/inventory', '/infrastructure'].includes(location.pathname)
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Package className={`h-5 w-5 shrink-0 transition-transform ${['/inventory', '/infrastructure'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Ops & Assets</span>
@@ -243,9 +371,9 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['ops'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/inventory" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Inventory & Store</Link>
-                    <Link to="/infrastructure" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Transport & Hostel</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/inventory" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/inventory' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Inventory & Store</Link>
+                    <Link to="/infrastructure" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/infrastructure' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Transport & Hostel</Link>
                   </div>
                 )}
               </div>
@@ -254,8 +382,15 @@ function App() {
             {/* 7. Masters Menu */}
             {hasPermission('settings') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('masters')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Database className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('masters')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    location.pathname.startsWith('/masters') || location.pathname === '/lookups'
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Database className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.startsWith('/masters') || location.pathname === '/lookups' ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Masters Menu</span>
@@ -264,16 +399,26 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['masters'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/masters/academic-years" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Academic Sessions</Link>
-                    <Link to="/masters/classes" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Class Master</Link>
-                    <Link to="/masters/sections" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Section Master</Link>
-                    <Link to="/masters/subjects" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Subject Master</Link>
-                    <Link to="/masters/departments" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Departments</Link>
-                    <Link to="/masters/designations" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Designations</Link>
-                    <Link to="/masters/rooms" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Infrastructure Rooms</Link>
-                    <Link to="/masters/labs" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Lab Master</Link>
-                    <Link to="/lookups" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">General Lookups</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    {[
+                      { to: '/masters/academic-years', label: 'Academic Sessions' },
+                      { to: '/masters/classes', label: 'Class Master' },
+                      { to: '/masters/sections', label: 'Section Master' },
+                      { to: '/masters/subjects', label: 'Subject Master' },
+                      { to: '/masters/departments', label: 'Departments' },
+                      { to: '/masters/designations', label: 'Designations' },
+                      { to: '/masters/rooms', label: 'Infrastructure Rooms' },
+                      { to: '/masters/labs', label: 'Lab Master' },
+                      { to: '/lookups', label: 'General Lookups' }
+                    ].map(link => (
+                      <Link 
+                        key={link.to} 
+                        to={link.to} 
+                        className={`block py-1.5 text-sm transition-colors ${location.pathname === link.to ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
@@ -282,8 +427,15 @@ function App() {
             {/* 8. Settings */}
             {hasPermission('settings') && (
               <div className="space-y-1">
-                <button onClick={() => sidebarOpen && toggleSubMenu('setup')} className={`w-full flex items-center py-2 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 group ${sidebarOpen ? 'px-4' : 'justify-center'}`}>
-                  <Settings className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('setup')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    location.pathname.startsWith('/settings')
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Settings className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.startsWith('/settings') ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
                       <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Settings</span>
@@ -292,10 +444,11 @@ function App() {
                   )}
                 </button>
                 {sidebarOpen && openMenus['setup'] && (
-                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <Link to="/settings/permissions" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">Menu Controls</Link>
-                    <Link to="/settings/users" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">User Management</Link>
-                    <Link to="/settings/setup" className="block py-1.5 text-sm text-slate-500 hover:text-primary-600 transition-colors">System Quick Setup</Link>
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/settings/organization" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/organization' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Organization Settings</Link>
+                    <Link to="/settings/permissions" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/permissions' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Menu Controls</Link>
+                    <Link to="/settings/users" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/users' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>User Management</Link>
+                    <Link to="/settings/setup" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/setup' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>System Quick Setup</Link>
                   </div>
                 )}
               </div>
@@ -329,6 +482,7 @@ function App() {
         onClick={() => {
           sidebarOpen && setSidebarOpen(false);
           profileOpen && setProfileOpen(false);
+          showSearchResults && setShowSearchResults(false);
         }}
       >
         
@@ -344,7 +498,82 @@ function App() {
               <Menu className="h-5 w-5" />
             </button>
             
+            <div className="relative ml-2">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                className="block w-full md:w-64 pl-10 pr-3 py-1.5 rounded-lg text-sm bg-white hover:bg-slate-50 focus:bg-slate-100 focus:outline-none border-0 transition-all placeholder:text-slate-400"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchResults(true);
+                }}
+                onFocus={() => setShowSearchResults(true)}
+              />
+              
+              {showSearchResults && (filteredResults.length > 0 || studentResults.length > 0) && (
+                <div className="absolute top-full left-0 mt-2 w-full md:w-72 bg-white border border-slate-100 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+                  {filteredResults.length > 0 && (
+                    <div className="mb-2">
+                      <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Navigation</p>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredResults.map((item, index) => (
+                          <Link
+                            key={index}
+                            to={item.path}
+                            onClick={() => {
+                              setSearchQuery('');
+                              setStudentResults([]);
+                              setShowSearchResults(false);
+                            }}
+                            className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                          >
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary-400 mr-3"></div>
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
+                  {studentResults.length > 0 && (
+                    <div>
+                      <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Students</p>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                        {studentResults.map((student) => (
+                          <div
+                            key={student.id}
+                            onClick={() => {
+                              setSearchQuery('');
+                              setStudentResults([]);
+                              setShowSearchResults(false);
+                              setQuickViewStudent(student);
+                            }}
+                            className="flex items-center px-4 py-2.5 hover:bg-emerald-50 transition-colors group cursor-pointer"
+                          >
+                            <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] mr-3 shrink-0">
+                              {student.firstName[0]}{student.lastName[0]}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-700 leading-tight truncate group-hover:text-emerald-700">
+                                {student.firstName} {student.lastName}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-medium">Adm: {student.admissionNo || 'N/A'}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -427,7 +656,9 @@ function App() {
               <Route path="/settings/users" element={<UserManagement />} />
               <Route path="/settings/permissions" element={<MenuPermissions />} />
               <Route path="/settings/setup" element={<SystemSetup />} />
+              <Route path="/settings/organization" element={<OrganizationSettings />} />
               <Route path="/timetable" element={<Timetable />} />
+              <Route path="/academic-calendar" element={<AcademicCalendar />} />
               
               {/* Academic Masters */}
               <Route path="/masters/classes" element={
@@ -545,6 +776,19 @@ function App() {
           </div>
         </main>
       </div>
+
+      {quickViewStudent && (
+        <StudentDetailPanel
+          student={quickViewStudent}
+          onClose={() => setQuickViewStudent(null)}
+          onEdit={(s) => {
+            setQuickViewStudent(null);
+            window.location.href = `/students?edit=${s.id}`;
+          }}
+          className={quickViewStudent?.classId ? classMap[quickViewStudent.classId] : ''}
+          sectionName={quickViewStudent?.sectionId ? sectionMap[quickViewStudent.sectionId] : ''}
+        />
+      )}
     </div>
   );
 }

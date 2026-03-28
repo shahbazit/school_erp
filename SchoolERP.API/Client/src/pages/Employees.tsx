@@ -13,7 +13,8 @@ import {
 } from '../api/employeeApi';
 import { masterApi } from '../api/masterApi';
 import { leaveApi, type LeavePlanDto } from '../api/leaveApi';
-import apiClient from '../api/apiClient';
+import apiClient from '../api/apiClient'
+import { useLocalization } from '../contexts/LocalizationContext';
 
 // --- Constants ---
 const EMPLOYMENT_TYPES = [
@@ -24,6 +25,7 @@ const EMPLOYMENT_TYPES = [
 ];
 
 export default function Employees() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -717,8 +719,8 @@ export default function Employees() {
                              <div>
                                 <h4 className="font-black text-emerald-800 text-lg">{employeeSalary.salaryStructureName}</h4>
                                 <div className="flex items-center gap-4 mt-1">
-                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Gross: ₹{employeeSalary.grossSalary.toLocaleString()}</div>
-                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider bg-emerald-100/50 px-2 py-0.5 rounded-lg">Net: ₹{employeeSalary.netSalary.toLocaleString()}</div>
+                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Gross: {formatCurrency(employeeSalary.grossSalary)}</div>
+                                   <div className="text-xs text-emerald-600 font-bold uppercase tracking-wider bg-emerald-100/50 px-2 py-0.5 rounded-lg">Net: {formatCurrency(employeeSalary.netSalary)}</div>
                                 </div>
                              </div>
                              <div className="h-12 w-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
@@ -743,7 +745,7 @@ export default function Employees() {
                                >
                                   <option value="">Select a Structure...</option>
                                   {salaryStructures.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name} (Net: ₹{s.netTotal.toLocaleString()})</option>
+                                    <option key={s.id} value={s.id}>{s.name} (Net: {formatCurrency(s.netTotal)})</option>
                                   ))}
                                </select>
                             </FormField>

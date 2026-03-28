@@ -1,0 +1,12 @@
+namespace SchoolERP.Domain.Entities;
+using SchoolERP.Domain.Common;
+
+public class InventorySupplier : BaseEntity
+{
+    public string Name { get; set; } = null!;
+    public string? ContactPerson { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Address { get; set; }
+    public string? Category { get; set; } // Stationery, Uniform, etc.
+}

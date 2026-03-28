@@ -58,6 +58,10 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IFeeService, FeeService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<ICalendarService, CalendarService>();
+builder.Services.AddScoped<ITransportService, TransportService>();
+builder.Services.AddScoped<IHostelService, HostelService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 var jwtSettings = new JwtSettings();
 builder.Configuration.Bind(nameof(jwtSettings), jwtSettings);
@@ -136,7 +140,9 @@ using (var scope = app.Services.CreateScope())
                     new MenuMaster { Key = "hr", Label = "Human Resource", Icon = "Briefcase", SortOrder = 5 },
                     new MenuMaster { Key = "attendance", Label = "Attendance", Icon = "CalendarCheck", SortOrder = 6 },
                     new MenuMaster { Key = "examination", Label = "Examination", Icon = "FileText", SortOrder = 7 },
-                    new MenuMaster { Key = "settings", Label = "Settings", Icon = "Settings", SortOrder = 8 }
+                    new MenuMaster { Key = "transport", Label = "Transport", Icon = "Bus", SortOrder = 8 },
+                    new MenuMaster { Key = "hostel", Label = "Hostel", Icon = "Bed", SortOrder = 9 },
+                    new MenuMaster { Key = "settings", Label = "Settings", Icon = "Settings", SortOrder = 10 }
                 };
                 context.MenuMasters.AddRange(menus);
                 context.SaveChanges();

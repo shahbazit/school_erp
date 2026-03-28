@@ -39,6 +39,24 @@ export interface MonthlyAttendanceSummaryDto {
   dailyRecords: EmployeeAttendanceDto[];
 }
 
+export interface AttendanceDayDetailDto {
+  date: string;
+  dayType: string; // "WorkingDay", "WeeklyOff", "Holiday"
+  eventName?: string;
+  attendanceStatus?: AttendanceStatus | null;
+  leaveType?: string | null;
+  isMissing: boolean;
+}
+
+export interface DetailedMonthlyAttendanceDto {
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  year: number;
+  month: number;
+  days: AttendanceDayDetailDto[];
+}
+
 export interface MarkAttendanceDto {
   employeeId: string;
   attendanceDate: string;
@@ -66,6 +84,13 @@ export const attendanceApi = {
 
   getMonthlySummary: async (employeeId: string, year: number, month: number): Promise<MonthlyAttendanceSummaryDto> => {
     const res = await apiClient.get<MonthlyAttendanceSummaryDto>(`/employeeattendance/summary/${employeeId}`, {
+      params: { year, month }
+    });
+    return res.data;
+  },
+
+  getDetailedReport: async (employeeId: string, year: number, month: number): Promise<DetailedMonthlyAttendanceDto> => {
+    const res = await apiClient.get<DetailedMonthlyAttendanceDto>(`/employeeattendance/detailed-report/${employeeId}`, {
       params: { year, month }
     });
     return res.data;

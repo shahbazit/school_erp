@@ -146,6 +146,84 @@ public class EmployeeAttendanceController : ControllerBase
     // ─────────────────────────────────────────────────────────────────────
     // GET /api/employee-attendance/summary/{employeeId}
     // ─────────────────────────────────────────────────────────────────────
+    [HttpGet("detailed-report/{employeeId}")]
+    [Authorize(Roles = "Admin,HR")]
+    public async Task<IActionResult> GetDetailedMonthlyReport(Guid employeeId, [FromQuery] int year, [FromQuery] int month)
+    {
+        var employee = await _unitOfWork.Repository<Employee>().GetQueryable()
+            .Include(e => e.Department)
+            .FirstOrDefaultAsync(e => e.Id == employeeId);
+            
+        if (employee == null) return NotFound("Employee not found");
+
+        var startDate = new DateTime(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        // 1. Get Holidays and Weekly Offs (Respecting granular targeting)
+        var holidays = await _unitOfWork.Repository<AcademicCalendar>().GetQueryable()
+            .Include(e => e.TargetDepartments)
+            .Where(e => e.Date >= startDate && e.Date <= endDate && 
+                  (e.IsAllStaff || (employee.DepartmentId.HasValue && e.TargetDepartments.Any(d => d.Id == employee.DepartmentId.Value))))
+            .ToListAsync();
+
+        // 2. Get Approved Leaves
+        var leaves = await _unitOfWork.Repository<LeaveApplication>().GetQueryable()
+            .Include(l => l.LeaveType)
+            .Where(l => l.EmployeeId == employeeId && l.Status == LeaveStatus.Approved && l.StartDate <= endDate && l.EndDate >= startDate)
+            .ToListAsync();
+
+        // 3. Get Attendance Records
+        var attendance = await _unitOfWork.Repository<EmployeeAttendance>().GetQueryable()
+            .Where(a => a.EmployeeId == employeeId && a.AttendanceDate >= startDate && a.AttendanceDate <= endDate)
+            .ToListAsync();
+
+        var report = new DetailedMonthlyAttendanceDto
+        {
+            EmployeeId = employeeId,
+            EmployeeCode = employee.EmployeeCode,
+            EmployeeName = $"{employee.FirstName} {employee.LastName}",
+            Year = year,
+            Month = month
+        };
+
+        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            var dayDetail = new AttendanceDayDetailDto { Date = date };
+
+            // Check Holiday/WeeklyOff
+            var holiday = holidays.FirstOrDefault(h => h.Date.Date == date.Date);
+            if (holiday != null)
+            {
+                dayDetail.DayType = holiday.Category == CalendarEventType.WeeklyOff ? "WeeklyOff" : "Holiday";
+                dayDetail.EventName = holiday.Name;
+            }
+
+            // Check Leave (Applies even on holidays sometimes, but we prioritize Leave status)
+            var leave = leaves.FirstOrDefault(l => date >= l.StartDate.Date && date <= l.EndDate.Date);
+            if (leave != null)
+            {
+                dayDetail.LeaveType = leave.LeaveType?.Name ?? "Leave";
+            }
+
+            // Check Attendance
+            var att = attendance.FirstOrDefault(a => a.AttendanceDate.Date == date.Date);
+            if (att != null)
+            {
+                dayDetail.AttendanceStatus = att.Status;
+            }
+
+            // Detect Missing: Working day with no attendance and no leave
+            if (dayDetail.DayType == "WorkingDay" && dayDetail.LeaveType == null && dayDetail.AttendanceStatus == null)
+            {
+                dayDetail.IsMissing = true;
+            }
+
+            report.Days.Add(dayDetail);
+        }
+
+        return Ok(report);
+    }
+
     [HttpGet("summary/{employeeId}")]
     public async Task<IActionResult> GetMonthlySummary(Guid employeeId, [FromQuery] int year, [FromQuery] int month)
     {

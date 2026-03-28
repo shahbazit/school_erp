@@ -12,9 +12,11 @@ import {
   Info
 } from 'lucide-react';
 import { masterApi } from '../../api/masterApi';
-import { feeApi } from '../../api/feeApi';
+import { feeApi } from '../../api/feeApi'
+import { useLocalization } from '../../contexts/LocalizationContext';
 
 export default function FeeGeneration() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [classes, setClasses] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('');

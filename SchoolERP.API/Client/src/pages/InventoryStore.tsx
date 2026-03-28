@@ -1,48 +1,184 @@
+import { useLocalization } from '../contexts/LocalizationContext';
 import { useState, useEffect } from 'react';
 import { 
-  Package, TrendingDown, TrendingUp, Search, 
-  Settings, Plus, FileText, Filter, Calendar, 
-  ShoppingCart, Send, AlertCircle, CheckCircle2,
-  Trash2, Edit3, DollarSign, UserCheck, BarChart3,
-  Box, History, Layers
+  Package, TrendingUp, Search, 
+  Plus, Filter, 
+  ShoppingCart, Send, AlertCircle,
+  Trash2, Edit3, UserCheck, BarChart3,
+  Box, History, Layers, X, Loader2
 } from 'lucide-react';
+import { 
+    inventoryApi, 
+    InventoryItem, 
+    InventoryTransaction, 
+    InventorySupplier, 
+    InventoryCategory,
+    InventoryTransactionType
+} from '../api/inventoryApi';
+import { toast } from 'react-hot-toast';
+
 
 export default function InventoryStore() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'items' | 'suppliers' | 'transactions'>('dashboard');
-  const [items, setItems] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const { formatCurrency, formatDate, settings } = useLocalization();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'items' | 'suppliers' | 'transactions' | 'categories'>('dashboard');
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
+  const [suppliers, setSuppliers] = useState<InventorySupplier[]>([]);
+  const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Initial Data Mock (Module ready for backend binding)
-  useEffect(() => {
-    // Simulated initial data
-    setItems([
-      { id: '1', name: 'Standard Uniform (Set)', category: 'Uniform', stock: 42, unit: 'Set', min: 10, price: 1200 },
-      { id: '2', name: 'Notebook (Single Line)', category: 'Stationery', stock: 156, unit: 'Pcs', min: 30, price: 50 },
-      { id: '3', name: 'Graph Paper Pad', category: 'Lab Supplies', stock: 5, unit: 'Pad', min: 15, price: 85 },
-      { id: '4', name: 'School Tie', category: 'Uniform', stock: 88, unit: 'Pcs', min: 10, price: 250 },
-    ]);
-    
-    setTransactions([
-      { id: 't1', date: '2024-03-21', type: 'Purchase', item: 'Notebook (Single Line)', qty: 100, entity: 'Bharat Paper Mill', user: 'Admin' },
-      { id: 't2', date: '2024-03-21', type: 'Issue', item: 'Standard Uniform (Set)', qty: 1, entity: 'Rahul Sharma (10th-A)', user: 'Office' },
-      { id: 't3', date: '2024-03-20', type: 'Adjustment', item: 'Graph Paper Pad', qty: -2, entity: 'Damaged In Transit', user: 'Lab Asst' },
-    ]);
+  // Modal states
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
-    setSuppliers([
-      { id: 's1', name: 'Bharat Paper Mill', contact: 'Anil Kumar', phone: '9876543210', category: 'Stationery' },
-      { id: 's2', name: 'Metro Textiles', contact: 'Rajesh Jain', phone: '9123456780', category: 'Uniform' },
-    ]);
-  }, []);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<InventorySupplier | null>(null);
+  const [editingCategory, setEditingCategory] = useState<InventoryCategory | null>(null);
+  const [transactionType, setTransactionType] = useState<InventoryTransactionType>(InventoryTransactionType.Purchase);
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [itemsRes, transRes, suppsRes, catsRes] = await Promise.all([
+        inventoryApi.getItems(),
+        inventoryApi.getTransactions(),
+        inventoryApi.getSuppliers(),
+        inventoryApi.getCategories()
+      ]);
+      setItems(itemsRes.data);
+      setTransactions(transRes.data);
+      setSuppliers(suppsRes.data);
+      setCategories(catsRes.data);
+    } catch (error) {
+      console.error('Failed to fetch inventory data', error);
+      toast.error('Failed to load inventory data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpsertItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      id: editingItem?.id,
+      name: formData.get('name') as string,
+      code: formData.get('code') as string,
+      categoryId: formData.get('categoryId') as string,
+      unit: formData.get('unit') as string,
+      minQuantity: Number(formData.get('minQuantity')),
+      unitPrice: Number(formData.get('unitPrice')),
+    };
+
+    try {
+      await inventoryApi.upsertItem(data);
+      toast.success(editingItem ? 'Item updated' : 'Item added');
+      setShowItemModal(false);
+      setEditingItem(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to save item');
+    }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    if (!window.confirm('Delete this item?')) return;
+    try {
+      await inventoryApi.deleteItem(id);
+      toast.success('Item deleted');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to delete item');
+    }
+  };
+
+  const handleUpsertSupplier = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      id: editingSupplier?.id || '',
+      name: formData.get('name') as string,
+      contactPerson: formData.get('contactPerson') as string,
+      phone: formData.get('phone') as string,
+      email: formData.get('email') as string,
+      address: formData.get('address') as string,
+      category: formData.get('category') as string,
+    };
+
+    try {
+      await inventoryApi.upsertSupplier(data);
+      toast.success(editingSupplier ? 'Supplier updated' : 'Supplier added');
+      setShowSupplierModal(false);
+      setEditingSupplier(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to save supplier');
+    }
+  };
+
+  const handleUpsertCategory = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      id: editingCategory?.id || '',
+      name: formData.get('name') as string,
+      description: formData.get('description') as string,
+    };
+
+    try {
+      await inventoryApi.upsertCategory(data);
+      toast.success(editingCategory ? 'Category updated' : 'Category added');
+      setShowCategoryModal(false);
+      setEditingCategory(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to save category');
+    }
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      itemId: formData.get('itemId') as string,
+      type: transactionType,
+      quantity: Number(formData.get('quantity')),
+      reference: formData.get('reference') as string,
+      entity: formData.get('entity') as string,
+      handledBy: formData.get('handledBy') as string,
+    };
+
+    try {
+      await inventoryApi.createTransaction(data);
+      toast.success('Transaction recorded');
+      setShowTransactionModal(false);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to record transaction');
+    }
+  };
 
   const metrics = [
-    { label: 'Total In-Stock Items', value: '241', icon: Package, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Low Stock Alerts', value: '5', icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Monthly Purchases', value: '₹8,250', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Total Issuances', value: '1,420', icon: Send, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Total In-Stock Items', value: items.length.toString(), icon: Package, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Low Stock Alerts', value: items.filter(i => i.currentStock <= i.minQuantity).length.toString(), icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Total Transactions', value: transactions.length.toString(), icon: History, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Total Suppliers', value: suppliers.length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
+
+  if (loading && items.length === 0) {
+    return (
+        <div className="flex h-[60vh] items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+        </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in duration-700">
@@ -60,11 +196,23 @@ export default function InventoryStore() {
         </div>
         
         <div className="flex items-center gap-2">
-           <button className="btn-secondary flex items-center gap-2 px-5 py-2.5 shadow-sm rounded-xl hover:scale-[1.02] transition-transform">
-             <BarChart3 className="h-4 w-4" /> Reports
+           <button 
+                onClick={() => {
+                    setTransactionType(InventoryTransactionType.Purchase);
+                    setShowTransactionModal(true);
+                }}
+                className="btn-secondary flex items-center gap-2 px-5 py-2.5 shadow-sm rounded-xl hover:scale-[1.02] transition-transform"
+            >
+             <ShoppingCart className="h-4 w-4" /> New Acquisition
            </button>
-           <button className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-lg shadow-indigo-200 rounded-xl hover:scale-[1.02] active:scale-95 transition-all">
-             <Plus className="h-4 w-4" /> New Acquisition
+           <button 
+                onClick={() => {
+                    setEditingItem(null);
+                    setShowItemModal(true);
+                }}
+                className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-lg shadow-indigo-200 rounded-xl hover:scale-[1.02] active:scale-95 transition-all"
+            >
+             <Plus className="h-4 w-4" /> Add Item
            </button>
         </div>
       </div>
@@ -75,7 +223,8 @@ export default function InventoryStore() {
           { id: 'dashboard', label: 'Overview', icon: BarChart3 },
           { id: 'items', label: 'Item Master', icon: Box },
           { id: 'transactions', label: 'Transactions', icon: History },
-          { id: 'suppliers', label: 'Suppliers', icon: UserCheck }
+          { id: 'suppliers', label: 'Suppliers', icon: UserCheck },
+          { id: 'categories', label: 'Categories', icon: Layers }
         ].map(tab => (
           <button
             key={tab.id}
@@ -122,17 +271,29 @@ export default function InventoryStore() {
                        <AlertCircle className="h-4 w-4" /> Attention Required
                     </h3>
                     <div className="mt-4 space-y-3">
-                       {items.filter(i => i.stock <= i.min).map(item => (
-                          <div key={item.id} className="bg-white p-3.5 rounded-xl shadow-sm border border-amber-100 flex justify-between items-center group">
-                             <div>
-                                <p className="text-xs font-bold text-slate-800">{item.name}</p>
-                                <p className="text-[10px] text-red-500 font-bold mt-0.5">Stock Left: {item.stock} {item.unit}</p>
+                       {items.filter(i => i.currentStock <= i.minQuantity).length > 0 ? (
+                           items.filter(i => i.currentStock <= i.minQuantity).slice(0, 5).map(item => (
+                            <div key={item.id} className="bg-white p-3.5 rounded-xl shadow-sm border border-amber-100 flex justify-between items-center group">
+                                <div>
+                                   <p className="text-xs font-bold text-slate-800">{item.name}</p>
+                                   <p className="text-[10px] text-red-500 font-bold mt-0.5">Stock Left: {item.currentStock} {item.unit}</p>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setTransactionType(InventoryTransactionType.Purchase);
+                                        setShowTransactionModal(true);
+                                    }}
+                                    className="h-8 w-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-amber-600 hover:text-white"
+                                >
+                                   <Plus className="h-4 w-4" />
+                                </button>
                              </div>
-                             <button className="h-8 w-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-amber-600 hover:text-white">
-                                <Plus className="h-4 w-4" />
-                             </button>
-                          </div>
-                       ))}
+                           ))
+                       ) : (
+                           <div className="text-center py-6 text-slate-400 italic text-xs">
+                               No critical stock issues detected.
+                           </div>
+                       )}
                     </div>
                  </div>
 
@@ -140,11 +301,23 @@ export default function InventoryStore() {
                  <div className="glass-card p-6 border-slate-200">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Quick Operations</h3>
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                       <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-100 group">
+                       <button 
+                        onClick={() => {
+                            setTransactionType(InventoryTransactionType.Purchase);
+                            setShowTransactionModal(true);
+                        }}
+                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-100 group"
+                       >
                           <ShoppingCart className="h-6 w-6 group-hover:scale-110 transition-transform" />
                           <span className="text-xs font-bold">Purchase Order</span>
                        </button>
-                       <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100 group">
+                       <button 
+                        onClick={() => {
+                            setTransactionType(InventoryTransactionType.Issue);
+                            setShowTransactionModal(true);
+                        }}
+                        className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-100 group"
+                       >
                           <Send className="h-6 w-6 group-hover:scale-110 transition-transform" />
                           <span className="text-xs font-bold">Issue Item</span>
                        </button>
@@ -157,7 +330,12 @@ export default function InventoryStore() {
                  <div className="glass-card overflow-hidden h-full border-none ring-1 ring-slate-200 shadow-sm">
                     <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                        <h3 className="text-base font-bold text-slate-800">Operational Log</h3>
-                       <button className="text-xs font-bold text-indigo-600 hover:underline">View Historical Archive</button>
+                       <button 
+                        onClick={() => setActiveTab('transactions')}
+                        className="text-xs font-bold text-indigo-600 hover:underline"
+                       >
+                           View Historical Archive
+                       </button>
                     </div>
                     <div className="overflow-x-auto">
                        <table className="w-full text-left font-normal border-collapse">
@@ -170,39 +348,47 @@ export default function InventoryStore() {
                              </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                             {transactions.map((t, idx) => (
-                                <tr key={t.id} className="hover:bg-slate-50/30 transition-colors group">
-                                   <td className="px-6 py-4">
-                                      <div className="flex items-center gap-3">
-                                         <div className={`h-1.5 w-1.5 rounded-full ${
-                                            t.type === 'Purchase' ? 'bg-emerald-500' : t.type === 'Issue' ? 'bg-indigo-500' : 'bg-amber-500'
-                                         }`} />
-                                         <div>
-                                            <p className="text-sm font-bold text-slate-800">{t.item}</p>
-                                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{t.type} • {t.date}</p>
-                                         </div>
-                                      </div>
-                                   </td>
-                                   <td className="px-6 py-4">
-                                      <p className="text-sm text-slate-600 font-medium">{t.entity}</p>
-                                   </td>
-                                   <td className="px-6 py-4">
-                                      <div className="flex items-center gap-1.5">
-                                         <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-bold">
-                                            {t.user.substring(0, 2)}
-                                         </div>
-                                         <span className="text-xs text-slate-500">{t.user}</span>
-                                      </div>
-                                   </td>
-                                   <td className="px-6 py-4 text-right">
-                                      <span className={`text-sm font-bold ${
-                                         t.qty > 0 ? 'text-emerald-600' : 'text-amber-600'
-                                      }`}>
-                                         {t.qty > 0 ? `+${t.qty}` : t.qty}
-                                      </span>
-                                   </td>
-                                </tr>
-                             ))}
+                             {transactions.length > 0 ? (
+                                 transactions.slice(0, 10).map((t) => (
+                                    <tr key={t.id} className="hover:bg-slate-50/30 transition-colors group">
+                                       <td className="px-6 py-4">
+                                          <div className="flex items-center gap-3">
+                                             <div className={`h-1.5 w-1.5 rounded-full ${
+                                                t.type === InventoryTransactionType.Purchase ? 'bg-emerald-500' : t.type === InventoryTransactionType.Issue ? 'bg-indigo-500' : 'bg-amber-500'
+                                             }`} />
+                                             <div>
+                                                <p className="text-sm font-bold text-slate-800">{t.itemName}</p>
+                                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{t.typeName} • {formatDate(t.transactionDate)}</p>
+                                             </div>
+                                          </div>
+                                       </td>
+                                       <td className="px-6 py-4">
+                                          <p className="text-sm text-slate-600 font-medium">{t.entity || '-'}</p>
+                                       </td>
+                                       <td className="px-6 py-4">
+                                          <div className="flex items-center gap-1.5">
+                                             <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-bold">
+                                                {t.handledBy?.substring(0, 2).toUpperCase() || 'AD'}
+                                             </div>
+                                             <span className="text-xs text-slate-500">{t.handledBy}</span>
+                                          </div>
+                                       </td>
+                                       <td className="px-6 py-4 text-right">
+                                          <span className={`text-sm font-bold ${
+                                             t.type === InventoryTransactionType.Purchase ? 'text-emerald-600' : 'text-amber-600'
+                                          }`}>
+                                             {t.type === InventoryTransactionType.Purchase ? `+${t.quantity}` : `-${t.quantity}`}
+                                          </span>
+                                       </td>
+                                    </tr>
+                                 ))
+                             ) : (
+                                 <tr>
+                                     <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic text-sm">
+                                         No transactions found.
+                                     </td>
+                                 </tr>
+                             )}
                           </tbody>
                        </table>
                     </div>
@@ -229,7 +415,13 @@ export default function InventoryStore() {
                  <button className="flex items-center gap-2 p-2.5 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                     <Filter className="h-4 w-4" />
                  </button>
-                 <button className="btn-primary flex items-center gap-2 px-6 py-2.5 rounded-2xl shadow-lg shadow-indigo-200">
+                 <button 
+                    onClick={() => {
+                        setEditingItem(null);
+                        setShowItemModal(true);
+                    }}
+                    className="btn-primary flex items-center gap-2 px-6 py-2.5 rounded-2xl shadow-lg shadow-indigo-200"
+                 >
                     <Plus className="h-4 w-4" /> Add Asset
                  </button>
               </div>
@@ -251,38 +443,270 @@ export default function InventoryStore() {
                        <tr key={item.id} className="hover:bg-slate-50/40 transition-colors group">
                           <td className="px-6 py-5">
                              <p className="text-sm font-bold text-slate-800">{item.name}</p>
-                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Code: IT-{item.id.padStart(4, '0')}</p>
+                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Code: {item.code || `IT-${item.id.substring(0, 4)}`}</p>
                           </td>
                           <td className="px-6 py-5">
                              <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                                {item.category}
+                                {item.categoryName || 'Uncategorized'}
                              </span>
                           </td>
                           <td className="px-6 py-5">
                              <div className="flex flex-col items-center">
-                                <span className={`text-sm font-black ${item.stock <= item.min ? 'text-red-500' : 'text-slate-800'}`}>
-                                   {item.stock} {item.unit}
+                                <span className={`text-sm font-black ${item.currentStock <= item.minQuantity ? 'text-red-500' : 'text-slate-800'}`}>
+                                   {item.currentStock} {item.unit}
                                 </span>
                                 <div className="w-24 h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden shadow-inner">
                                    <div 
-                                      className={`h-full transition-all duration-1000 ${item.stock <= item.min ? 'bg-red-400' : 'bg-indigo-400'}`} 
-                                      style={{ width: `${Math.min((item.stock/item.min) * 50, 100)}%` }}
+                                      className={`h-full transition-all duration-1000 ${item.currentStock <= item.minQuantity ? 'bg-red-400' : 'bg-indigo-400'}`} 
+                                      style={{ width: `${Math.min((item.currentStock / (item.minQuantity || 1)) * 50, 100)}%` }}
                                    />
                                 </div>
                              </div>
                           </td>
                           <td className="px-6 py-5 font-normal text-sm text-slate-600">
-                             ₹{item.price.toFixed(2)}
+                             {formatCurrency(item.unitPrice)}
                           </td>
                           <td className="px-6 py-5 text-right">
                              <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all hover:scale-110">
+                                <button 
+                                    onClick={() => {
+                                        setEditingItem(item);
+                                        setShowItemModal(true);
+                                    }}
+                                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all hover:scale-110"
+                                >
                                    <Edit3 className="h-4 w-4" />
                                 </button>
-                                <button className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all hover:scale-110">
+                                <button 
+                                    onClick={() => handleDeleteItem(item.id)}
+                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all hover:scale-110"
+                                >
                                    <Trash2 className="h-4 w-4" />
                                 </button>
                              </div>
+                          </td>
+                       </tr>
+                    ))}
+                    {items.length === 0 && (
+                        <tr>
+                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic text-sm">
+                                No items found in catalog.
+                            </td>
+                        </tr>
+                    )}
+                 </tbody>
+              </table>
+           </div>
+        </div>
+      )}
+
+      {activeTab === 'suppliers' && (
+          <div className="glass-card animate-in fade-in slide-in-from-right-4 duration-500 border-none ring-1 ring-slate-100">
+            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+               <h2 className="text-lg font-bold text-slate-800">Supplier Directory</h2>
+               <button 
+                    onClick={() => {
+                        setEditingSupplier(null);
+                        setShowSupplierModal(true);
+                    }}
+                    className="btn-primary flex items-center gap-2 px-6 py-2.5 rounded-2xl shadow-lg shadow-indigo-200"
+                >
+                    <Plus className="h-4 w-4" /> Add Supplier
+               </button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left font-normal border-collapse">
+                    <thead className="bg-slate-50/50">
+                        <tr>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic">Supplier Details</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic">Category</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic">Contact</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {suppliers.map(s => (
+                            <tr key={s.id} className="hover:bg-slate-50/40 transition-colors group">
+                                <td className="px-6 py-5">
+                                    <p className="text-sm font-bold text-slate-800">{s.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-medium">{s.address || 'No address'}</p>
+                                </td>
+                                <td className="px-6 py-5">
+                                    <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                        {s.category || 'General'}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-5">
+                                    <p className="text-sm text-slate-600 font-medium">{s.contactPerson || '-'}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold">{s.phone || '-'}</p>
+                                </td>
+                                <td className="px-6 py-5 text-right">
+                                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => {
+                                                setEditingSupplier(s);
+                                                setShowSupplierModal(true);
+                                            }}
+                                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                        >
+                                            <Edit3 className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                            onClick={async () => {
+                                                if(confirm('Delete supplier?')) {
+                                                    await inventoryApi.deleteSupplier(s.id);
+                                                    fetchData();
+                                                }
+                                            }}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                        {suppliers.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic text-sm">
+                                    No suppliers registered.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+          </div>
+      )}
+
+      {activeTab === 'categories' && (
+          <div className="glass-card animate-in fade-in slide-in-from-right-4 duration-500 border-none ring-1 ring-slate-100">
+            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+               <h2 className="text-lg font-bold text-slate-800">Item Categories</h2>
+               <button 
+                    onClick={() => {
+                        setEditingCategory(null);
+                        setShowCategoryModal(true);
+                    }}
+                    className="btn-primary flex items-center gap-2 px-6 py-2.5 rounded-2xl shadow-lg shadow-indigo-200"
+                >
+                    <Plus className="h-4 w-4" /> Add Category
+               </button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left font-normal border-collapse">
+                    <thead className="bg-slate-50/50">
+                        <tr>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic">Category Name</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic">Description</th>
+                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {categories.map(c => (
+                            <tr key={c.id} className="hover:bg-slate-50/40 transition-colors group">
+                                <td className="px-6 py-5">
+                                    <p className="text-sm font-bold text-slate-800">{c.name}</p>
+                                </td>
+                                <td className="px-6 py-5">
+                                    <p className="text-sm text-slate-400 italic">{c.description || 'No description'}</p>
+                                </td>
+                                <td className="px-6 py-5 text-right">
+                                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => {
+                                                setEditingCategory(c);
+                                                setShowCategoryModal(true);
+                                            }}
+                                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                                        >
+                                            <Edit3 className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                            onClick={async () => {
+                                                if(confirm('Delete category?')) {
+                                                    await inventoryApi.deleteCategory(c.id);
+                                                    fetchData();
+                                                }
+                                            }}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+          </div>
+      )}
+
+      {activeTab === 'transactions' && (
+        <div className="glass-card animate-in fade-in slide-in-from-right-4 duration-500 border-none ring-1 ring-slate-100">
+           <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h2 className="text-lg font-bold text-slate-800">Transaction History</h2>
+              <div className="flex gap-2">
+                <button 
+                    onClick={() => {
+                        setTransactionType(InventoryTransactionType.Purchase);
+                        setShowTransactionModal(true);
+                    }}
+                    className="btn-secondary flex items-center gap-2 px-5 py-2.5 rounded-xl shadow-sm text-sm"
+                >
+                    <Plus className="h-4 w-4" /> New Acquisition
+                </button>
+                <button 
+                    onClick={() => {
+                        setTransactionType(InventoryTransactionType.Issue);
+                        setShowTransactionModal(true);
+                    }}
+                    className="btn-secondary flex items-center gap-2 px-5 py-2.5 rounded-xl shadow-sm text-sm"
+                >
+                    <Send className="h-4 w-4" /> Issue Item
+                </button>
+              </div>
+           </div>
+           
+           <div className="overflow-x-auto">
+              <table className="w-full text-left font-normal border-collapse">
+                 <thead className="bg-slate-50/50">
+                    <tr>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Date & Type</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Item</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Entity/Ref</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Handler</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Quantity</th>
+                    </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                    {transactions.map(t => (
+                       <tr key={t.id} className="hover:bg-slate-50/40 transition-colors group">
+                          <td className="px-6 py-4">
+                             <p className="text-xs font-bold text-slate-800">{formatDate(t.transactionDate)}</p>
+                             <span className={`text-[10px] font-black uppercase tracking-widest ${
+                                 t.type === InventoryTransactionType.Purchase ? 'text-emerald-600' : 'text-indigo-600'
+                             }`}>
+                                {t.typeName}
+                             </span>
+                          </td>
+                          <td className="px-6 py-4">
+                             <p className="text-sm font-bold text-slate-800">{t.itemName}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                             <p className="text-sm text-slate-600 font-medium">{t.entity || '-'}</p>
+                             <p className="text-[10px] text-slate-400 italic">Ref: {t.reference || 'N/A'}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                             <span className="text-xs text-slate-500">{t.handledBy}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <span className={`text-sm font-bold ${
+                                t.type === InventoryTransactionType.Purchase ? 'text-emerald-600' : 'text-amber-600'
+                             }`}>
+                                {t.type === InventoryTransactionType.Purchase ? `+${t.quantity}` : `-${t.quantity}`}
+                             </span>
                           </td>
                        </tr>
                     ))}
@@ -292,13 +716,185 @@ export default function InventoryStore() {
         </div>
       )}
 
-      {/* Placeholder for Suppliers and Transactions Tabs */}
-      {(activeTab === 'suppliers' || activeTab === 'transactions') && (
-        <div className="glass-card p-20 flex flex-col items-center justify-center text-slate-400 border-none ring-1 ring-slate-100">
-           <Layers className="h-16 w-16 opacity-10 animate-pulse mb-6" />
-           <p className="text-sm font-bold uppercase tracking-widest">Sub-module Under Final Tuning</p>
-           <p className="text-xs font-medium italic mt-2">Connecting to Real-time Stream Analytics...</p>
-        </div>
+      {/* Item Modal */}
+      {showItemModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                  <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                          <Box className="h-5 w-5 text-indigo-600" />
+                          {editingItem ? 'Edit Item' : 'Add New Item'}
+                      </h2>
+                      <button onClick={() => setShowItemModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                          <X className="h-5 w-5 text-slate-400" />
+                      </button>
+                  </div>
+                  <form onSubmit={handleUpsertItem} className="p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Item Name</label>
+                            <input name="name" defaultValue={editingItem?.name} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Item Code</label>
+                            <input name="code" defaultValue={editingItem?.code} className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Category</label>
+                            <select name="categoryId" defaultValue={editingItem?.categoryId} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
+                                <option value="">Select Category</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Unit</label>
+                            <input name="unit" defaultValue={editingItem?.unit || 'Pcs'} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Unit Price</label>
+                            <input name="unitPrice" type="number" step="0.01" defaultValue={editingItem?.unitPrice} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Min Stock Alert</label>
+                            <input name="minQuantity" type="number" defaultValue={editingItem?.minQuantity} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                      </div>
+                      <div className="pt-4 flex gap-3">
+                          <button type="button" onClick={() => setShowItemModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
+                          <button type="submit" className="flex-1 px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Save Item</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Transaction Modal */}
+      {showTransactionModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                  <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                          {transactionType === InventoryTransactionType.Purchase ? <ShoppingCart className="h-5 w-5 text-emerald-600" /> : <Send className="h-5 w-5 text-indigo-600" />}
+                          {transactionType === InventoryTransactionType.Purchase ? 'Record Purchase' : 'Issue Item'}
+                      </h2>
+                      <button onClick={() => setShowTransactionModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                          <X className="h-5 w-5 text-slate-400" />
+                      </button>
+                  </div>
+                  <form onSubmit={handleCreateTransaction} className="p-6 space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Select Item</label>
+                        <select name="itemId" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
+                            <option value="">Select Item</option>
+                            {items.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.currentStock})</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Quantity</label>
+                            <input name="quantity" type="number" step="0.01" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Reference No</label>
+                            <input name="reference" placeholder="Bill/Slip No" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">{transactionType === InventoryTransactionType.Purchase ? 'Supplier' : 'Issued To'}</label>
+                            {transactionType === InventoryTransactionType.Purchase ? (
+                                <select name="entity" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
+                                    <option value="">Select Supplier</option>
+                                    {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                </select>
+                            ) : (
+                                <input name="entity" placeholder="Recipient Name" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Handled By</label>
+                            <input name="handledBy" defaultValue="Admin" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                      </div>
+                      <div className="pt-4 flex gap-3">
+                          <button type="button" onClick={() => setShowTransactionModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
+                          <button type="submit" className={`flex-1 px-6 py-3 ${transactionType === InventoryTransactionType.Purchase ? 'bg-emerald-600' : 'bg-indigo-600'} text-white font-bold rounded-2xl shadow-lg transition-all`}>
+                            {transactionType === InventoryTransactionType.Purchase ? 'Confirm Purchase' : 'Confirm Issue'}
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Supplier Modal */}
+      {showSupplierModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                  <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                          <UserCheck className="h-5 w-5 text-indigo-600" />
+                          {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
+                      </h2>
+                      <button onClick={() => setShowSupplierModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                          <X className="h-5 w-5 text-slate-400" />
+                      </button>
+                  </div>
+                  <form onSubmit={handleUpsertSupplier} className="p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Company/Name</label>
+                            <input name="name" defaultValue={editingSupplier?.name} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Contact Person</label>
+                            <input name="contactPerson" defaultValue={editingSupplier?.contactPerson} className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Phone</label>
+                            <input name="phone" defaultValue={editingSupplier?.phone} className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Address</label>
+                            <input name="address" defaultValue={editingSupplier?.address} className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                      </div>
+                      <div className="pt-4 flex gap-3">
+                          <button type="button" onClick={() => setShowSupplierModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
+                          <button type="submit" className="flex-1 px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Save Supplier</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
+      {/* Category Modal */}
+      {showCategoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
+                  <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                          <Layers className="h-5 w-5 text-indigo-600" />
+                          {editingCategory ? 'Edit Category' : 'New Category'}
+                      </h2>
+                      <button onClick={() => setShowCategoryModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+                          <X className="h-5 w-5 text-slate-400" />
+                      </button>
+                  </div>
+                  <form onSubmit={handleUpsertCategory} className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Category Name</label>
+                            <input name="name" defaultValue={editingCategory?.name} required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Description</label>
+                            <textarea name="description" defaultValue={editingCategory?.description} className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none h-24 resize-none" />
+                        </div>
+                        <div className="pt-4 flex gap-3">
+                            <button type="button" onClick={() => setShowCategoryModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
+                            <button type="submit" className="flex-1 px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Save</button>
+                        </div>
+                  </form>
+              </div>
+          </div>
       )}
 
     </div>

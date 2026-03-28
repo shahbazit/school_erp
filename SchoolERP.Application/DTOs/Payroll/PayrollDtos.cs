@@ -92,4 +92,20 @@ public class ProcessPayrollDto
     [Required] public int Year { get; set; }
     [Required] public int Month { get; set; }
     public string? Remarks { get; set; }
+    public bool ForceProcess { get; set; } = false;
+}
+
+public class PayrollValidationResultDto
+{
+    public bool IsValid { get; set; }
+    public List<string> Errors { get; set; } = new();
+    public List<EmployeeMissingDataDto> MissingData { get; set; } = new();
+}
+
+public class EmployeeMissingDataDto
+{
+    public Guid EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public List<DateTime> MissingDates { get; set; } = new();
+    public List<DateTime> AbsentDates { get; set; } = new();
 }

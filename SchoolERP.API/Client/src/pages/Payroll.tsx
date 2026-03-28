@@ -12,6 +12,7 @@ import {
   SalaryStructureDto,
   SalaryComponentType
 } from '../api/payrollApi';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 const statusConfig = {
   [PayrollStatus.Draft]: { label: 'Draft', color: 'bg-slate-100 text-slate-700 border-slate-200', icon: <Clock className="w-4 h-4" /> },
@@ -22,6 +23,7 @@ const statusConfig = {
 };
 
 export default function Payroll() {
+  const { formatCurrency, formatDate } = useLocalization();
   const [activeTab, setActiveTab] = useState<'runs' | 'structures' | 'process' | 'ledger'>('runs');
 
   return (
@@ -53,6 +55,7 @@ export default function Payroll() {
 }
 
 function EmployeeLedger() {
+  const { formatCurrency, formatDate } = useLocalization();
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -173,10 +176,10 @@ function EmployeeLedger() {
                                      <span className={`w-2 h-2 rounded-full ${h.type === 'Salary' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                                      <p className="text-sm font-black text-slate-800">{h.type}</p>
                                   </div>
-                                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{new Date(h.date).toLocaleDateString()} &bull; {new Date(0, h.month-1).toLocaleString('default', { month: 'long' })} {h.year}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">{formatDate(h.date)} &bull; {new Date(0, h.month-1).toLocaleString('default', { month: 'long' })} {h.year}</p>
                                </td>
                                <td className="px-6 py-5 text-right">
-                                  <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-lg inline-block">₹{h.netSalary.toLocaleString()}</p>
+                                  <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-lg inline-block">{formatCurrency(h.netSalary)}</p>
                                </td>
                                <td className="px-6 py-5 max-w-sm">
                                   <p className="text-xs text-slate-500 font-semibold leading-relaxed italic">{h.remarks || '--'}</p>
@@ -222,7 +225,7 @@ function EmployeeLedger() {
                                </div>
                             </td>
                             <td className="px-8 py-5 text-right font-mono font-black text-slate-800">
-                               ₹{e.netSalary.toLocaleString()}
+                               {formatCurrency(e.netSalary)}
                             </td>
                             <td className="px-8 py-5 text-right">
                                <button 
@@ -262,6 +265,7 @@ function EmployeeLedger() {
 }
 
 function MiscPayoutModal({ employeeId, employeeName, onClose, onSuccess }: { employeeId: string, employeeName: string, onClose: () => void, onSuccess: () => void }) {
+  const { formatCurrency, settings } = useLocalization();
   const [data, setData] = useState({ type: 'Bonus', amount: 0, paymentMethod: 'Bank Transfer', remarks: '' });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -302,7 +306,7 @@ function MiscPayoutModal({ employeeId, employeeName, onClose, onSuccess }: { emp
              </div>
 
              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Amount (₹)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Amount ({settings?.currencySymbol || "₹"})</label>
                 <input 
                   type="number" 
                   className="w-full px-4 py-3 bg-slate-50 border-0 rounded-2xl font-black text-primary-600 shadow-inner focus:ring-2 focus:ring-primary-400 outline-none transition text-xl" 
@@ -338,6 +342,7 @@ function MiscPayoutModal({ employeeId, employeeName, onClose, onSuccess }: { emp
 }
 
 function PayrollRuns() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [runs, setRuns] = useState<PayrollRunDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRun, setSelectedRun] = useState<PayrollRunDto | null>(null);
@@ -395,7 +400,7 @@ function PayrollRuns() {
                          </div>
                       </td>
                       <td className="px-8 py-6 text-sm font-bold text-slate-500">
-                         {new Date(run.processedDate).toLocaleDateString()}
+                         {formatDate(run.processedDate)}
                       </td>
                       <td className="px-8 py-6">
                          <div className={`px-4 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 ${statusConfig[run.status].color}`}>
@@ -409,7 +414,7 @@ function PayrollRuns() {
                          </div>
                       </td>
                       <td className="px-8 py-6 text-right">
-                         <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-4 py-1.5 rounded-xl inline-block">₹{run.totalAmount.toLocaleString()}</p>
+                         <p className="text-sm font-mono font-black text-primary-600 bg-primary-50 px-4 py-1.5 rounded-xl inline-block">{formatCurrency(run.totalAmount)}</p>
                       </td>
                       <td className="px-8 py-6 text-right">
                          <button 
@@ -431,6 +436,7 @@ function PayrollRuns() {
 }
 
 function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClose: () => void, onUpdate: () => void }) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [details, setDetails] = useState<PayrollDetailDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -510,7 +516,7 @@ function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClo
                       <span className={`px-3 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest ${statusConfig[run.status].color}`}>
                         {statusConfig[run.status].label}
                       </span>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Payout: <span className="text-primary-600 ml-1 font-black">₹{run.totalAmount.toLocaleString()}</span></p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Payout: <span className="text-primary-600 ml-1 font-black">{formatCurrency(run.totalAmount)}</span></p>
                    </div>
                 </div>
              </div>
@@ -566,8 +572,8 @@ function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClo
                                <p className="font-black text-slate-800 text-sm leading-none">{d.employeeName}</p>
                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{d.employeeCode}</p>
                             </td>
-                            <td className="px-5 py-3 text-right text-sm font-mono text-slate-600">₹{d.grossSalary.toLocaleString()}</td>
-                            <td className="px-5 py-3 text-right text-sm font-mono text-rose-500">-₹{d.totalDeductions.toLocaleString()}</td>
+                            <td className="px-5 py-3 text-right text-sm font-mono text-slate-600">{formatCurrency(d.grossSalary)}</td>
+                            <td className="px-5 py-3 text-right text-sm font-mono text-rose-500">-{formatCurrency(d.totalDeductions)}</td>
                             <td className="px-5 py-3 text-right">
                                <div className="flex flex-col items-end">
                                   {d.adjustmentEarnings > 0 && <span className="text-[10px] font-bold text-emerald-500">+{d.adjustmentEarnings.toLocaleString()}</span>}
@@ -576,7 +582,7 @@ function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClo
                                </div>
                             </td>
                             <td className="px-5 py-3 text-right">
-                               <p className="text-sm font-mono font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg inline-block">₹{d.netSalary.toLocaleString()}</p>
+                               <p className="text-sm font-mono font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg inline-block">{formatCurrency(d.netSalary)}</p>
                             </td>
                             <td className="px-5 py-3 text-right">
                                <div className="flex items-center justify-end gap-2">
@@ -666,6 +672,7 @@ function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClo
 }
 
 function SalaryStructures() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [structures, setStructures] = useState<SalaryStructureDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -739,15 +746,15 @@ function SalaryStructures() {
              <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-50">
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pay</p>
-                   <p className="text-xl font-black text-slate-800">₹{ss.netTotal.toLocaleString()}</p>
+                   <p className="text-xl font-black text-slate-800">{formatCurrency(ss.netTotal)}</p>
                 </div>
                 <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-50">
                    <p className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Earnings</p>
-                   <p className="text-xl font-black text-emerald-600">₹{ss.totalEarnings.toLocaleString()}</p>
+                   <p className="text-xl font-black text-emerald-600">{formatCurrency(ss.totalEarnings)}</p>
                 </div>
                 <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-50">
                    <p className="text-[10px] font-black text-rose-600/60 uppercase tracking-widest mb-1">Deductions</p>
-                   <p className="text-xl font-black text-rose-600">₹{ss.totalDeductions.toLocaleString()}</p>
+                   <p className="text-xl font-black text-rose-600">{formatCurrency(ss.totalDeductions)}</p>
                 </div>
              </div>
 
@@ -756,7 +763,7 @@ function SalaryStructures() {
                 <div className="flex flex-wrap gap-2">
                    {ss.components.slice(0, 4).map((c, idx) => (
                       <span key={idx} className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold flex items-center gap-1.5 border ${c.type === SalaryComponentType.Earning ? 'bg-emerald-50/50 text-emerald-700 border-emerald-100' : 'bg-rose-50/50 text-rose-700 border-rose-100'}`}>
-                         {c.name}: ₹{c.amount.toLocaleString()}
+                         {c.name}: {formatCurrency(c.amount)}
                       </span>
                    ))}
                    {ss.components.length > 4 && (
@@ -799,6 +806,7 @@ function SalaryStructures() {
 }
 
 function ProcessPayroll({ onSuccess }: { onSuccess: () => void }) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [data, setData] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() + 1, remarks: '' });
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -868,6 +876,7 @@ function ProcessPayroll({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: { detail: any, run?: any, employeeName?: string, employeeCode?: string, onClose: () => void }) {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const components = JSON.parse(detail.componentBreakdownDetails || '[]');
   const earnings = components.filter((c: any) => c.Type === 'Earning');
   const deductions = components.filter((c: any) => c.Type === 'Deduction');
@@ -933,7 +942,7 @@ function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: {
                       </div>
                       <div className="flex justify-between">
                          <span className="text-sm font-medium text-slate-500">Gross Amount</span>
-                         <span className="text-sm font-bold text-slate-800">₹{detail.grossSalary.toLocaleString()}</span>
+                         <span className="text-sm font-bold text-slate-800">{formatCurrency(detail.grossSalary)}</span>
                       </div>
                    </div>
                 </div>
@@ -946,18 +955,18 @@ function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: {
                       {earnings.map((e: any, i: number) => (
                          <div key={i} className="flex justify-between items-center text-sm font-medium">
                             <span className="text-slate-600">{e.Name}</span>
-                            <span className="text-emerald-600 font-bold">₹{e.Amount.toLocaleString()}</span>
+                            <span className="text-emerald-600 font-bold">{formatCurrency(e.Amount)}</span>
                          </div>
                       ))}
                       {detail.adjustmentEarnings > 0 && (
                         <div className="flex justify-between items-center text-sm font-medium bg-emerald-50/50 p-2 rounded-lg -mx-2 border border-emerald-50">
                            <span className="text-emerald-700 font-bold">Adjustments / Reimb.</span>
-                           <span className="text-emerald-600 font-bold">₹{detail.adjustmentEarnings.toLocaleString()}</span>
+                           <span className="text-emerald-600 font-bold">{formatCurrency(detail.adjustmentEarnings)}</span>
                         </div>
                       )}
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between font-black">
                          <span className="text-slate-800">Total Earnings</span>
-                         <span className="text-slate-800">₹{(detail.grossSalary + detail.adjustmentEarnings).toLocaleString()}</span>
+                         <span className="text-slate-800">{formatCurrency(detail.grossSalary + detail.adjustmentEarnings)}</span>
                       </div>
                    </div>
                 </div>
@@ -968,18 +977,18 @@ function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: {
                       {deductions.map((d: any, i: number) => (
                          <div key={i} className="flex justify-between items-center text-sm font-medium">
                             <span className="text-slate-600">{d.Name}</span>
-                            <span className="text-rose-600 font-bold">₹{d.Amount.toLocaleString()}</span>
+                            <span className="text-rose-600 font-bold">{formatCurrency(d.Amount)}</span>
                          </div>
                       ))}
                       {detail.adjustmentDeductions > 0 && (
                         <div className="flex justify-between items-center text-sm font-medium bg-rose-50/50 p-2 rounded-lg -mx-2 border border-rose-50">
                            <span className="text-rose-700 font-bold">Adjustments / Cuts</span>
-                           <span className="text-rose-600 font-bold">₹{detail.adjustmentDeductions.toLocaleString()}</span>
+                           <span className="text-rose-600 font-bold">{formatCurrency(detail.adjustmentDeductions)}</span>
                         </div>
                       )}
                       <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between font-black">
                          <span className="text-slate-800">Total Deductions</span>
-                         <span className="text-slate-800">₹{(detail.totalDeductions + detail.adjustmentDeductions).toLocaleString()}</span>
+                         <span className="text-slate-800">{formatCurrency(detail.totalDeductions + detail.adjustmentDeductions)}</span>
                       </div>
                    </div>
                 </div>
@@ -989,11 +998,11 @@ function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                    <div>
                       <p className="text-[10px] font-black text-primary-200 uppercase tracking-widest mb-1">Net Monthly Payout</p>
-                      <h4 className="text-4xl font-black tracking-tighter">₹{detail.netSalary.toLocaleString()}</h4>
+                      <h4 className="text-4xl font-black tracking-tighter">{formatCurrency(detail.netSalary)}</h4>
                    </div>
                    <div className="text-right">
                       <p className="text-[10px] font-black text-primary-200 uppercase tracking-widest mb-1">In Words</p>
-                      <p className="text-sm font-bold opacity-90 break-words">{detail.netSalary.toLocaleString()} Rupees Only</p>
+                      <p className="text-sm font-bold opacity-90 break-words">{formatCurrency(detail.netSalary)} Rupees Only</p>
                    </div>
                 </div>
              </div>
@@ -1021,6 +1030,7 @@ function SalarySlipModal({ detail, run, employeeName, employeeCode, onClose }: {
 }
 
 function UpsertSalaryStructureModal({ structure, onClose, onSuccess }: { structure: SalaryStructureDto | null, onClose: () => void, onSuccess: () => void }) {
+  const { formatCurrency, settings } = useLocalization();
   const [name, setName] = useState(structure?.name || '');
   const [description, setDescription] = useState(structure?.description || '');
   const [isActive, setIsActive] = useState(structure?.isActive ?? true);
@@ -1127,7 +1137,7 @@ function UpsertSalaryStructureModal({ structure, onClose, onSuccess }: { structu
                               onChange={e => updateComponent(realIdx, 'name', e.target.value)}
                            />
                            <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-[10px]">₹</span>
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-[10px]">{settings?.currencySymbol || "₹"}</span>
                               <input 
                                  type="number"
                                  className="w-24 pl-5 pr-3 py-2 bg-white rounded-lg font-black text-emerald-600 text-right text-xs outline-none border border-slate-100"
@@ -1163,7 +1173,7 @@ function UpsertSalaryStructureModal({ structure, onClose, onSuccess }: { structu
                               onChange={e => updateComponent(realIdx, 'name', e.target.value)}
                            />
                            <div className="relative">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-[10px]">₹</span>
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-[10px]">{settings?.currencySymbol || "₹"}</span>
                               <input 
                                  type="number"
                                  className="w-24 pl-5 pr-3 py-2 bg-white rounded-lg font-black text-rose-600 text-right text-xs outline-none border border-slate-100"
@@ -1187,7 +1197,7 @@ function UpsertSalaryStructureModal({ structure, onClose, onSuccess }: { structu
            <div className="flex items-center gap-4">
               <div className="px-4 py-2 bg-slate-900 rounded-xl text-white">
                  <p className="text-[8px] font-black opacity-40 uppercase tracking-widest">Net Payout</p>
-                 <p className="text-lg font-black tracking-tight">₹{netTotal.toLocaleString()}</p>
+                 <p className="text-lg font-black tracking-tight">{formatCurrency(netTotal)}</p>
               </div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
                  {components.length} Items

@@ -10,6 +10,7 @@ import {
 import { financialsApi } from '../api/financialsApi';
 import { masterApi } from '../api/masterApi';
 import { GenericModal } from '../components/GenericModal';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 // Shared Metric Component for Premium Feel
 const MetricCard = ({ label, value, trend, icon: Icon, color, red = false }: any) => (
@@ -39,6 +40,7 @@ const MetricCard = ({ label, value, trend, icon: Icon, color, red = false }: any
 );
 
 export default function Financials() {
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [activeTab, setActiveTab] = useState<'overview' | 'fee-setup' | 'billing' | 'defaulters' | 'expenses'>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<any>(null);
@@ -192,9 +194,9 @@ export default function Financials() {
 
        {/* Top Metrics Grid */}
        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <MetricCard label="Total Revenue" value={`₹${summary?.totalRevenueYTD.toLocaleString()}`} trend="+Active" icon={TrendingUp} color="bg-emerald-500" />
-          <MetricCard label="Total Expenses" value={`₹${summary?.totalExpensesYTD.toLocaleString()}`} trend="Operational" icon={ArrowDownRight} color="bg-rose-500" red={summary?.totalExpensesYTD > 0} />
-          <MetricCard label="Net Balance" value={`₹${summary?.netProfit.toLocaleString()}`} trend="Liquid" icon={Coins} color="bg-indigo-600" />
+          <MetricCard label="Total Revenue" value={formatCurrency(summary?.totalRevenueYTD)} trend="+Active" icon={TrendingUp} color="bg-emerald-500" />
+          <MetricCard label="Total Expenses" value={formatCurrency(summary?.totalExpensesYTD)} trend="Operational" icon={ArrowDownRight} color="bg-rose-500" red={summary?.totalExpensesYTD > 0} />
+          <MetricCard label="Net Balance" value={formatCurrency(summary?.netProfit)} trend="Liquid" icon={Coins} color="bg-indigo-600" />
           <MetricCard label="Collection Rate" value={`${summary?.overallCollectionRate}%`} trend="Overall" icon={PieChart} color="bg-amber-500" />
        </div>
 
@@ -234,8 +236,8 @@ export default function Financials() {
                         <div key={i} className="space-y-3">
                            <div className="flex justify-between items-end">
                               <p className="text-sm font-black text-slate-700">{item.category}</p>
-                              <div className="flex items-center gap-3">
-                                 <span className="text-sm font-black text-slate-900">₹{item.amount.toLocaleString()}</span>
+                               <div className="flex items-center gap-3">
+                                 <span className="text-sm font-black text-slate-900">{formatCurrency(item.amount)}</span>
                                  <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{item.percentage}%</span>
                               </div>
                            </div>
@@ -259,7 +261,7 @@ export default function Financials() {
                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction</th>
                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Party/Member</th>
                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Method</th>
-                               <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
+                               <th className="px-6 py-4 text-[10px) font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
                             </tr>
                          </thead>
                          <tbody className="divide-y divide-slate-50">
@@ -268,7 +270,7 @@ export default function Financials() {
                                   <td className="px-6 py-4">
                                      <p className="text-sm font-black text-slate-800">{row.description}</p>
                                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-tighter">
-                                       {new Date(row.date).toLocaleDateString()}
+                                       {formatDate(row.date)}
                                      </p>
                                   </td>
                                   <td className="px-6 py-4 text-sm text-slate-500 font-bold">{row.source}</td>
@@ -279,7 +281,7 @@ export default function Financials() {
                                   </td>
                                   <td className="px-6 py-4 text-right">
                                      <span className={`text-sm font-black ${row.type === 'Credit' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                        {row.type === 'Credit' ? '+' : '-'}{row.amount.toLocaleString()}
+                                        {row.type === 'Credit' ? '+' : '-'}{formatCurrency(row.amount)}
                                      </span>
                                   </td>
                                 </tr>
@@ -295,9 +297,8 @@ export default function Financials() {
                 <div className="glass-card p-6 bg-indigo-600 text-white border-none shadow-2xl relative overflow-hidden group">
                    <div className="absolute top-0 right-0 -mr-10 -mt-10 h-40 w-40 bg-white/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-1000" />
                    <h4 className="text-xs font-bold uppercase tracking-[0.2em] opacity-60">System Liquidity</h4>
-                   <p className="text-4xl font-black mt-3 flex items-start gap-1">
-                      <span className="text-lg mt-1 font-bold opacity-50">₹</span>
-                      {summary?.netProfit ? (summary.netProfit / 1000000).toFixed(2) : '0.00'}<span className="text-2xl mt-2 opacity-60 ml-0.5">M</span>
+                   <p className="text-4xl font-black mt-3">
+                      {formatCurrency(summary?.netProfit || 0)}
                    </p>
                    <p className="text-xs font-bold mt-2 opacity-60">Current liquid reserves across all accounts.</p>
                 </div>
@@ -331,7 +332,7 @@ export default function Financials() {
              <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-rose-50/30">
                 <div>
                    <h3 className="text-2xl font-black text-rose-600 tracking-tighter uppercase">Arrears & Pending Dues</h3>
-                   <p className="text-xs text-rose-400 font-bold uppercase tracking-widest mt-1">Students with outstanding balance &gt; ₹500</p>
+                   <p className="text-xs text-rose-400 font-bold uppercase tracking-widest mt-1">Students with outstanding balance &gt; {formatCurrency(500)}</p>
                 </div>
                 <div className="h-12 w-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
                    <AlertCircle className="h-6 w-6" />
@@ -343,7 +344,7 @@ export default function Financials() {
                       <tr>
                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</th>
                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Adm No</th>
-                         <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Grade</th>
+                         <th className="px-8 py-5 text-[10px) font-black text-slate-400 uppercase tracking-widest">Grade</th>
                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Balance Due</th>
                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
                       </tr>
@@ -354,7 +355,7 @@ export default function Financials() {
                             <td className="px-8 py-5 font-black text-slate-800">{d.fullName}</td>
                             <td className="px-8 py-5 text-sm text-slate-500 font-mono">{d.admissionNo}</td>
                             <td className="px-8 py-5 font-bold text-slate-600 underline decoration-slate-200 underline-offset-4">{d.className}</td>
-                            <td className="px-8 py-5 text-right font-black text-rose-600 text-lg">₹{d.outstandingAmount.toLocaleString()}</td>
+                            <td className="px-8 py-5 text-right font-black text-rose-600 text-lg">{formatCurrency(d.outstandingAmount)}</td>
                             <td className="px-8 py-5 text-center">
                                <button 
                                  onClick={() => window.location.href = `/fees/student/${d.studentId}`}
@@ -407,13 +408,13 @@ export default function Financials() {
                          <tr key={ex.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-6 py-5">
                                <p className="text-sm font-black text-slate-800">{ex.description}</p>
-                               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{new Date(ex.date).toLocaleDateString()}</p>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{formatDate(ex.date)}</p>
                             </td>
                             <td className="px-6 py-5">
                                <span className="px-3 py-1 bg-slate-100 text-[10px] font-black text-slate-500 rounded-full uppercase tracking-widest">{ex.category}</span>
                             </td>
                             <td className="px-6 py-5 font-bold text-slate-500 text-xs uppercase tracking-tighter">{ex.paymentMethod}</td>
-                            <td className="px-6 py-5 text-right font-black text-rose-500 text-sm italic">₹{ex.amount.toLocaleString()}</td>
+                            <td className="px-6 py-5 text-right font-black text-rose-500 text-sm italic">{formatCurrency(ex.amount)}</td>
                          </tr>
                       ))}
                       {expenses.length === 0 && (
@@ -473,7 +474,7 @@ export default function Financials() {
                    </select>
                 </div>
                 <div>
-                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Amount (₹)</label>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Amount ({settings?.currencySymbol || '₹'})</label>
                    <input 
                      type="number" 
                      required
@@ -547,7 +548,7 @@ export default function Financials() {
                    </select>
                 </div>
                 <div>
-                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Amount (₹)</label>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Amount ({settings?.currencySymbol || '₹'})</label>
                    <input 
                      type="number" 
                      required

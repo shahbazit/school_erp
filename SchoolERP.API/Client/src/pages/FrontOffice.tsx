@@ -5,35 +5,101 @@ import {
   MapPin, Clock, CheckCircle2, AlertCircle,
   MoreVertical, Edit3, Trash2, ArrowRight, ArrowUpRight,
   UserCheck, UserMinus, PhoneIncoming, MessageSquare,
-  BarChart3, LifeBuoy, Zap, ChevronRight
+  BarChart3, LifeBuoy, Zap, ChevronRight, X, Loader2
 } from 'lucide-react';
+import { frontOfficeApi, AdmissionEnquiry, VisitorLog } from '../api/frontOfficeApi';
+import { masterApi } from '../api/masterApi';
+import { GenericModal } from '../components/GenericModal';
 
 export default function FrontOffice() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'enquiries' | 'visitors' | 'calls' | 'complaints'>('dashboard');
-  const [enquiries, setEnquiries] = useState<any[]>([]);
-  const [visitors, setVisitors] = useState<any[]>([]);
+  const [enquiries, setEnquiries] = useState<AdmissionEnquiry[]>([]);
+  const [visitors, setVisitors] = useState<VisitorLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [classes, setClasses] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modals
+  const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState(false);
+  const [isVisitorModalOpen, setIsVisitorModalOpen] = useState(false);
+  const [editingEnquiry, setEditingEnquiry] = useState<AdmissionEnquiry | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Initial Mock Data
   useEffect(() => {
-    setEnquiries([
-      { id: '1', date: '2024-03-22', student: 'Aarav Mehta', parent: 'Sanjay Mehta', phone: '+91 98765 43210', class: '10th-A', status: 'Follow-up', source: 'Website', next: '2024-03-24' },
-      { id: '2', date: '2024-03-21', student: 'Ishita Jain', parent: 'Anil Jain', phone: '+91 98111 22233', class: '8th-C', status: 'Converted', source: 'Referral', next: null },
-      { id: '3', date: '2024-03-20', student: 'Kabir Singh', parent: 'Daljit Singh', phone: '+91 91234 56789', class: 'LKG', status: 'New', source: 'Social Media', next: '2024-03-22' },
-    ]);
-    
-    setVisitors([
-      { id: 'v1', name: 'Vivek Sharma', purpose: 'Fee Payment', whom: 'Accounts Dept', in: '10:30 AM', out: null, phone: '+91 98765 00000', idCard: 'AD-9201' },
-      { id: 'v2', name: 'Pooja Gupta', purpose: 'Parent Teacher Meet', whom: 'Class Teacher 5B', in: '11:15 AM', out: '11:45 AM', phone: '+91 91234 11111', idCard: 'AD-9202' },
-    ]);
+    fetchData();
+    masterApi.getAll('classes').then(setClasses);
   }, []);
 
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [enqRes, visRes] = await Promise.all([
+        frontOfficeApi.getEnquiries(),
+        frontOfficeApi.getVisitors()
+      ]);
+      setEnquiries(enqRes.data);
+      setVisitors(visRes.data);
+    } catch (err) {
+      console.error("Failed to fetch front office data", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckout = async (id: string) => {
+    if (!window.confirm("Check out this visitor?")) return;
+    try {
+      await frontOfficeApi.checkOutVisitor(id);
+      fetchData();
+    } catch (err) {
+      alert("Checkout failed");
+    }
+  };
+
+  const handleEnquirySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+      if (editingEnquiry) {
+        await frontOfficeApi.updateEnquiry(editingEnquiry.id, data);
+      } else {
+        await frontOfficeApi.createEnquiry(data);
+      }
+      setIsEnquiryModalOpen(false);
+      setEditingEnquiry(null);
+      fetchData();
+    } catch (err) {
+      alert("Failed to save enquiry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVisitorSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+      await frontOfficeApi.recordVisitor(data);
+      setIsVisitorModalOpen(false);
+      fetchData();
+    } catch (err) {
+      alert("Failed to record visitor");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const metrics = [
-    { label: 'Today\'s Enquiries', value: '12', icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Visitors Checked-In', value: '4', icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Pending Follow-ups', value: '28', icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Calls Today', value: '45', icon: PhoneCall, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Today\'s Enquiries', value: enquiries.filter(e => new Date(e.createdAt).toDateString() === new Date().toDateString()).length.toString(), icon: MessageSquare, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Visitors Checked-In', value: visitors.filter(v => !v.checkOutTime).length.toString(), icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Pending Follow-ups', value: enquiries.filter(e => e.status === 'Follow-up').length.toString(), icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Enquiries Total', value: enquiries.length.toString(), icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
 
   return (
@@ -52,10 +118,10 @@ export default function FrontOffice() {
           </div>
           
           <div className="flex gap-2">
-             <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-black text-slate-600 hover:border-indigo-400 hover:shadow-lg transition-all">
-                <BarChart3 className="h-4 w-4" /> CRM Analytics
+             <button onClick={fetchData} className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-black text-slate-600 hover:border-indigo-400 hover:shadow-lg transition-all">
+                <BarChart3 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
              </button>
-             <button className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all">
+             <button onClick={() => setIsVisitorModalOpen(true)} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all">
                 <Plus className="h-4 w-4" /> Register Guest
              </button>
           </div>
@@ -116,29 +182,34 @@ export default function FrontOffice() {
                       <div className="overflow-x-auto h-full">
                          <table className="w-full text-left">
                             <tbody className="divide-y divide-slate-50">
-                               {visitors.filter(v => v.out === null).map((v, i) => (
+                               {visitors.filter(v => v.checkOutTime === null).map((v, i) => (
                                   <tr key={v.id} className="group hover:bg-slate-50/50 transition-colors">
                                      <td className="px-6 py-5">
-                                        <p className="text-sm font-black text-slate-800 tracking-tight">{v.name}</p>
+                                        <p className="text-sm font-black text-slate-800 tracking-tight">{v.visitorName}</p>
                                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{v.phone}</p>
                                      </td>
                                      <td className="px-6 py-5">
                                         <p className="text-xs text-slate-500 font-bold">{v.purpose}</p>
-                                        <p className="text-[10px] text-indigo-400 font-bold italic mt-0.5">Meeting: {v.whom}</p>
+                                        <p className="text-[10px] text-indigo-400 font-bold italic mt-0.5">Meeting: {v.whomToMeet}</p>
                                      </td>
                                      <td className="px-6 py-5">
                                         <div className="flex items-center gap-1.5 text-emerald-600 font-black text-sm italic">
-                                           <CheckCircle2 className="h-3.5 w-3.5" /> {v.in}
+                                           <CheckCircle2 className="h-3.5 w-3.5" /> {new Date(v.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                      </td>
                                      <td className="px-6 py-5 text-right">
-                                        <button className="px-5 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white shadow-sm transition-all shadow-emerald-100">Checkout</button>
+                                        <button 
+                                         onClick={() => handleCheckout(v.id)}
+                                         className="px-5 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white shadow-sm transition-all shadow-emerald-100"
+                                        >
+                                         Checkout
+                                        </button>
                                      </td>
                                   </tr>
                                ))}
                             </tbody>
                          </table>
-                         {visitors.filter(v => v.out === null).length === 0 && (
+                         {visitors.filter(v => v.checkOutTime === null).length === 0 && (
                             <div className="py-20 text-center text-slate-300">
                                <UserMinus className="h-12 w-12 mx-auto opacity-10 mb-2" />
                                <p className="text-xs font-black uppercase tracking-widest italic">No Guest Checked-in Currently</p>
@@ -152,6 +223,8 @@ export default function FrontOffice() {
                       <div className="relative group">
                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
                          <input 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-100 transition-all placeholder:italic placeholder:font-bold"
                             placeholder="Find caller records, visitor history or complaints..."
                          />
@@ -168,24 +241,26 @@ export default function FrontOffice() {
                             <h4 className="text-[11px] font-black tracking-[0.2em] uppercase opacity-70 italic">Pending Alerts</h4>
                             <p className="text-3xl font-black italic tracking-tighter">Follow-ups</p>
                          </div>
-                         <div className="h-12 w-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black">28</div>
+                         <div className="h-12 w-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black">
+                            {enquiries.filter(e => e.status === 'Follow-up').length}
+                         </div>
                       </div>
                       <div className="space-y-4">
-                         {enquiries.filter(e => e.next).slice(0, 3).map(e => (
+                         {enquiries.filter(e => e.nextFollowUpDate).slice(0, 3).map(e => (
                             <div key={e.id} className="p-4 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl hover:bg-white/20 transition-all cursor-pointer group/item">
                                <div className="flex justify-between items-start">
-                                  <p className="text-xs font-black tracking-tight">{e.student}</p>
+                                  <p className="text-xs font-black tracking-tight">{e.studentName}</p>
                                   <ArrowUpRight className="h-3 w-3 opacity-0 group-hover/item:opacity-100 transition-opacity" />
                                </div>
-                               <p className="text-[10px] font-bold opacity-60 mt-1 italic tracking-widest">{e.class} • Parent: {e.parent}</p>
+                               <p className="text-[10px] font-bold opacity-60 mt-1 italic tracking-widest">{e.className} • Parent: {e.parentName}</p>
                                <div className="mt-3 flex items-center justify-between">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Date: {e.next}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-200">Date: {new Date(e.nextFollowUpDate!).toLocaleDateString()}</span>
                                   <div className="h-6 w-6 rounded-lg bg-emerald-400 text-slate-800 flex items-center justify-center"><PhoneCall className="h-3 w-3" /></div>
                                </div>
                             </div>
                          ))}
                       </div>
-                      <button className="w-full mt-6 py-4 bg-white/20 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/30 transition-all shadow-xl shadow-indigo-900/40">View Enrollment Matrix</button>
+                      <button onClick={() => setActiveTab('enquiries')} className="w-full mt-6 py-4 bg-white/20 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/30 transition-all shadow-xl shadow-indigo-900/40">View Enrollment Matrix</button>
                    </div>
 
                    <div className="glass-card p-8 border-dashed border-2 border-slate-200 flex flex-col items-center justify-center space-y-3 group hover:border-indigo-300 transition-all cursor-pointer py-10">
@@ -205,11 +280,16 @@ export default function FrontOffice() {
              <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/20 italic-normal font-normal">
                 <div className="relative flex-1 group">
                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
-                   <input className="w-full pl-10 pr-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold shadow-inner placeholder:text-slate-200" placeholder="Search by Student Name, Parent Name or Registration ID..." />
+                   <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold shadow-inner placeholder:text-slate-200" 
+                      placeholder="Search by Student Name, Parent Name or Registration ID..." 
+                    />
                 </div>
                 <div className="flex gap-2">
-                   <button className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 shadow-sm"><Filter className="h-4 w-4" /></button>
-                   <button className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black shadow-xl shadow-indigo-100"><Plus className="h-4 w-4" /> New Enquiry</button>
+                   <button onClick={fetchData} className="p-3 bg-white border border-slate-200 rounded-xl text-slate-400 shadow-sm"><Filter className="h-4 w-4" /></button>
+                   <button onClick={() => { setEditingEnquiry(null); setIsEnquiryModalOpen(true); }} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-black shadow-xl shadow-indigo-100"><Plus className="h-4 w-4" /> New Enquiry</button>
                 </div>
              </div>
              
@@ -224,23 +304,23 @@ export default function FrontOffice() {
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                      {enquiries.map((enq, idx) => (
-                         <tr key={idx} className="hover:bg-slate-50/30 transition-colors group cursor-default">
+                      {enquiries.filter(e => e.studentName.toLowerCase().includes(searchTerm.toLowerCase()) || e.parentName.toLowerCase().includes(searchTerm.toLowerCase())).map((enq, idx) => (
+                         <tr key={enq.id} className="hover:bg-slate-50/30 transition-colors group cursor-default">
                             <td className="px-6 py-5">
                                <div className="flex items-center gap-4">
-                                  <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center font-black text-indigo-400 text-xs shadow-inner">
-                                     {enq.student.split(' ').map((n: string) => n[0]).join('')}
+                                  <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center font-black text-indigo-400 text-xs shadow-inner uppercase">
+                                     {enq.studentName.substring(0, 2)}
                                   </div>
                                   <div>
-                                     <p className="text-sm font-black text-slate-800 tracking-tight">{enq.student}</p>
-                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Application for: {enq.class}</p>
+                                     <p className="text-sm font-black text-slate-800 tracking-tight">{enq.studentName}</p>
+                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Application for: {enq.className}</p>
                                   </div>
                                </div>
                             </td>
                             <td className="px-6 py-5">
-                               <p className="text-sm font-bold text-slate-600 tracking-tight italic">{enq.parent}</p>
+                               <p className="text-sm font-bold text-slate-600 tracking-tight italic">{enq.parentName}</p>
                                <p className="text-[10px] text-indigo-500 font-black flex items-center gap-1.5 mt-1 tracking-tight">
-                                  <PhoneCall className="h-3 w-3" /> {enq.phone}
+                                  <PhoneCall className="h-3 w-3" /> {enq.mobile}
                                </p>
                             </td>
                             <td className="px-6 py-5">
@@ -248,39 +328,161 @@ export default function FrontOffice() {
                                   <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-sm ${
                                      enq.status === 'Converted' ? 'bg-emerald-100 text-emerald-700' :
                                      enq.status === 'Follow-up' ? 'bg-amber-100 text-amber-700' :
+                                     enq.status === 'Lost' ? 'bg-red-100 text-red-700' :
                                      'bg-indigo-100 text-indigo-700'
                                   }`}>
                                      {enq.status}
                                   </span>
-                                  {enq.next && (
-                                     <p className="text-[9px] text-slate-400 font-black mt-2 uppercase tracking-tight">Next Call: <span className="text-slate-800">{enq.next}</span></p>
+                                  {enq.nextFollowUpDate && (
+                                     <p className="text-[9px] text-slate-400 font-black mt-2 uppercase tracking-tight">Next Call: <span className="text-slate-800">{new Date(enq.nextFollowUpDate).toLocaleDateString()}</span></p>
                                   )}
                                </div>
                             </td>
                             <td className="px-6 py-5 text-right">
                                <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
-                                  <button className="p-2.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all hover:scale-110 shadow-sm"><Edit3 className="h-4 w-4" /></button>
-                                  <button className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all hover:scale-110 shadow-sm"><Trash2 className="h-4 w-4" /></button>
+                                  <button 
+                                     onClick={() => { setEditingEnquiry(enq); setIsEnquiryModalOpen(true); }}
+                                     className="p-2.5 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all hover:scale-110 shadow-sm"
+                                   >
+                                     <Edit3 className="h-4 w-4" />
+                                  </button>
+                                  <button 
+                                     onClick={async () => {
+                                       if (window.confirm("Delete enquiry?")) {
+                                         await frontOfficeApi.deleteEnquiry(enq.id);
+                                         fetchData();
+                                       }
+                                     }}
+                                     className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all hover:scale-110 shadow-sm"
+                                  >
+                                     <Trash2 className="h-4 w-4" />
+                                  </button>
                                </div>
                             </td>
                          </tr>
                       ))}
+                      {enquiries.length === 0 && (
+                         <tr>
+                           <td colSpan={4} className="py-20 text-center text-slate-300">
+                              <MessageSquare className="h-12 w-12 mx-auto opacity-10 mb-2" />
+                              <p className="text-xs font-black uppercase tracking-widest italic">No Enquiries Found</p>
+                           </td>
+                         </tr>
+                      )}
                    </tbody>
                 </table>
              </div>
           </div>
        )}
 
-       {/* Placeholders for Visitor, Communications, Resolution Tabs */}
-       {['visitors', 'calls', 'complaints'].includes(activeTab) && (
+       {/* Placeholders for Communications, Resolution Tabs */}
+       {['calls', 'complaints'].includes(activeTab) && (
           <div className="glass-card p-32 text-center border-none ring-1 ring-slate-100/40">
              <div className="h-24 w-24 bg-slate-50 text-slate-200 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
                 <LifeBuoy className="h-12 w-12 opacity-5 animate-pulse" />
              </div>
-             <h3 className="text-2xl font-black text-slate-800 tracking-tighter italic uppercase">Synchronizing Reception Master</h3>
-             <p className="text-xs text-slate-400 font-black mt-3 tracking-[0.3em] uppercase">Connecting to Real-time Occupancy Matrix...</p>
+             <h3 className="text-2xl font-black text-slate-800 tracking-tighter italic uppercase">Synchronizing Master</h3>
+             <p className="text-xs text-slate-400 font-black mt-3 tracking-[0.3em] uppercase">Connecting to Real-time Logs...</p>
           </div>
        )}
+
+       {/* Modals */}
+       <GenericModal 
+         isOpen={isEnquiryModalOpen} 
+         onClose={() => { setIsEnquiryModalOpen(false); setEditingEnquiry(null); }}
+         title={editingEnquiry ? "Update Enquiry" : "New Admission Enquiry"}
+         icon={MessageSquare}
+       >
+         <form onSubmit={handleEnquirySubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Student Name</label>
+                  <input required name="studentName" defaultValue={editingEnquiry?.studentName} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Parent Name</label>
+                  <input required name="parentName" defaultValue={editingEnquiry?.parentName} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+               </div>
+            </div>
+            <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Mobile Number</label>
+                  <input required name="mobile" defaultValue={editingEnquiry?.mobile} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Target Class</label>
+                  <select required name="classId" defaultValue={editingEnquiry?.classId} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white appearance-none">
+                     <option value="">Select Class</option>
+                     {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Source</label>
+                  <select name="source" defaultValue={editingEnquiry?.source || 'Website'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white appearance-none">
+                     <option>Website</option>
+                     <option>Social Media</option>
+                     <option>Referral</option>
+                     <option>Newspaper</option>
+                  </select>
+               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Status</label>
+                  <select name="status" defaultValue={editingEnquiry?.status || 'New'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white appearance-none">
+                     <option>New</option>
+                     <option>Follow-up</option>
+                     <option>Converted</option>
+                     <option>Lost</option>
+                  </select>
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400">Follow-up Date</label>
+                  <input type="date" name="nextFollowUpDate" defaultValue={editingEnquiry?.nextFollowUpDate?.substring(0, 10)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+               </div>
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">Notes/Remarks</label>
+               <textarea name="notes" defaultValue={editingEnquiry?.notes} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white h-24" />
+            </div>
+            <button disabled={submitting} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center justify-center gap-2">
+               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : editingEnquiry ? "Update Enquiry Record" : "Save Admission Enquiry"}
+            </button>
+         </form>
+       </GenericModal>
+
+       <GenericModal 
+         isOpen={isVisitorModalOpen} 
+         onClose={() => setIsVisitorModalOpen(false)}
+         title="Register New Guest"
+         icon={UserCheck}
+       >
+         <form onSubmit={handleVisitorSubmit} className="space-y-4">
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">Visitor Full Name</label>
+               <input required name="visitorName" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">Contact Number</label>
+               <input required name="phone" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">Purpose of Visit</label>
+               <input required name="purpose" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">Whom to Meet</label>
+               <input required name="whomToMeet" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" placeholder="Staff Name or Dept..." />
+            </div>
+            <div className="space-y-1">
+               <label className="text-[10px] font-black uppercase text-slate-400">ID Proof / Card No</label>
+               <input name="idProof" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold focus:bg-white" />
+            </div>
+            <button disabled={submitting} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 flex items-center justify-center gap-2">
+               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify & Check-In Guest"}
+            </button>
+         </form>
+       </GenericModal>
 
     </div>
   );
