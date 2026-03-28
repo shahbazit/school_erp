@@ -22,4 +22,12 @@ public interface ITransportService
     Task<IEnumerable<TransportAssignmentDto>> GetAllAssignmentsAsync();
     Task<TransportAssignmentDto> AssignTransportAsync(CreateTransportAssignmentDto dto);
     Task<bool> RemoveAssignmentAsync(Guid id);
+
+    // Stoppages
+    Task<IEnumerable<TransportStoppageDto>> GetAllStoppagesAsync();
+    Task<TransportStoppageDto> GetStoppageByIdAsync(Guid id);
+    Task<TransportStoppageDto> CreateStoppageAsync(CreateTransportStoppageDto dto);
+    Task<TransportStoppageDto> UpdateStoppageAsync(Guid id, CreateTransportStoppageDto dto);
+    Task<bool> DeleteStoppageAsync(Guid id);
 }
+

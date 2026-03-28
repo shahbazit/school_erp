@@ -38,8 +38,16 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
-
-
+        
+        // If domain is provided, prioritize it for organization resolution
+        if (!string.IsNullOrEmpty(request.SchoolDomain))
+        {
+            var orgByDomain = await _authService.GetOrganizationByDomainAsync(request.SchoolDomain);
+            if (orgByDomain != null)
+            {
+                orgId = orgByDomain.Id;
+            }
+        }
 
         var result = await _authService.LoginAsync(request.Email, request.Password, orgId != Guid.Empty ? orgId : null);
 

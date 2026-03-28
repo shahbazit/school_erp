@@ -10,6 +10,7 @@ interface AuthProps {
 
 export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps) {
   const [isLogin, setIsLogin] = useState(initialIsLogin);
+  const [loginRole] = useState<'institution'>('institution');
   const [step, setStep] = useState(1);
   const [registrationUid, setRegistrationUid] = useState<string | null>(null);
   const [verifySuccess, setVerifySuccess] = useState(false);
@@ -39,7 +40,10 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
     e.preventDefault();
 
     if (isLogin) {
-      const success = await login({ email: formData.email, password: formData.password });
+      const success = await login({ 
+        email: formData.email, 
+        password: formData.password
+      });
       if (success) {
         onAuthSuccess();
       }
@@ -117,6 +121,15 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
                   </li>
               </ul>
             )}
+
+            {isLogin && (
+              <div className="mt-12 space-y-4 max-w-[280px] mx-auto">
+                <div className="p-5 rounded-2xl border bg-white border-primary-200 shadow-xl shadow-primary-500/5 transform scale-105">
+                  <p className="text-[10px] font-bold text-primary-600 uppercase mb-2 tracking-widest">Workspace Access</p>
+                  <p className="text-xs text-slate-600 leading-relaxed font-medium">Official administrative portal for School Leaders, Teachers, and Operations staff.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -140,12 +153,13 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
 
           <div className="mb-6 text-center lg:text-left">
             <h5 className="font-bold text-slate-900 text-xl mb-1">
-              {isLogin ? 'Sign In' : (step === 1 ? 'Create Account' : 'School Details')}
+              {isLogin ? 'Institution Login' : (step === 1 ? 'Create Account' : 'School Details')}
             </h5>
             <p className="text-slate-500 text-xs m-0">
-              {isLogin ? 'Enter your credentials to continue.' : `Step ${step} of 2: ${step === 1 ? 'Personal Details' : 'Institute Information'}`}
+              {isLogin ? 'Official workspace access for school faculty.' : `Step ${step} of 2: ${step === 1 ? 'Personal Details' : 'Institute Information'}`}
             </p>
           </div>
+
 
           {error && !verifySuccess && (
             <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-xs border border-red-100 shadow-sm mb-6 font-medium">
@@ -166,7 +180,9 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
               {isLogin ? (
                 <>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Email address</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                      Institutional Email / Employee Code
+                    </label>
                     <input name="email" type="email" required value={formData.email} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
                   </div>
                   <div>
@@ -240,18 +256,18 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
               )}
 
               <div className="text-center pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="bg-primary-600 text-white px-8 py-2.5 rounded-lg font-bold text-xs shadow-sm shadow-primary-500/30 hover:bg-primary-700 focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all w-full disabled:opacity-70 flex justify-center items-center"
-                >
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-primary-600 shadow-primary-500/30 hover:bg-primary-700 focus:ring-primary-500 text-white px-8 py-2.5 rounded-lg font-bold text-xs shadow-sm transition-all w-full disabled:opacity-70 flex justify-center items-center"
+                  >
                   {loading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
                       Processing...
                     </>
                   ) : (
-                    isLogin ? 'Sign In' : (step === 1 ? 'Next: School Details' : 'Finalize Registration')
+                    isLogin ? 'Sign In to Workspace' : (step === 1 ? 'Next: School Details' : 'Finalize Registration')
                   )}
                 </button>
                 

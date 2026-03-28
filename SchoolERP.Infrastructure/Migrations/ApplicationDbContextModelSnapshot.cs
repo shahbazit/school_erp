@@ -1246,6 +1246,9 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("FinancialAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1275,11 +1278,60 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.HasIndex("AcademicYearId");
 
+                    b.HasIndex("FinancialAccountId");
+
                     b.HasIndex("OrganizationId");
 
                     b.HasIndex("StudentId");
 
                     b.ToTable("FeeTransactions", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.FinancialAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("OwnerEmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("OwnerEmployeeId");
+
+                    b.ToTable("FinancialAccounts", "dbo");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Homework", b =>
@@ -1937,6 +1989,163 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.ToTable("LeaveTypes", "dbo");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryBook", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Author")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AvailableCopies")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Edition")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ISBN")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Publisher")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TotalCopies")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("LibraryBooks", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryBookIssue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BookId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("FineAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReturnDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("StudentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("LibraryBookIssues", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("LibraryCategories", "dbo");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.Lookup", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2102,6 +2311,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("FinancialAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("LinkedEmployeeId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2125,6 +2337,8 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FinancialAccountId");
 
                     b.HasIndex("OrganizationId");
 
@@ -2260,6 +2474,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("FinancialAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
@@ -2276,6 +2493,8 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FinancialAccountId");
 
                     b.HasIndex("OrganizationId");
 
@@ -2662,10 +2881,37 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("AdmissionScheme")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AdmissionType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("AnnualIncome")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ApaarId")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("BloodGroup")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Bus")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("BusFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Caste")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Category")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("City")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ColorVision")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("ConsentAccepted")
@@ -2692,6 +2938,15 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("EmergencyContactRelation")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("EnrollmentSchoolName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FamilyId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FatherAadharNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("FatherEmail")
                         .HasColumnType("nvarchar(max)");
 
@@ -2702,6 +2957,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FatherOccupation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FatherQualification")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FirstName")
@@ -2724,7 +2982,16 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("GuardianRelation")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("HeightInCM")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("HouseName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCaptain")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsEmailVerified")
@@ -2733,12 +3000,24 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<bool>("IsMobileVerified")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsMonitor")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LedgerNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Medium")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("MobileNumber")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MotherAadharNo")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("MotherEmail")
@@ -2753,19 +3032,97 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("MotherOccupation")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("MotherQualification")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("OpeningBalance")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ParentAccountNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentBankIFSCCODE")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentBankName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentMobileNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentOccupation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ParentQualification")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PermanentAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PermanentEducationNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Pincode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PlaceOfBirth")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PreviousClass")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PreviousSchool")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("RegistrationNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Religion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RouteName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("SMSFacility")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SMSMobileNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SRNNumber")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("State")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("StoppageName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StudentAadharNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StudentBankAccountNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StudentBankName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StudentIFSCCODE")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("StudentPhoto")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("TCDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TCNo")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -2773,6 +3130,9 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("WeightInKG")
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
@@ -3542,6 +3902,44 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.ToTable("TransportRoutes", "dbo");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.TransportStoppage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Cost")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("TransportStoppages", "dbo");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.TransportVehicle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3941,6 +4339,10 @@ namespace SchoolERP.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SchoolERP.Domain.Entities.FinancialAccount", "FinancialAccount")
+                        .WithMany()
+                        .HasForeignKey("FinancialAccountId");
+
                     b.HasOne("SchoolERP.Domain.Entities.Student", "Student")
                         .WithMany()
                         .HasForeignKey("StudentId")
@@ -3949,7 +4351,18 @@ namespace SchoolERP.Infrastructure.Migrations
 
                     b.Navigation("AcademicYear");
 
+                    b.Navigation("FinancialAccount");
+
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.FinancialAccount", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.Employee", "OwnerEmployee")
+                        .WithMany()
+                        .HasForeignKey("OwnerEmployeeId");
+
+                    b.Navigation("OwnerEmployee");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.Homework", b =>
@@ -4098,6 +4511,60 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasForeignKey("LeavePlanId");
 
                     b.Navigation("LeavePlan");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryBook", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.LibraryCategory", "Category")
+                        .WithMany("Books")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryBookIssue", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.LibraryBook", "Book")
+                        .WithMany("Issues")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SchoolERP.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SchoolERP.Domain.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Book");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.OfficeExpense", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.FinancialAccount", "FinancialAccount")
+                        .WithMany()
+                        .HasForeignKey("FinancialAccountId");
+
+                    b.Navigation("FinancialAccount");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.OtherIncome", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.FinancialAccount", "FinancialAccount")
+                        .WithMany()
+                        .HasForeignKey("FinancialAccountId");
+
+                    b.Navigation("FinancialAccount");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollDetail", b =>
@@ -4472,6 +4939,16 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("LeaveTypes");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryBook", b =>
+                {
+                    b.Navigation("Issues");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.LibraryCategory", b =>
+                {
+                    b.Navigation("Books");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.PayrollRun", b =>

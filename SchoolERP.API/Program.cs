@@ -62,6 +62,8 @@ builder.Services.AddScoped<ICalendarService, CalendarService>();
 builder.Services.AddScoped<ITransportService, TransportService>();
 builder.Services.AddScoped<IHostelService, HostelService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<ILibraryService, LibraryService>();
+builder.Services.AddScoped<IFinanceReportService, FinanceReportService>();
 
 var jwtSettings = new JwtSettings();
 builder.Configuration.Bind(nameof(jwtSettings), jwtSettings);
@@ -142,7 +144,8 @@ using (var scope = app.Services.CreateScope())
                     new MenuMaster { Key = "examination", Label = "Examination", Icon = "FileText", SortOrder = 7 },
                     new MenuMaster { Key = "transport", Label = "Transport", Icon = "Bus", SortOrder = 8 },
                     new MenuMaster { Key = "hostel", Label = "Hostel", Icon = "Bed", SortOrder = 9 },
-                    new MenuMaster { Key = "settings", Label = "Settings", Icon = "Settings", SortOrder = 10 }
+                    new MenuMaster { Key = "library", Label = "Library", Icon = "Library", SortOrder = 10 },
+                    new MenuMaster { Key = "settings", Label = "Settings", Icon = "Settings", SortOrder = 11 }
                 };
                 context.MenuMasters.AddRange(menus);
                 context.SaveChanges();
@@ -214,6 +217,21 @@ using (var scope = app.Services.CreateScope())
             context.SaveChanges();
 
             Log.Information("Initial admin, employee roles, and full permissions seeded successfully.");
+        }
+
+        // Always seed some financial accounts if none exist for the first org
+        if (!context.FinancialAccounts.Any())
+        {
+            var org = context.Organizations.FirstOrDefault();
+            if (org != null)
+            {
+                context.FinancialAccounts.AddRange(new[] {
+                    new FinancialAccount { Name = "Cash Counter 1", AccountType = "Cash", Description = "Main Admission Counter", IsActive = true, OrganizationId = org.Id },
+                    new FinancialAccount { Name = "Cash Counter 2", AccountType = "Cash", Description = "General Fees Counter", IsActive = true, OrganizationId = org.Id },
+                    new FinancialAccount { Name = "Main Bank A/C", AccountType = "Bank", Description = "Central School Fund Account", IsActive = true, OrganizationId = org.Id }
+                });
+                context.SaveChanges();
+            }
         }
         // Ensure Admin user always has access and is not locked out
         var adminEmail = "shahbazit007@gmail.com";

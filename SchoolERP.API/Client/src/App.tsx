@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
   GraduationCap, Settings, LogOut, Bell, Menu, ChevronDown, 
-  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search
+  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search, BookOpen
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -17,9 +17,11 @@ import StudentAttendance from './pages/StudentAttendance';
 import StudentPromotion from './pages/StudentPromotion';
  import CertificateGenerator from './pages/CertificateGenerator';
 import StudentImport from './pages/StudentImport';
-import TransportHostel from './pages/TransportHostel';
+import TransportManagement from './pages/TransportManagement';
+import HostelManagement from './pages/HostelManagement';
 import InventoryStore from './pages/InventoryStore';
 import FrontOffice from './pages/FrontOffice';
+import LibraryManagement from './pages/LibraryManagement';
 import CommunicationHub from './pages/CommunicationHub';
 import Financials from './pages/Financials';
 import Examinations from './pages/Examinations';
@@ -38,6 +40,8 @@ import UserManagement from './pages/UserManagement';
 import SystemSetup from './pages/SystemSetup';
 import AcademicCalendar from './pages/AcademicCalendar';
 import OrganizationSettings from './pages/OrganizationSettings';
+import FinanceDashboard from './pages/FinanceDashboard';
+import PortalLogin from './pages/PortalLogin';
 import { usePermissions } from './hooks/usePermissions';
 import { useEffect as useAppEffect, useMemo } from 'react';
 import { studentApi } from './api/studentApi';
@@ -118,43 +122,60 @@ function App() {
   const organizationName = decodedToken?.OrganizationName || 'School';
 
   const menuItems = [
-    { label: 'Dashboard', path: '/', permission: true },
-    { label: 'Student Directory', path: '/students', permission: hasPermission('students') },
-    { label: 'Daily Attendance', path: '/student-attendance', permission: hasPermission('students') },
-    { label: 'Exams & Result', path: '/examinations', permission: hasPermission('students') },
-    { label: 'Promotion & Transfer', path: '/student-promotion', permission: hasPermission('students') },
-    { label: 'Certificate & ID', path: '/certificates', permission: hasPermission('students') },
-    { label: 'Class Timetables', path: '/timetable', permission: hasPermission('students') },
-    { label: 'Academic Calendar', path: '/academic-calendar', permission: hasPermission('students') },
-    { label: 'Bulk Import', path: '/student-import', permission: hasPermission('students') },
-    { label: 'Admission Enquiry', path: '/front-office', permission: hasPermission('front_office') || hasPermission('communication') },
-    { label: 'Communication Hub', path: '/communication', permission: hasPermission('front_office') || hasPermission('communication') },
-    { label: 'General Ledger', path: '/financials', permission: hasPermission('finance') },
-    { label: 'Fee Heads', path: '/fees/heads', permission: hasPermission('finance') },
-    { label: 'Fee Structure', path: '/fees/structures', permission: hasPermission('finance') },
-    { label: 'Fee Allocation', path: '/fees/generate', permission: hasPermission('finance') },
-    { label: 'Fee Policies & Discounts', path: '/fees/settings', permission: hasPermission('finance') },
-    { label: 'Employee List', path: '/employees', permission: hasPermission('hr') },
-    { label: 'Academic Staff', path: '/teachers', permission: hasPermission('hr') },
-    { label: 'Staff Attendance', path: '/attendance', permission: hasPermission('hr') },
-    { label: 'Leave Management', path: '/leaves', permission: hasPermission('hr') },
-    { label: 'Leave Policies', path: '/leave/settings', permission: hasPermission('hr') },
-    { label: 'Staff Payroll', path: '/payroll', permission: hasPermission('hr') },
-    { label: 'Inventory & Store', path: '/inventory', permission: hasPermission('inventory') || hasPermission('infrastructure') },
-    { label: 'Transport & Hostel', path: '/infrastructure', permission: hasPermission('inventory') || hasPermission('infrastructure') },
-    { label: 'Academic Sessions', path: '/masters/academic-years', permission: hasPermission('settings') },
-    { label: 'Class Master', path: '/masters/classes', permission: hasPermission('settings') },
-    { label: 'Section Master', path: '/masters/sections', permission: hasPermission('settings') },
-    { label: 'Subject Master', path: '/masters/subjects', permission: hasPermission('settings') },
-    { label: 'Departments', path: '/masters/departments', permission: hasPermission('settings') },
-    { label: 'Designations', path: '/masters/designations', permission: hasPermission('settings') },
-    { label: 'Infrastructure Rooms', path: '/masters/rooms', permission: hasPermission('settings') },
-    { label: 'Lab Master', path: '/masters/labs', permission: hasPermission('settings') },
-    { label: 'General Lookups', path: '/lookups', permission: hasPermission('settings') },
-    { label: 'Menu Controls', path: '/settings/permissions', permission: hasPermission('settings') },
-    { label: 'User Management', path: '/settings/users', permission: hasPermission('settings') },
-    { label: 'System Quick Setup', path: '/settings/setup', permission: hasPermission('settings') },
-    { label: 'Organization Settings', path: '/settings/organization', permission: hasPermission('settings') },
+    { label: 'Dashboard', path: '/', permission: true, group: 'dashboard' },
+    
+    // Students
+    { label: 'Student Directory', path: '/students', permission: hasPermission('students'), group: 'students' },
+    { label: 'Daily Attendance', path: '/student-attendance', permission: hasPermission('students'), group: 'students' },
+    { label: 'Promotion & Transfer', path: '/student-promotion', permission: hasPermission('students'), group: 'students' },
+    { label: 'Certificate & ID', path: '/certificates', permission: hasPermission('students'), group: 'students' },
+    { label: 'Bulk Import', path: '/student-import', permission: hasPermission('students'), group: 'students' },
+    
+    // Academic
+    { label: 'Exams & Result', path: '/examinations', permission: hasPermission('academic'), group: 'academic' },
+    { label: 'Class Timetables', path: '/timetable', permission: hasPermission('academic'), group: 'academic' },
+    { label: 'Academic Calendar', path: '/academic-calendar', permission: hasPermission('academic'), group: 'academic' },
+    
+    // Finance
+    { label: 'Finance Dashboard', path: '/finance-dashboard', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'General Ledger', path: '/financials', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'Fee Collection', path: '/fees/generate', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'Fee Structures', path: '/fees/structures', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'Fee Heads', path: '/fees/heads', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'Fee Policies', path: '/fees/settings', permission: hasPermission('finance'), group: 'finance' },
+    
+    // HR & Payroll
+    { label: 'Employee List', path: '/employees', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Academic Staff', path: '/teachers', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Staff Attendance', path: '/attendance', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Leave Management', path: '/leaves', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Leave Policies', path: '/leave/settings', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Staff Payroll', path: '/payroll', permission: hasPermission('hr'), group: 'hr' },
+    
+    // Logistics
+    { label: 'Front Office', path: '/front-office', permission: hasPermission('front_office'), group: 'logistics' },
+    { label: 'Communication', path: '/communication', permission: hasPermission('communication'), group: 'logistics' },
+    { label: 'Inventory & Store', path: '/inventory', permission: hasPermission('inventory'), group: 'logistics' },
+    { label: 'Transport Management', path: '/transport', permission: hasPermission('infrastructure'), group: 'logistics' },
+    { label: 'Hostel Management', path: '/hostel', permission: hasPermission('infrastructure'), group: 'logistics' },
+    { label: 'Library Management', path: '/library', permission: hasPermission('infrastructure'), group: 'logistics' },
+    
+    // Masters
+    { label: 'Academic Sessions', path: '/masters/academic-years', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Class Master', path: '/masters/classes', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Section Master', path: '/masters/sections', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Subject Master', path: '/masters/subjects', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Departments', path: '/masters/departments', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Designations', path: '/masters/designations', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Infrastructure Rooms', path: '/masters/rooms', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Lab Master', path: '/masters/labs', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'General Lookups', path: '/lookups', permission: hasPermission('settings'), group: 'masters' },
+    
+    // Administration
+    { label: 'Organization Settings', path: '/settings/organization', permission: hasPermission('settings'), group: 'admin' },
+    { label: 'Menu Controls', path: '/settings/permissions', permission: hasPermission('settings'), group: 'admin' },
+    { label: 'User Management', path: '/settings/users', permission: hasPermission('settings'), group: 'admin' },
+    { label: 'System Quick Setup', path: '/settings/setup', permission: hasPermission('settings'), group: 'admin' },
   ].filter(item => item.permission === true || item.permission);
 
   const filteredResults = searchQuery.trim() === '' 
@@ -180,10 +201,11 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Auth initialIsLogin={true} onAuthSuccess={() => setIsAuthenticated(true)} />} />
+        <Route path="/portal" element={<PortalLogin onAuthSuccess={() => setIsAuthenticated(true)} />} />
         <Route path="/register" element={<Auth initialIsLogin={false} onAuthSuccess={() => setIsAuthenticated(true)} />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to="/portal" />} />
       </Routes>
     );
   }
@@ -216,21 +238,21 @@ function App() {
               {sidebarOpen && <span className="ml-3 font-semibold text-sm truncate animate-in fade-in">Dashboard</span>}
             </Link>
 
-            {/* 2. Academic & Students */}
+            {/* 2. Students */}
             {hasPermission('students') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('students')} 
                   className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
-                    ['/students', '/student-attendance', '/examinations', '/student-promotion', '/certificates', '/timetable', '/academic-calendar', '/student-import'].includes(location.pathname)
+                    ['/students', '/student-attendance', '/student-promotion', '/certificates', '/student-import'].includes(location.pathname)
                       ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
                       : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
                   }`}
                 >
-                  <Backpack className={`h-5 w-5 shrink-0 transition-transform ${['/students', '/student-attendance', '/examinations', '/student-promotion', '/certificates', '/timetable', '/academic-calendar', '/student-import'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <Backpack className={`h-5 w-5 shrink-0 transition-transform ${['/students', '/student-attendance', '/student-promotion', '/certificates', '/student-import'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Academic Hub</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Students</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['students'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
@@ -240,11 +262,8 @@ function App() {
                     {[
                       { to: '/students', label: 'Student Directory' },
                       { to: '/student-attendance', label: 'Daily Attendance' },
-                      { to: '/examinations', label: 'Exams & Result' },
                       { to: '/student-promotion', label: 'Promotion & Transfer' },
                       { to: '/certificates', label: 'Certificate & ID' },
-                      { to: '/timetable', label: 'Class Timetables' },
-                      { to: '/academic-calendar', label: 'Academic Calendar' },
                       { to: '/student-import', label: 'Bulk Import' }
                     ].map(link => (
                       <Link 
@@ -260,66 +279,78 @@ function App() {
               </div>
             )}
 
-            {/* 3. Reception & CRM */}
-            {(hasPermission('front_office') || hasPermission('communication')) && (
+            {/* 3. Academic */}
+            {(hasPermission('students') || hasPermission('academic')) && (
               <div className="space-y-1">
                 <button 
-                  onClick={() => sidebarOpen && toggleSubMenu('crm')} 
+                  onClick={() => sidebarOpen && toggleSubMenu('academic')} 
                   className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
-                    ['/front-office', '/communication'].includes(location.pathname)
+                    ['/examinations', '/timetable', '/academic-calendar'].includes(location.pathname)
                       ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
                       : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
                   }`}
                 >
-                  <Building2 className={`h-5 w-5 shrink-0 transition-transform ${['/front-office', '/communication'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <BookOpen className={`h-5 w-5 shrink-0 transition-transform ${['/examinations', '/timetable', '/academic-calendar'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Front Desk & CRM</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['crm'] ? 'rotate-180' : ''}`} />
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Academic</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['academic'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
                 </button>
-                {sidebarOpen && openMenus['crm'] && (
+                {sidebarOpen && openMenus['academic'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
-                    <Link to="/front-office" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/front-office' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Admission Enquiry</Link>
-                    <Link to="/communication" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/communication' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Communication Hub</Link>
+                    {[
+                      { to: '/examinations', label: 'Exams & Result' },
+                      { to: '/timetable', label: 'Class Timetables' },
+                      { to: '/academic-calendar', label: 'Academic Calendar' }
+                    ].map(link => (
+                      <Link 
+                        key={link.to} 
+                        to={link.to} 
+                        className={`block py-1.5 text-sm transition-colors ${location.pathname === link.to ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* 4. Accounts & Finance */}
+            {/* 4. Finance */}
             {hasPermission('finance') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('accounts')} 
                   className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
-                    ['/financials', '/fees/heads', '/fees/structures', '/fees/generate', '/fees/settings'].includes(location.pathname) || location.pathname.startsWith('/fees/student')
+                    ['/financials', '/finance-dashboard', '/fees/heads', '/fees/structures', '/fees/generate', '/fees/settings'].includes(location.pathname) || location.pathname.startsWith('/fees/student')
                       ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
                       : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
                   }`}
                 >
-                  <Wallet className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.includes('/fees') || location.pathname === '/financials' ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <Wallet className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.includes('/fees') || location.pathname === '/financials' || location.pathname === '/finance-dashboard' ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Accounts & Fees</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Finance</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['accounts'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
                 </button>
                 {sidebarOpen && openMenus['accounts'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/finance-dashboard" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/finance-dashboard' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Finance Dashboard</Link>
                     <Link to="/financials" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/financials' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>General Ledger</Link>
+                    <Link to="/fees/generate" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/generate' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Collection</Link>
+                    <Link to="/fees/structures" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/structures' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Structures</Link>
                     <Link to="/fees/heads" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/heads' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Heads</Link>
-                    <Link to="/fees/structures" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/structures' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Structure</Link>
-                    <Link to="/fees/generate" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/generate' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Allocation</Link>
-                    <Link to="/fees/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Policies & Discounts</Link>
+                    <Link to="/fees/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Policies</Link>
                   </div>
                 )}
               </div>
             )}
 
-            {/* 5. Human Resources */}
+            {/* 5. HR & Payroll */}
             {hasPermission('hr') && (
               <div className="space-y-1">
                 <button 
@@ -333,7 +364,7 @@ function App() {
                   <UserCog className={`h-5 w-5 shrink-0 transition-transform ${['/employees', '/teachers', '/attendance', '/leaves', '/leave/settings', '/payroll'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Human Resources</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">HR & Payroll</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['hr'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
@@ -351,35 +382,39 @@ function App() {
               </div>
             )}
 
-            {/* 6. Operations & Assets */}
-            {(hasPermission('inventory') || hasPermission('infrastructure')) && (
+            {/* 6. Logistics */}
+            {(hasPermission('inventory') || hasPermission('infrastructure') || hasPermission('front_office')) && (
               <div className="space-y-1">
                 <button 
-                  onClick={() => sidebarOpen && toggleSubMenu('ops')} 
+                  onClick={() => sidebarOpen && toggleSubMenu('logistics')} 
                   className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
-                    ['/inventory', '/infrastructure'].includes(location.pathname)
+                    ['/front-office', '/communication', '/inventory', '/transport', '/hostel', '/library'].includes(location.pathname)
                       ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
                       : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
                   }`}
                 >
-                  <Package className={`h-5 w-5 shrink-0 transition-transform ${['/inventory', '/infrastructure'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <Package className={`h-5 w-5 shrink-0 transition-transform ${['/front-office', '/communication', '/inventory', '/transport', '/hostel', '/library'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Ops & Assets</span>
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['ops'] ? 'rotate-180' : ''}`} />
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Logistics</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['logistics'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
                 </button>
-                {sidebarOpen && openMenus['ops'] && (
+                {sidebarOpen && openMenus['logistics'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/front-office" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/front-office' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Front Office</Link>
+                    <Link to="/communication" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/communication' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Communication</Link>
                     <Link to="/inventory" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/inventory' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Inventory & Store</Link>
-                    <Link to="/infrastructure" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/infrastructure' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Transport & Hostel</Link>
+                    <Link to="/transport" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/transport' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Transport</Link>
+                    <Link to="/hostel" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/hostel' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Hostel</Link>
+                    <Link to="/library" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/library' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Library</Link>
                   </div>
                 )}
               </div>
             )}
 
-            {/* 7. Masters Menu */}
+            {/* 7. Masters */}
             {hasPermission('settings') && (
               <div className="space-y-1">
                 <button 
@@ -393,7 +428,7 @@ function App() {
                   <Database className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.startsWith('/masters') || location.pathname === '/lookups' ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Masters Menu</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Masters</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['masters'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
@@ -424,7 +459,7 @@ function App() {
               </div>
             )}
 
-            {/* 8. Settings */}
+            {/* 8. Administration */}
             {hasPermission('settings') && (
               <div className="space-y-1">
                 <button 
@@ -438,7 +473,7 @@ function App() {
                   <Settings className={`h-5 w-5 shrink-0 transition-transform ${location.pathname.startsWith('/settings') ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Settings</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Administration</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['setup'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
@@ -446,9 +481,9 @@ function App() {
                 {sidebarOpen && openMenus['setup'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
                     <Link to="/settings/organization" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/organization' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Organization Settings</Link>
-                    <Link to="/settings/permissions" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/permissions' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Menu Controls</Link>
                     <Link to="/settings/users" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/users' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>User Management</Link>
-                    <Link to="/settings/setup" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/setup' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>System Quick Setup</Link>
+                    <Link to="/settings/permissions" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/permissions' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Role Permissions</Link>
+                    <Link to="/settings/setup" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/settings/setup' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>System Setup</Link>
                   </div>
                 )}
               </div>
@@ -640,11 +675,14 @@ function App() {
               <Route path="/student-promotion" element={<StudentPromotion />} />
               <Route path="/certificates" element={<CertificateGenerator />} />
               <Route path="/student-import" element={<StudentImport />} />
-              <Route path="/infrastructure" element={<TransportHostel />} />
+              <Route path="/transport" element={<TransportManagement />} />
+              <Route path="/hostel" element={<HostelManagement />} />
+              <Route path="/library" element={<LibraryManagement />} />
               <Route path="/communication" element={<CommunicationHub />} />
               <Route path="/inventory" element={<InventoryStore />} />
               <Route path="/front-office" element={<FrontOffice />} />
               <Route path="/financials" element={<Financials />} />
+              <Route path="/finance-dashboard" element={<FinanceDashboard />} />
               <Route path="/employees" element={<Employees />} />
               <Route path="/teachers" element={<Teachers />} />
               <Route path="/attendance" element={<Attendance />} />

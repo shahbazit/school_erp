@@ -100,6 +100,14 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
         scrubbedData[field.name] = field.defaultValue ?? (field.type === 'checkbox' ? false : '');
       }
     });
+    
+    // Check for exclusivity in Academic Years
+    if (endpoint.includes('academic-year') && scrubbedData.isCurrent) {
+      const otherCurrentYears = masters.filter(m => m.isCurrent && m.id !== editingMaster?.id);
+      for (const year of otherCurrentYears) {
+        await updateMaster(year.id, { ...year, isCurrent: false });
+      }
+    }
 
     let success = false;
     if (editingMaster) {

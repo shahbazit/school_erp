@@ -17,20 +17,21 @@ interface StudentDetailPanelProps {
   onEdit: (student: Student) => void;
   className?: string;
   sectionName?: string;
+  academicYearName?: string;
 }
 
-type TabType = 'PERSONAL' | 'ACADEMIC' | 'PARENT' | 'ADDRESS' | 'FINANCE' | 'DOCUMENTS';
+type TabType = 'BASIC' | 'ADMISSION' | 'DOCUMENT' | 'FAMILY' | 'ADDRESS' | 'FINANCE';
 
-export default function StudentDetailPanel({ student, onClose, onEdit, className, sectionName }: StudentDetailPanelProps) {
+export default function StudentDetailPanel({ student, onClose, onEdit, className, sectionName, academicYearName }: StudentDetailPanelProps) {
   const { formatCurrency, formatDate, settings } = useLocalization();
-  const [activeTab, setActiveTab] = useState<TabType>('PERSONAL');
+  const [activeTab, setActiveTab] = useState<TabType>('BASIC');
   const [documents, setDocuments] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [feeAccount, setFeeAccount] = useState<any>(null);
   const [loadingFee, setLoadingFee] = useState(false);
 
   useEffect(() => {
-    if (student?.id && activeTab === 'DOCUMENTS') {
+    if (student?.id && activeTab === 'DOCUMENT') {
        fetchDocuments();
     }
     if (student?.id && activeTab === 'FINANCE') {
@@ -65,19 +66,19 @@ export default function StudentDetailPanel({ student, onClose, onEdit, className
   if (!student) return null;
 
   const tabs: { id: TabType, label: string, icon: any }[] = [
-    { id: 'PERSONAL', label: 'Personal', icon: User },
-    { id: 'ACADEMIC', label: 'Academic', icon: BookOpen },
-    { id: 'PARENT', label: 'Parent/Guardian', icon: Users },
-    { id: 'FINANCE', label: 'Finance', icon: CreditCard },
-    { id: 'ADDRESS', label: 'Address', icon: MapPin },
-    { id: 'DOCUMENTS', label: 'Documents', icon: FileText }
+    { id: 'BASIC', label: 'Basic Details', icon: User },
+    { id: 'ADMISSION', label: 'Admission Details', icon: BookOpen },
+    { id: 'DOCUMENT', label: 'Document Details', icon: FileText },
+    { id: 'FAMILY', label: 'Family Details', icon: Users },
+    { id: 'ADDRESS', label: 'Address Details', icon: MapPin },
+    { id: 'FINANCE', label: 'Fees & Discounts', icon: CreditCard }
   ];
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full lg:w-[60%] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="relative w-full lg:w-[85%] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -134,66 +135,142 @@ export default function StudentDetailPanel({ student, onClose, onEdit, className
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-          {activeTab === 'PERSONAL' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
-              <InfoRow label="Full Name" value={`${student.firstName} ${student.lastName}`} />
-              <InfoRow label="Gender" value={student.gender} />
+          {activeTab === 'BASIC' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+              <InfoRow label="Student Name" value={`${student.firstName} ${student.lastName}`} />
+              <InfoRow label="Father's Name" value={student.fatherName || '—'} />
+              <InfoRow label="Mother's Name" value={student.motherName || '—'} />
+              <InfoRow label="Contact Number" value={student.mobileNumber} />
               <InfoRow label="Date of Birth" value={student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '—'} />
-              <InfoRow label="Blood Group" value={student.bloodGroup || '—'} />
-              <InfoRow label="Mobile" value={student.mobileNumber} />
-              <InfoRow label="Email" value={student.email || '—'} />
-            </div>
-          )}
-
-          {activeTab === 'ACADEMIC' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
-              <InfoRow label="Class" value={className || '—'} />
-              <InfoRow label="Section" value={sectionName || '—'} />
-              <InfoRow label="Roll Number" value={student.rollNumber || '—'} />
+              <InfoRow label="Gender" value={student.gender} />
               <InfoRow label="Admission Number" value={student.admissionNo} />
-              <InfoRow label="Academic Year" value={student.academicYear} />
-              <InfoRow label="Admission Date" value={formatDate(student.admissionDate)} />
-              <InfoRow label="Previous School" value={student.previousSchool || '—'} className="md:col-span-2" />
+              <InfoRow label="Date Of Admission" value={student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : '—'} />
+              <InfoRow label="Ledger Number" value={student.ledgerNumber || '—'} />
+              <InfoRow label="Admission in Class" value={className || '—'} />
+              <InfoRow label="Admission in Section" value={sectionName || '—'} />
+              <InfoRow label="Roll Number" value={student.rollNumber || '—'} />
+              <InfoRow label="SRN Number" value={student.srnNumber || '—'} />
+              <InfoRow label="Permanent Education No" value={student.permanentEducationNo || '—'} />
+              <InfoRow label="Family Id" value={student.familyId || '—'} />
+              <InfoRow label="Apaar Id" value={student.apaarId || '—'} />
+              <InfoRow label="Medium" value={student.medium || '—'} />
+              <InfoRow label="Enrollment School Name" value={student.enrollmentSchoolName || '—'} />
+              <InfoRow label="Opening Balance" value={student.openingBalance || '—'} />
+              <InfoRow label="Academic Year" value={academicYearName || student.academicYear || '—'} />
             </div>
           )}
 
-          {activeTab === 'PARENT' && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                   <User className="h-4 w-4 text-primary-500" /> Father's Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InfoRow label="Name" value={student.fatherName || '—'} />
-                  <InfoRow label="Mobile" value={student.fatherMobile || '—'} />
-                  <InfoRow label="Occupation" value={student.fatherOccupation || '—'} />
-                  <InfoRow label="Email" value={student.fatherEmail || '—'} />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                   <User className="h-4 w-4 text-pink-500" /> Mother's Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InfoRow label="Name" value={student.motherName || '—'} />
-                  <InfoRow label="Mobile" value={student.motherMobile || '—'} />
-                  <InfoRow label="Occupation" value={student.motherOccupation || '—'} />
-                  <InfoRow label="Email" value={student.motherEmail || '—'} />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                   <Info className="h-4 w-4 text-amber-500" /> Emergency Contact
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InfoRow label="Name" value={student.emergencyContactName || '—'} />
-                  <InfoRow label="Mobile" value={student.emergencyContactNumber || '—'} />
-                  <InfoRow label="Relation" value={student.emergencyContactRelation || '—'} className="md:col-span-2" />
-                </div>
-              </div>
+          {activeTab === 'ADMISSION' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+              <InfoRow label="Admission Scheme" value={student.admissionScheme || '—'} />
+              <InfoRow label="Admission Type" value={student.admissionType || '—'} />
+              <InfoRow label="Guardian Name" value={student.guardianName || '—'} />
+              <InfoRow label="Relation" value={student.guardianRelation || '—'} />
+              <InfoRow label="Religion" value={student.religion || '—'} />
+              <InfoRow label="Category" value={student.category || '—'} />
+              <InfoRow label="Caste" value={student.caste || '—'} />
+              <InfoRow label="Blood Group" value={student.bloodGroup || '—'} />
+              <InfoRow label="Place Of Birth" value={student.placeOfBirth || '—'} />
+              <InfoRow label="Height (In CM)" value={student.heightInCM || '—'} />
+              <InfoRow label="Weight (In KG)" value={student.weightInKG || '—'} />
+              <InfoRow label="Color Vision" value={student.colorVision || '—'} />
+              <InfoRow label="Previous Class" value={student.previousClass || '—'} />
+              <InfoRow label="Previous School Name" value={student.previousSchool || '—'} />
+              <InfoRow label="TC No" value={student.tcNo || '—'} />
+              <InfoRow label="TC Date" value={student.tcDate ? new Date(student.tcDate).toLocaleDateString() : '—'} />
+              <InfoRow label="House Name" value={student.houseName || '—'} />
+              <InfoRow label="Is Captain" value={student.isCaptain ? 'Yes' : 'No'} />
+              <InfoRow label="Is Monitor" value={student.isMonitor ? 'Yes' : 'No'} />
+              <InfoRow label="Bus" value={student.bus || '—'} />
+              <InfoRow label="Route Name" value={student.routeName || '—'} />
+              <InfoRow label="Stoppage Name" value={student.stoppageName || '—'} />
+              <InfoRow label="Bus Fee" value={student.busFee || '—'} />
             </div>
+          )}
+
+          {activeTab === 'DOCUMENT' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <InfoRow label="Student Aadhar No" value={student.studentAadharNo || '—'} />
+                <InfoRow label="Student Bank Account No" value={student.studentBankAccountNo || '—'} />
+                <InfoRow label="Student Bank Name" value={student.studentBankName || '—'} />
+                <InfoRow label="Student IFSC CODE" value={student.studentIFSCCODE || '—'} />
+                <InfoRow label="Father Aadhar No" value={student.fatherAadharNo || '—'} />
+                <InfoRow label="Parent Account No" value={student.parentAccountNo || '—'} />
+                <InfoRow label="Parent Bank Name" value={student.parentBankName || '—'} />
+                <InfoRow label="Parent Bank IFSC CODE" value={student.parentBankIFSCCODE || '—'} />
+                <InfoRow label="Mother Aadhar No" value={student.motherAadharNo || '—'} />
+                <InfoRow label="Registration Number" value={student.registrationNumber || '—'} />
+                <InfoRow label="Annual Income" value={student.annualIncome || '—'} />
+              </div>
+              
+              <h3 className="text-lg font-bold text-slate-700 border-b pb-2 pt-6">Uploaded Documents</h3>
+              {loadingDocs ? (
+                 <div className="text-center py-10">
+                    <div className="h-8 w-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="mt-2 text-slate-500 text-sm">Loading documents...</p>
+                 </div>
+               ) : documents.length === 0 ? (
+                 <div className="text-center py-10 border-2 border-dashed border-slate-100 rounded-2xl">
+                    <FileText className="h-8 w-8 text-slate-200 mx-auto" />
+                    <p className="mt-2 text-slate-400 text-sm">No documents found.</p>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {documents.map(doc => (
+                      <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between group hover:border-primary-300 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-slate-50 rounded-lg flex items-center justify-center">
+                            <FileText className="h-5 w-5 text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-700">{doc.documentName}</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-semibold">Uploaded: {formatDate(doc.createdDate)}</p>
+                          </div>
+                        </div>
+                        <a 
+                          href={`${BASE_URL}${doc.documentUrl}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    ))}
+                 </div>
+               )}
+            </div>
+          )}
+
+          {activeTab === 'FAMILY' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
+              <InfoRow label="Father Contact Number" value={student.fatherMobile || '—'} />
+              <InfoRow label="Father Email" value={student.fatherEmail || '—'} />
+              <InfoRow label="Father Occupation" value={student.fatherOccupation || '—'} />
+              <InfoRow label="Father Qualification" value={student.fatherQualification || '—'} />
+              
+              <InfoRow label="Mother Mobile Number" value={student.motherMobile || '—'} />
+              <InfoRow label="Mother Email" value={student.motherEmail || '—'} />
+              <InfoRow label="Mother Occupation" value={student.motherOccupation || '—'} />
+              <InfoRow label="Mother Qualification" value={student.motherQualification || '—'} />
+              
+              <InfoRow label="Parent Mobile Number" value={student.parentMobileNumber || '—'} />
+              <InfoRow label="Parent Email" value={student.parentEmail || '—'} />
+              <InfoRow label="Parent Occupation" value={student.parentOccupation || '—'} />
+              <InfoRow label="Parent Qualification" value={student.parentQualification || '—'} />
+              
+              <InfoRow label="Student Email" value={student.email || '—'} />
+              <InfoRow label="SMS Facility" value={student.smsFacility ? 'Yes' : 'No'} />
+              <InfoRow label="SMS Mobile Number" value={student.smsMobileNumber || '—'} />
+            </div>
+          )}
+
+          {activeTab === 'ADDRESS' && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
+               <InfoRow label="Present Address" value={`${student.addressLine1 || ''} ${student.addressLine2 || ''} ${student.city || ''} ${student.state || ''} ${student.pincode || ''}`} className="md:col-span-2" />
+               <InfoRow label="Permanent Address" value={student.permanentAddress || '—'} className="md:col-span-2" />
+             </div>
           )}
 
           {activeTab === 'FINANCE' && (
@@ -218,7 +295,7 @@ export default function StudentDetailPanel({ student, onClose, onEdit, className
                       </div>
                       <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl relative overflow-hidden group">
                          <Wallet className="absolute -right-2 -bottom-2 h-16 w-16 text-rose-900/5 group-hover:scale-110 transition-transform" />
-                         <p className="text-[10px] font-bold text-rose-600/70 uppercase tracking-widest mb-1">Net Balance</p>
+                         <p className="text-[10px] font-bold text-rose-600/70 uppercase tracking-widest mb-1">Net Outstanding</p>
                          <p className="text-xl font-bold text-rose-600">{formatCurrency(feeAccount.currentBalance)}</p>
                       </div>
                    </div>
@@ -271,62 +348,13 @@ export default function StudentDetailPanel({ student, onClose, onEdit, className
             </div>
           )}
 
-          {activeTab === 'ADDRESS' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
-               <InfoRow label="Address Line 1" value={student.addressLine1 || '—'} className="md:col-span-2" />
-               <InfoRow label="Address Line 2" value={student.addressLine2 || '—'} className="md:col-span-2" />
-               <InfoRow label="City" value={student.city || '—'} />
-               <InfoRow label="State" value={student.state || '—'} />
-               <InfoRow label="PIN Code" value={student.pincode || '—'} />
-            </div>
-          )}
-
-          {activeTab === 'DOCUMENTS' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-               {loadingDocs ? (
-                 <div className="text-center py-10">
-                    <div className="h-8 w-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="mt-2 text-slate-500 text-sm">Loading documents...</p>
-                 </div>
-               ) : documents.length === 0 ? (
-                 <div className="text-center py-10 border-2 border-dashed border-slate-100 rounded-2xl">
-                    <FileText className="h-8 w-8 text-slate-200 mx-auto" />
-                    <p className="mt-2 text-slate-400 text-sm">No documents found.</p>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {documents.map(doc => (
-                      <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between group hover:border-primary-300 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-slate-50 rounded-lg flex items-center justify-center">
-                            <FileText className="h-5 w-5 text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">{doc.documentName}</p>
-                            <p className="text-[10px] text-slate-400 uppercase font-semibold">Uploaded: {formatDate(doc.createdDate)}</p>
-                          </div>
-                        </div>
-                        <a 
-                          href={`${BASE_URL}${doc.documentUrl}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </div>
-                    ))}
-                 </div>
-               )}
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-function InfoRow({ label, value, className = "" }: { label: string, value: string, className?: string }) {
+function InfoRow({ label, value, className = "" }: { label: string, value: string | number, className?: string }) {
   return (
     <div className={`space-y-1 ${className}`}>
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</p>

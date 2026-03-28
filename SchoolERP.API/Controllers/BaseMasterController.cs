@@ -27,9 +27,17 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
     [HttpGet]
     public virtual async Task<ActionResult<IEnumerable<TDto>>> GetAll()
     {
-        var entities = await _unitOfWork.Repository<TEntity>().GetAllAsync();
-        // Since we have IsActive and name, we could default order here if we knew them, but generic is fine
-        return Ok(entities.Select(MapToDto));
+        try
+        {
+            var entities = await _unitOfWork.Repository<TEntity>().GetAllAsync();
+            var dtos = entities.Select(MapToDto);
+            return Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            // Log for debugging
+            return StatusCode(500, new { message = "Error fetching master data", error = ex.Message, inner = ex.InnerException?.Message });
+        }
     }
 
     [HttpGet("{id}")]

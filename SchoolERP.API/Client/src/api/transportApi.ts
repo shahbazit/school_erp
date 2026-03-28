@@ -37,6 +37,13 @@ export interface TransportAssignment {
   isActive: boolean;
 }
 
+export interface TransportStoppage {
+  id: string;
+  name: string;
+  cost: number;
+  isActive: boolean;
+}
+
 export const transportApi = {
   // Vehicles
   getVehicles: () => apiClient.get<TransportVehicle[]>('/transport/vehicles'),
@@ -50,9 +57,16 @@ export const transportApi = {
   updateRoute: (id: string, data: Partial<TransportRoute>) => apiClient.put<TransportRoute>(`/transport/routes/${id}`, data),
   deleteRoute: (id: string) => apiClient.delete(`/transport/routes/${id}`),
 
+  // Stoppages
+  getStoppages: () => apiClient.get<TransportStoppage[]>('/transport/stoppages'),
+  createStoppage: (data: Partial<TransportStoppage>) => apiClient.post<TransportStoppage>('/transport/stoppages', data),
+  updateStoppage: (id: string, data: Partial<TransportStoppage>) => apiClient.put<TransportStoppage>(`/transport/stoppages/${id}`, data),
+  deleteStoppage: (id: string) => apiClient.delete(`/transport/stoppages/${id}`),
+
   // Assignments
   getAssignments: () => apiClient.get<TransportAssignment[]>('/transport/assignments'),
   assignTransport: (data: { studentId: string; routeId: string; startDate: string; endDate?: string }) => 
     apiClient.post<TransportAssignment>('/transport/assignments', data),
   removeAssignment: (id: string) => apiClient.delete(`/transport/assignments/${id}`),
 };
+

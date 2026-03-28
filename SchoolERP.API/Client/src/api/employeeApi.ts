@@ -165,5 +165,10 @@ export const employeeApi = {
 
   removeDocument: async (id: string, docId: string): Promise<void> => {
     await apiClient.post(`/employee/${id}/documents/${docId}/delete`);
+  },
+
+  getShortList: async (): Promise<any[]> => {
+    const response = await apiClient.get<any[]>('/employee/short-list');
+    return response.data;
   }
 };

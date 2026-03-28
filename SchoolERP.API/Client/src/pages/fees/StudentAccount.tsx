@@ -14,7 +14,8 @@ import {
   History,
   CreditCard
 } from 'lucide-react';
-import { masterApi } from '../../api/masterApi'
+import { masterApi } from '../../api/masterApi';
+import { financeApi } from '../../api/financeApi';
 import { useLocalization } from '../../contexts/LocalizationContext';
 
 interface Transaction {
@@ -178,7 +179,7 @@ export default function StudentAccount() {
             <Wallet className="h-24 w-24 text-red-900" />
           </div>
           <div className="relative z-10">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-red-600/70">Net Balance</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-red-600/70">Net Outstanding</p>
             <p className="text-2xl font-black text-red-600">{formatCurrency(account.currentBalance)}</p>
             <p className="text-xs text-red-500 font-semibold mt-2 flex items-center">
               <AlertCircle className="h-3 w-3 mr-1" /> Payment due
@@ -749,15 +750,23 @@ function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, 
   const { formatCurrency, formatDate, settings } = useLocalization();
   const currentYear = academicYears.find((y: any) => y.isCurrent);
   
+  const [financialAccounts, setFinancialAccounts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     amount: balance,
     discount: 0,
     academicYearId: currentYear?.id || '',
     paymentMethod: 'Cash',
     referenceNumber: '',
-    remarks: ''
+    remarks: '',
+    financialAccountId: ''
   });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    financeApi.listAccounts().then(res => {
+      setFinancialAccounts(res.data.filter((a: any) => a.isActive));
+    }).catch(console.error);
+  }, []);
 
   // Sync state if currentYear loads after modal opens
   useEffect(() => {
@@ -852,6 +861,22 @@ function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, 
               <option value="Online">Online / UPI</option>
               <option value="Cheque">Cheque</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Receiving Account / Person</label>
+            <select 
+              className="form-input border-amber-200 focus:border-amber-400 bg-amber-50/10"
+              required
+              value={formData.financialAccountId}
+              onChange={(e) => setFormData({...formData, financialAccountId: e.target.value})}
+            >
+              <option value="">-- Select Receiving Account --</option>
+              {financialAccounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name} ({acc.accountType})</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1 ml-1 italic">* Ensure you are collecting into your assigned counter.</p>
           </div>
 
           <div>

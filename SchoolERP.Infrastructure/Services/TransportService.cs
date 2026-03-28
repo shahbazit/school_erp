@@ -238,4 +238,77 @@ public class TransportService : ITransportService
         await _context.SaveChangesAsync();
         return true;
     }
+
+    // Stoppages
+    public async Task<IEnumerable<TransportStoppageDto>> GetAllStoppagesAsync()
+    {
+        return await _context.TransportStoppages
+            .Select(s => new TransportStoppageDto
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Cost = s.Cost,
+                IsActive = s.IsActive
+            }).ToListAsync();
+    }
+
+    public async Task<TransportStoppageDto> GetStoppageByIdAsync(Guid id)
+    {
+        var s = await _context.TransportStoppages.FindAsync(id);
+        if (s == null) return null!;
+
+        return new TransportStoppageDto
+        {
+            Id = s.Id,
+            Name = s.Name,
+            Cost = s.Cost,
+            IsActive = s.IsActive
+        };
+    }
+
+    public async Task<TransportStoppageDto> CreateStoppageAsync(CreateTransportStoppageDto dto)
+    {
+        var stoppage = new TransportStoppage
+        {
+            Name = dto.Name,
+            Cost = dto.Cost,
+            IsActive = true
+        };
+
+        _context.TransportStoppages.Add(stoppage);
+        await _context.SaveChangesAsync();
+
+        return MapToStoppageDto(stoppage);
+    }
+
+    public async Task<TransportStoppageDto> UpdateStoppageAsync(Guid id, CreateTransportStoppageDto dto)
+    {
+        var stoppage = await _context.TransportStoppages.FindAsync(id);
+        if (stoppage == null) return null!;
+
+        stoppage.Name = dto.Name;
+        stoppage.Cost = dto.Cost;
+
+        await _context.SaveChangesAsync();
+        return MapToStoppageDto(stoppage);
+    }
+
+    public async Task<bool> DeleteStoppageAsync(Guid id)
+    {
+        var stoppage = await _context.TransportStoppages.FindAsync(id);
+        if (stoppage == null) return false;
+
+        _context.TransportStoppages.Remove(stoppage);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    private TransportStoppageDto MapToStoppageDto(TransportStoppage s) => new()
+    {
+        Id = s.Id,
+        Name = s.Name,
+        Cost = s.Cost,
+        IsActive = s.IsActive
+    };
 }
+

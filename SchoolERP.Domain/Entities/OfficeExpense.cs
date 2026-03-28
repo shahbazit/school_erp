@@ -13,4 +13,7 @@ public class OfficeExpense : BaseEntity
     public string? PaymentMethod { get; set; } // Cash, Bank, UPI
     public Guid? AcademicYearId { get; set; } // Financial/Academic Year link
     public Guid? LinkedEmployeeId { get; set; } // For staff-specific misc payouts (Bonus, Incentive, etc.)
+    public Guid? FinancialAccountId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.ForeignKey("FinancialAccountId")]
+    public virtual FinancialAccount? FinancialAccount { get; set; }
 }

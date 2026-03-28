@@ -18,4 +18,7 @@ public class FeeTransaction : BaseEntity
     public string? Description { get; set; }
     public string? ReferenceNumber { get; set; } // Receipt No, Bank Ref, etc.
     public string? PaymentMethod { get; set; } // Cash, Bank, Online
+    public Guid? FinancialAccountId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.ForeignKey("FinancialAccountId")]
+    public virtual FinancialAccount? FinancialAccount { get; set; }
 }

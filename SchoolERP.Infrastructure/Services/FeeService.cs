@@ -289,7 +289,8 @@ public class FeeService : IFeeService
                 Amount = request.Amount,
                 Description = request.Remarks ?? "Fee Payment",
                 ReferenceNumber = request.ReferenceNumber,
-                PaymentMethod = request.PaymentMethod
+                PaymentMethod = request.PaymentMethod,
+                FinancialAccountId = request.FinancialAccountId
             };
             await _unitOfWork.Repository<FeeTransaction>().AddAsync(paymentTx);
             account.TotalPaid += request.Amount;

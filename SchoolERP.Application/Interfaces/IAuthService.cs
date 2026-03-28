@@ -19,4 +19,5 @@ public interface IAuthService
     Task<AuthResult> FinalizeRegistrationAsync(Guid registrationUid, string schoolName, string schoolDomain, string city, string address, string otp);
     Task<AuthResult> ForgotPasswordAsync(string email, Guid? organizationId = null);
     Task<AuthResult> ResetPasswordAsync(string email, string token, string newPassword, Guid? organizationId = null);
+    Task<SchoolERP.Domain.Entities.Organization?> GetOrganizationByDomainAsync(string domain);
 }

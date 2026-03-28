@@ -232,11 +232,20 @@ public class AuthService : IAuthService
 
     public async Task<AuthResult> LoginAsync(string email, string password, Guid? organizationId)
     {
+        var query = _dbContext.Users.IgnoreQueryFilters().AsQueryable();
+        
+        if (organizationId.HasValue && organizationId.Value != Guid.Empty)
+        {
+            query = query.Where(u => u.Email == email && u.OrganizationId == organizationId.Value);
+        }
+        else
+        {
+            query = query.Where(u => u.Email == email);
+        }
 
-
-        var user = await _dbContext.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == email );
+        var user = await query.FirstOrDefaultAsync();
         if (user == null)
-            return new AuthResult { Success = false, Errors = new[] { "Invalid email or password" } };
+            return new AuthResult { Success = false, Errors = new[] { "Invalid email, password, or organization" } };
 
         // Check Employee linkage and status
         var employee = await _dbContext.Employees.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.UserId == user.Id);
@@ -498,5 +507,9 @@ public class AuthService : IAuthService
         await _dbContext.SaveChangesAsync();
 
         return new AuthResult { Success = true, Errors = new[] { "Password reset successfully." } };
+    }
+    public async Task<SchoolERP.Domain.Entities.Organization?> GetOrganizationByDomainAsync(string domain)
+    {
+        return await _dbContext.Organizations.FirstOrDefaultAsync(o => o.Domain == domain && !o.IsDeleted && o.IsActive);
     }
 }

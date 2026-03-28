@@ -15,8 +15,11 @@ export default function Landing() {
             <span className="text-xl font-bold tracking-tight">SchoolERP</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/portal" className="text-sm font-semibold text-slate-600 hover:text-primary-600 transition-colors">
+              Student Portal
+            </Link>
             <Link to="/login" className="text-sm font-semibold text-slate-600 hover:text-primary-600 transition-colors">
-              Sign In
+              Institution Login
             </Link>
             <Link to="/register" className="text-sm font-bold bg-primary-600 text-white px-5 py-2.5 rounded-full shadow-md hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-600/20 transition-all flex items-center gap-2">
               Get Started <ArrowRight className="h-4 w-4" />
@@ -45,11 +48,12 @@ export default function Landing() {
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/register" className="w-full sm:w-auto px-8 py-4 bg-primary-600 text-white font-bold rounded-full shadow-xl shadow-primary-600/30 hover:bg-primary-700 hover:shadow-2xl hover:shadow-primary-600/40 hover:-translate-y-1 transition-all flex items-center justify-center gap-2 text-lg">
-              Start for free <ArrowRight className="h-5 w-5" />
+            <Link to="/portal" className="w-full sm:w-auto px-10 py-5 bg-emerald-600 text-white font-extrabold rounded-full shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700 hover:shadow-emerald-600/40 hover:-translate-y-1 transition-all flex items-center justify-center gap-3 text-xl">
+              <Users className="h-6 w-6" />
+              Student Portal
             </Link>
             <Link to="/login" className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 font-bold rounded-full shadow-md border border-slate-200 hover:border-primary-200 hover:text-primary-600 hover:shadow-lg hover:-translate-y-1 transition-all text-lg flex items-center justify-center">
-              Login to workspace
+              Institutional Admin
             </Link>
           </div>
         </div>

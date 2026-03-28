@@ -47,4 +47,18 @@ public class TransportController : ControllerBase
 
     [HttpDelete("assignments/{id}")]
     public async Task<IActionResult> RemoveAssignment(Guid id) => Ok(await _transportService.RemoveAssignmentAsync(id));
+
+    // Stoppages
+    [HttpGet("stoppages")]
+    public async Task<IActionResult> GetStoppages() => Ok(await _transportService.GetAllStoppagesAsync());
+
+    [HttpPost("stoppages")]
+    public async Task<IActionResult> CreateStoppage(CreateTransportStoppageDto dto) => Ok(await _transportService.CreateStoppageAsync(dto));
+
+    [HttpPut("stoppages/{id}")]
+    public async Task<IActionResult> UpdateStoppage(Guid id, CreateTransportStoppageDto dto) => Ok(await _transportService.UpdateStoppageAsync(id, dto));
+
+    [HttpDelete("stoppages/{id}")]
+    public async Task<IActionResult> DeleteStoppage(Guid id) => Ok(await _transportService.DeleteStoppageAsync(id));
 }
+

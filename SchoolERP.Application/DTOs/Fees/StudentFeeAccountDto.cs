@@ -32,6 +32,7 @@ public class ProcessPaymentRequest
     public string? PaymentMethod { get; set; }
     public string? ReferenceNumber { get; set; }
     public string? Remarks { get; set; }
+    public Guid? FinancialAccountId { get; set; }
 }
 public class AddExtraChargeRequest
 {

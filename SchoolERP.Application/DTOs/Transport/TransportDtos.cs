@@ -68,3 +68,18 @@ public class CreateTransportAssignmentDto
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
 }
+
+public class TransportStoppageDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Cost { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class CreateTransportStoppageDto
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Cost { get; set; }
+}
+

@@ -3,7 +3,6 @@ import { useStudents } from '../hooks/useStudents';
 import { Search, Plus, Edit2, Trash2, Eye, UserPlus, Users, GraduationCap, ArrowUpDown, CreditCard, FileText, Filter } from 'lucide-react';
 import StudentModal from '../components/StudentModal';
 import StudentDetailPanel from '../components/StudentDetailPanel';
-import StudentDocumentsModal from '../components/StudentDocumentsModal';
 import { Student } from '../types';
 import { masterApi } from '../api/masterApi';
 
@@ -11,14 +10,15 @@ export default function Students() {
   const { students, fetchStudents, loading, error, removeStudent, addStudent, updateStudent } = useStudents();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSession, setSelectedSession] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [docStudent, setDocStudent] = useState<Student | null>(null);
-  
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [modalDefaultTab, setModalDefaultTab] = useState<string | undefined>(undefined);
 
   // Masters mapping
   const [classesList, setClassesList] = useState<any[]>([]);
@@ -32,7 +32,7 @@ export default function Students() {
       // Pre-select current session if none selected
       const current = years.find((y: any) => y.isCurrent);
       if (current && !selectedSession) {
-        setSelectedSession(current.name);
+        setSelectedSession(current.id);
       }
     }).catch(console.error);
 
@@ -41,8 +41,17 @@ export default function Students() {
   }, []);
 
   useEffect(() => {
-    fetchStudents({ academicYear: selectedSession, pageSize: 1000 });
-  }, [fetchStudents, selectedSession]);
+    // Don't fetch until we have academic years to determine the default session
+    // otherwise it will double-load (once for "all" then again for "current")
+    if (academicYearsList.length === 0) return;
+
+    const filters: any = { pageSize: 1000 };
+    if (selectedSession) filters.academicYear = selectedSession;
+    if (selectedClass) filters.classId = selectedClass;
+    if (selectedSection) filters.sectionId = selectedSection;
+    
+    fetchStudents(filters);
+  }, [fetchStudents, selectedSession, selectedClass, selectedSection, academicYearsList.length]);
 
   const classMap = useMemo(() => {
     return classesList.reduce((acc, c) => ({ ...acc, [c.id]: c.name }), {});
@@ -51,6 +60,10 @@ export default function Students() {
   const sectionMap = useMemo(() => {
     return sectionsList.reduce((acc, s) => ({ ...acc, [s.id]: s.name }), {});
   }, [sectionsList]);
+
+  const academicYearMap = useMemo(() => {
+    return academicYearsList.reduce((acc, y) => ({ ...acc, [y.id]: y.name }), {} as Record<string, string>);
+  }, [academicYearsList]);
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => 
@@ -77,11 +90,13 @@ export default function Students() {
 
   const handleOpenAddModal = () => {
     setEditingStudent(null);
+    setModalDefaultTab(undefined);
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (student: Student) => {
+  const handleOpenEditModal = (student: Student, tab?: string) => {
     setEditingStudent(student);
+    setModalDefaultTab(tab);
     setIsModalOpen(true);
   };
 
@@ -167,7 +182,41 @@ export default function Students() {
             >
               <option value="">All Sessions</option>
               {academicYearsList.map(y => (
-                <option key={y.id} value={y.name}>{y.name}</option>
+                <option key={y.id} value={y.id}>{y.name}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <ArrowUpDown className="h-3 w-3 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Quick Filter: Class */}
+          <div className="relative w-full sm:w-40 shrink-0">
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none transition-all font-medium appearance-none"
+            >
+              <option value="">All Classes</option>
+              {classesList.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <ArrowUpDown className="h-3 w-3 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Quick Filter: Section */}
+          <div className="relative w-full sm:w-32 shrink-0">
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none transition-all font-medium appearance-none"
+            >
+              <option value="">All Sections</option>
+              {sectionsList.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -278,7 +327,7 @@ export default function Students() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end space-x-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => setSelectedStudent(student)}
                           className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors"
@@ -286,16 +335,7 @@ export default function Students() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button 
-                          onClick={() => {
-                            setDocStudent(student);
-                            setIsDocModalOpen(true);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
-                          title="Manage Documents"
-                        >
-                          <FileText className="h-4 w-4" />
-                        </button>
+
                         <button 
                           onClick={() => window.location.href = `/fees/student/${student.id}`}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
@@ -349,6 +389,7 @@ export default function Students() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveStudent}
         initialData={editingStudent}
+        defaultTab={modalDefaultTab}
       />
 
       {/* Slide-out Detail Panel */}
@@ -361,14 +402,9 @@ export default function Students() {
         }}
         className={selectedStudent?.classId ? classMap[selectedStudent.classId] : ''}
         sectionName={selectedStudent?.sectionId ? sectionMap[selectedStudent.sectionId] : ''}
+        academicYearName={selectedStudent?.academicYear ? (academicYearMap[selectedStudent.academicYear] || selectedStudent.academicYear) : ''}
       />
 
-      {/* Documents Modal */}
-      <StudentDocumentsModal
-        isOpen={isDocModalOpen}
-        onClose={() => setIsDocModalOpen(false)}
-        student={docStudent}
-      />
     </div>
   );
 }

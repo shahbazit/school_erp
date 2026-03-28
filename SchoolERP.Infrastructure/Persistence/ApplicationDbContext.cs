@@ -92,6 +92,7 @@ public class ApplicationDbContext : DbContext
     // Transport & Hostel
     public DbSet<TransportVehicle> TransportVehicles { get; set; } = null!;
     public DbSet<TransportRoute> TransportRoutes { get; set; } = null!;
+    public DbSet<TransportStoppage> TransportStoppages { get; set; } = null!;
     public DbSet<TransportAssignment> TransportAssignments { get; set; } = null!;
     public DbSet<Hostel> Hostels { get; set; } = null!;
     public DbSet<HostelRoom> HostelRooms { get; set; } = null!;
@@ -102,6 +103,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<InventoryItem> InventoryItems { get; set; } = null!;
     public DbSet<InventorySupplier> InventorySuppliers { get; set; } = null!;
     public DbSet<InventoryTransaction> InventoryTransactions { get; set; } = null!;
+
+    // Library
+    public DbSet<LibraryCategory> LibraryCategories { get; set; } = null!;
+    public DbSet<LibraryBook> LibraryBooks { get; set; } = null!;
+    public DbSet<LibraryBookIssue> LibraryBookIssues { get; set; } = null!;
+    public DbSet<FinancialAccount> FinancialAccounts { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -148,6 +155,7 @@ public class ApplicationDbContext : DbContext
         // Transport & Hostel Filters
         builder.Entity<TransportVehicle>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<TransportRoute>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<TransportStoppage>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<TransportAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Hostel>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<HostelRoom>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
@@ -158,6 +166,12 @@ public class ApplicationDbContext : DbContext
         builder.Entity<InventoryItem>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<InventorySupplier>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<InventoryTransaction>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+
+        // Library Filters
+        builder.Entity<LibraryCategory>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<LibraryBook>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<LibraryBookIssue>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<FinancialAccount>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
         // Master Query Filters
         builder.Entity<AcademicClass>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
@@ -224,6 +238,7 @@ public class ApplicationDbContext : DbContext
         // Transport & Hostel Indexes
         builder.Entity<TransportVehicle>().HasIndex(e => e.OrganizationId);
         builder.Entity<TransportRoute>().HasIndex(e => e.OrganizationId);
+        builder.Entity<TransportStoppage>().HasIndex(e => e.OrganizationId);
         builder.Entity<TransportAssignment>().HasIndex(e => e.OrganizationId);
         builder.Entity<Hostel>().HasIndex(e => e.OrganizationId);
         builder.Entity<HostelRoom>().HasIndex(e => e.OrganizationId);
@@ -234,6 +249,12 @@ public class ApplicationDbContext : DbContext
         builder.Entity<InventoryItem>().HasIndex(e => e.OrganizationId);
         builder.Entity<InventorySupplier>().HasIndex(e => e.OrganizationId);
         builder.Entity<InventoryTransaction>().HasIndex(e => e.OrganizationId);
+
+        // Library Indexes
+        builder.Entity<LibraryCategory>().HasIndex(e => e.OrganizationId);
+        builder.Entity<LibraryBook>().HasIndex(e => e.OrganizationId);
+        builder.Entity<LibraryBookIssue>().HasIndex(e => e.OrganizationId);
+        builder.Entity<FinancialAccount>().HasIndex(e => e.OrganizationId);
         
         // Ensure no duplicate attendance per student per day
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
@@ -564,6 +585,31 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(ha => ha.RoomId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Library Relationships
+        builder.Entity<LibraryBook>()
+            .HasOne(b => b.Category)
+            .WithMany(c => c.Books)
+            .HasForeignKey(b => b.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<LibraryBookIssue>()
+            .HasOne(bi => bi.Book)
+            .WithMany(b => b.Issues)
+            .HasForeignKey(bi => bi.BookId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<LibraryBookIssue>()
+            .HasOne(bi => bi.Student)
+            .WithMany()
+            .HasForeignKey(bi => bi.StudentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<LibraryBookIssue>()
+            .HasOne(bi => bi.Employee)
+            .WithMany()
+            .HasForeignKey(bi => bi.EmployeeId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
