@@ -544,3 +544,5 @@ wwwroot/uploads/**
 publish_output/
 publish_output_new/
 publish_output_v2/
+Publish_output/
+

@@ -136,7 +136,9 @@ export default function Dashboard() {
 
   const token = localStorage.getItem('token');
   const decoded: any = token ? JSON.parse(atob(token.split('.')[1])) : {};
-  const isAdmin = (decoded.Role || decoded.role || decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'])?.toLowerCase() === 'admin';
+  const roles = decoded.Role || decoded.role || decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || [];
+  const rolesArray = Array.isArray(roles) ? roles : [roles];
+  const isAdmin = rolesArray.some((r: string) => r.toLowerCase() === 'admin');
   const userName = decoded.name || decoded.Name || decoded.email || 'Administrator';
 
   const fetchAdminSummary = useCallback(async () => {
@@ -150,18 +152,18 @@ export default function Dashboard() {
 
   const fetchTeachers = useCallback(async () => {
     try {
-      const raw = await masterApi.getAll('employees');
-      // handle both array and paginated {items, totalCount} responses
-      const list: any[] = Array.isArray(raw) ? raw : ((raw as any)?.items ?? (raw as any)?.data ?? []);
-      setTeachers(list.filter((e: any) => e.teacherProfile));
-    } catch (err) { console.error(err); }
+      const list = await masterApi.getEmployeesShort();
+      // Since it's a short-list, it might not have the teacherProfile property.
+      // For now, let's accept all active employees as potential teachers for monitoring.
+      setTeachers(list || []);
+    } catch (err) { console.error("Dashboard: fetchTeachers failed", err); }
   }, []);
 
   const fetchTeacherSummary = useCallback(async (tid?: string) => {
     try {
       const data = await dashboardApi.getTeacherSummary(tid);
       setSummary(data);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Dashboard: fetchTeacherSummary failed", err); }
   }, []);
 
   useEffect(() => {
@@ -531,16 +533,18 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <select
-                    className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all min-w-[220px] font-medium text-slate-700"
-                    value={selectedTeacherId}
-                    onChange={handleTeacherChange}
-                  >
-                    <option value="">Select a teacher…</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>{t.firstName} {t.lastName}</option>
-                    ))}
-                  </select>
+                    <select
+                      className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all min-w-[220px] font-medium text-slate-700"
+                      value={selectedTeacherId}
+                      onChange={handleTeacherChange}
+                    >
+                      <option value="">Select a teacher…</option>
+                      {teachers.map((t: any) => (
+                        <option key={t.id || t.Id} value={t.id || t.Id}>
+                          {t.fullName || t.FullName || (t.firstName + ' ' + t.lastName)}
+                        </option>
+                      ))}
+                    </select>
                 </div>
               </div>
 

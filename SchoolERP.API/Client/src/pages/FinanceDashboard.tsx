@@ -70,7 +70,13 @@ const FinanceDashboard: React.FC = () => {
       console.log('Finance Summaries Debug:', response.data);
       const data = response.data;
       if (Array.isArray(data)) {
-        setSummaries(data);
+        // Deduplicate in case of API/DB anomalies
+        const uniqueData = data.reduce((acc: AccountSummary[], current) => {
+          const x = acc.find(item => item.accountId === current.accountId);
+          if (!x) return acc.concat([current]);
+          else return acc;
+        }, []);
+        setSummaries(uniqueData);
         if (data.length > 0 && !selectedAccount) {
           handleAccountClick(data[0]);
         }

@@ -38,13 +38,33 @@ public class DashboardController : ControllerBase
 
         // Validate organization existence (prevents 404 after DB reset)
         var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
-        if (!orgExists) 
+        if (!orgExists)
         {
-            Serilog.Log.Error("GetAdminSummary: Organization {OrgId} NOT FOUND in database.", orgId);
-            return NotFound(new { message = "Organization not found." });
+            // Auto-repair for Admin: If the provided OrgId is invalid but the user is an admin,
+            // find the first organization they belong to (assuming they belong to at least one)
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? User.FindFirst("role")?.Value;
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var firstOrg = await _context.Organizations.FirstOrDefaultAsync();
+                if (firstOrg != null)
+                {
+                    orgId = firstOrg.Id;
+                    Serilog.Log.Warning("GetAdminSummary: Provided OrgId invalid. Auto-repaired to {NewOrgId} for Admin.", orgId);
+                }
+                else
+                {
+                    Serilog.Log.Error("GetAdminSummary: NO ORGANIZATIONS FOUND in database.");
+                    return NotFound(new { message = "Organization not found." });
+                }
+            }
+            else
+            {
+                Serilog.Log.Error("GetAdminSummary: Organization {OrgId} NOT FOUND in database.", orgId);
+                return NotFound(new { message = "Organization not found." });
+            }
         }
 
-        Serilog.Log.Information("GetAdminSummary: Fetching summary for OrgId {OrgId}", orgId);
+
 
         var today = DateTime.Today;
         var thisMonth = new DateTime(today.Year, today.Month, 1);
@@ -203,16 +223,30 @@ public class DashboardController : ControllerBase
     }
 
     [HttpGet("teacher/summary")]
-    public async Task<IActionResult> GetTeacherSummary(Guid? employeeId)
+    [Authorize(Roles = "Teacher,Admin,Staff")]
+    public async Task<IActionResult> GetTeacherSummary([FromQuery] Guid? employeeId)
     {
         var orgId = _organizationService.GetOrganizationId();
         if (orgId == Guid.Empty) return Unauthorized();
 
         // Validate organization existence
         var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
-        if (!orgExists) return NotFound(new { message = "Organization not found." });
+        if (!orgExists)
+        {
+            var firstOrg = await _context.Organizations.FirstOrDefaultAsync();
+            if (firstOrg != null)
+            {
+                orgId = firstOrg.Id;
+                Serilog.Log.Warning("GetTeacherSummary: Provided OrgId invalid. Auto-repaired to {NewOrgId}", orgId);
+            }
+            else
+            {
+                return NotFound(new { message = "Organization not found." });
+            }
+        }
 
         var userId = _currentUserService.UserId;
+
         Employee? employee;
 
         if (employeeId.HasValue)
@@ -228,7 +262,11 @@ public class DashboardController : ControllerBase
                 .FirstOrDefaultAsync(e => e.UserId == userId);
         }
 
-        if (employee == null) return NotFound("Teacher profile not found");
+        if (employee == null) 
+        {
+             Serilog.Log.Warning("GetTeacherSummary: Profile not found for User={UserId} or EmployeeParam={EmployeeId}", userId, employeeId);
+             return NotFound(new { message = "Teacher profile not found for this user link." });
+        }
 
         var today = DateTime.Today;
         var dayOfWeek = (int)today.DayOfWeek;

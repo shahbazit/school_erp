@@ -1,0 +1,8 @@
+
+> school-erp-client@0.0.0 build
+> tsc && vite build
+
+src/pages/MenuPermissions.tsx(181,82): error TS2339: Property 'sortOrder' does not exist on type 'MenuMaster'.
+src/pages/MenuPermissions.tsx(181,96): error TS2339: Property 'sortOrder' does not exist on type 'MenuMaster'.
+src/pages/MenuPermissions.tsx(182,25): error TS2339: Property 'sortOrder' does not exist on type '{ children: MenuMaster[]; key: string; label: string; icon?: string | undefined; type: string; parentKey?: string | null | undefined; }'.
+src/pages/MenuPermissions.tsx(182,39): error TS2339: Property 'sortOrder' does not exist on type '{ children: MenuMaster[]; key: string; label: string; icon?: string | undefined; type: string; parentKey?: string | null | undefined; }'.

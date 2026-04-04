@@ -70,6 +70,26 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none;    /* Firefox */
   }
+
+  /* Global Read-Only Mode Utilities */
+  .is-read-only-view .btn-primary,
+  .is-read-only-view button[title*="Edit" i],
+  .is-read-only-view button[title*="edit" i],
+  .is-read-only-view button[title*="Delete" i],
+  .is-read-only-view button[title*="Deactivate" i],
+  .is-read-only-view button[title*="Remove" i],
+  .is-read-only-view button[title*="Add" i],
+  .is-read-only-view .lucide-plus,
+  .is-read-only-view .lucide-edit,
+  .is-read-only-view .lucide-trash-2,
+  .is-read-only-view .lucide-plus-circle,
+  .is-read-only-view .lucide-save {
+      display: none !important;
+  }
+
+  .is-read-only-view .actions-column {
+      display: none !important;
+  }
 }
 
 /* 🖨️ Global Print Fixes */

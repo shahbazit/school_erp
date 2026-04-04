@@ -207,11 +207,20 @@ public class AuthService : IAuthService
                 var allMenus = await _dbContext.MenuMasters.Where(m => m.IsActive).ToListAsync();
                 foreach (var menu in allMenus)
                 {
+                    _dbContext.OrganizationMenus.Add(new OrganizationMenu
+                    {
+                        MenuKey = menu.Key,
+                        IsEnabled = true,
+                        OrganizationId = organization.Id,
+                        CreatedAt = DateTime.UtcNow
+                    });
+
                     _dbContext.MenuPermissions.Add(new MenuPermission
                     {
                         RoleName = "Admin",
                         MenuKey = menu.Key,
-                        IsVisible = true,
+                        CanRead = true,
+                        CanWrite = true,
                         OrganizationId = organization.Id,
                         CreatedAt = DateTime.UtcNow
                     });

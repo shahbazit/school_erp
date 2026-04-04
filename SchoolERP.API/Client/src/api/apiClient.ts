@@ -63,7 +63,12 @@ apiClient.interceptors.response.use(
       const data = error.response.data;
       const message = (typeof data === 'object' ? (data?.message || data?.Message) : data) || 'Server error occurred.';
 
-      if (status === 401 || (status === 404 && message === 'Organization not found.')) {
+      const isOrgError = status === 404 && (
+        message?.toString().trim().toLowerCase() === 'organization not found.' || 
+        message?.toString().trim().toLowerCase() === 'organization not found'
+      );
+
+      if (status === 401 || isOrgError) {
         // Clear token and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('organizationId');

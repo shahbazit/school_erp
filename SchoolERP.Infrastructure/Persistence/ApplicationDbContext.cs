@@ -70,6 +70,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Room> Rooms { get; set; } = null!;
     public DbSet<Lab> Labs { get; set; } = null!;
     public DbSet<MenuPermission> MenuPermissions { get; set; } = null!;
+    public DbSet<OrganizationMenu> OrganizationMenus { get; set; } = null!;
     public DbSet<MenuMaster> MenuMasters { get; set; } = null!;
     public DbSet<Country> Countries { get; set; } = null!;
     public DbSet<State> States { get; set; } = null!;
@@ -220,6 +221,7 @@ public class ApplicationDbContext : DbContext
         builder.Entity<State>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<City>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<MenuPermission>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<OrganizationMenu>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Homework>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
 
@@ -386,6 +388,8 @@ public class ApplicationDbContext : DbContext
         builder.Entity<State>().HasIndex(e => e.OrganizationId);
         builder.Entity<City>().HasIndex(e => e.OrganizationId);
         builder.Entity<MenuPermission>().HasIndex(e => e.OrganizationId);
+        builder.Entity<OrganizationMenu>().HasIndex(e => e.OrganizationId);
+        builder.Entity<OrganizationMenu>().HasIndex(e => new { e.OrganizationId, e.MenuKey }).IsUnique();
         builder.Entity<Homework>().HasIndex(e => e.OrganizationId);
         builder.Entity<MenuPermission>().HasIndex(e => new { e.RoleName, e.UserId, e.MenuKey }).IsUnique();
         builder.Entity<MenuPermission>().HasIndex(e => new { e.UserId, e.MenuKey }).HasFilter("[UserId] IS NOT NULL");

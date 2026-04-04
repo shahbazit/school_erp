@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { masterApi } from '../api/masterApi';
 import apiClient from '../api/apiClient';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface StudentAttendanceDto {
   studentId: string;
@@ -36,6 +37,8 @@ function avatarColor(code: string) {
 }
 
 export default function StudentAttendance() {
+  const { hasWritePermission } = usePermissions();
+  const writeAllowed = hasWritePermission('student_attendance');
   const [activeTab, setActiveTab] = useState<'mark' | 'report'>('mark');
 
   // Filter States
@@ -126,7 +129,7 @@ export default function StudentAttendance() {
   const filteredRecords = records.filter(r => r.studentName.toLowerCase().includes(search.toLowerCase()) || r.admissionNo.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    <div className={`space-y-5 animate-in fade-in duration-500 max-w-7xl mx-auto ${!writeAllowed ? 'is-read-only-view' : ''}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -182,13 +185,15 @@ export default function StudentAttendance() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary-300" />
             </div>
             
-            <div className="flex gap-2">
-              <button onClick={() => markAll('Present')} disabled={records.length === 0} className="px-3 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">P</button>
-              <button onClick={() => markAll('Absent')} disabled={records.length === 0} className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100">A</button>
-              <button onClick={saveAttendance} disabled={isSaving || records.length === 0} className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-50">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save State
-              </button>
-            </div>
+            {writeAllowed && (
+              <div className="flex gap-2">
+                <button onClick={() => markAll('Present')} disabled={records.length === 0} className="px-3 py-2 text-xs font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100">P</button>
+                <button onClick={() => markAll('Absent')} disabled={records.length === 0} className="px-3 py-2 text-xs font-bold rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100">A</button>
+                <button onClick={saveAttendance} disabled={isSaving || records.length === 0} className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl shadow-sm disabled:opacity-50">
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save State
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Records Table */}
@@ -232,12 +237,13 @@ export default function StudentAttendance() {
                           {['Present', 'Absent', 'HalfDay', 'Leave'].map(stat => (
                             <button
                               key={stat}
-                              onClick={() => handleStatusChange(record.studentId, stat)}
+                              onClick={() => writeAllowed && handleStatusChange(record.studentId, stat)}
+                              disabled={!writeAllowed}
                               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wider transition-all ${
                                 record.status === stat 
                                   ? `${statusConfig[stat].color} ring-1 ring-offset-1 ring-${statusConfig[stat].color.split('-')[1]}-400 shadow-sm scale-105` 
                                   : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
-                                }`}
+                                } ${!writeAllowed ? 'cursor-not-allowed opacity-80' : ''}`}
                             >
                               {statusConfig[stat].icon} {statusConfig[stat].label}
                             </button>
@@ -249,8 +255,9 @@ export default function StudentAttendance() {
                           type="text"
                           placeholder="Optional notes..."
                           value={record.remarks || ''}
-                          onChange={(e) => handleRemarkChange(record.studentId, e.target.value)}
-                          className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-300 focus:bg-white transition-all"
+                          onChange={(e) => writeAllowed && handleRemarkChange(record.studentId, e.target.value)}
+                          disabled={!writeAllowed}
+                          className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-300 focus:bg-white transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                         />
                       </td>
                     </tr>

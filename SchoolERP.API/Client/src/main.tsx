@@ -4,12 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 import { LocalizationProvider } from './contexts/LocalizationContext'
+import { PermissionProvider } from './contexts/PermissionContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <LocalizationProvider>
-        <App />
+        <PermissionProvider>
+          <App />
+        </PermissionProvider>
       </LocalizationProvider>
     </BrowserRouter>
   </React.StrictMode>,

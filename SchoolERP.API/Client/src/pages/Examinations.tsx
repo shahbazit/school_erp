@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { masterApi } from '../api/masterApi';
 import apiClient from '../api/apiClient';
+import { usePermissions } from '../hooks/usePermissions';
 import { studentApi } from '../api/studentApi';
 import { Student } from '../types';
 
@@ -43,6 +44,8 @@ function avatarColor(code: string) {
 }
 
 export default function Examinations() {
+  const { hasWritePermission } = usePermissions();
+  const writeAllowed = hasWritePermission('examinations');
   const [activeTab, setActiveTab] = useState<'exams' | 'mark-entry' | 'marksheets'>('exams');
   
   // Masters
@@ -188,7 +191,7 @@ export default function Examinations() {
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in max-w-7xl mx-auto pb-20">
+    <div className={`space-y-5 animate-in fade-in max-w-7xl mx-auto pb-20 ${!writeAllowed ? 'is-read-only-view' : ''}`}>
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
@@ -325,13 +328,13 @@ export default function Examinations() {
                          </div>
                       </td>
                       <td className="px-4 py-3">
-                         <input type="number" min="0" max="100" step="0.5" value={r.obtainedMarks} onChange={(e) => updateRecord(r.studentId, 'obtainedMarks', parseFloat(e.target.value) || 0)} className="w-24 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-center" />
+                         <input type="number" min="0" max="100" step="0.5" value={r.obtainedMarks} onChange={(e) => writeAllowed && updateRecord(r.studentId, 'obtainedMarks', parseFloat(e.target.value) || 0)} disabled={!writeAllowed} className="w-24 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-center disabled:opacity-70 disabled:cursor-not-allowed" />
                       </td>
                       <td className="px-4 py-3">
-                         <input type="text" maxLength={2} value={r.grade || ''} onChange={(e) => updateRecord(r.studentId, 'grade', e.target.value.toUpperCase())} className="w-16 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-center uppercase" placeholder="A+" />
+                         <input type="text" maxLength={2} value={r.grade || ''} onChange={(e) => writeAllowed && updateRecord(r.studentId, 'grade', e.target.value.toUpperCase())} disabled={!writeAllowed} className="w-16 px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-bold focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all text-center uppercase disabled:opacity-70 disabled:cursor-not-allowed" placeholder="A+" />
                       </td>
                       <td className="px-4 py-3">
-                         <input type="text" value={r.remarks || ''} onChange={(e) => updateRecord(r.studentId, 'remarks', e.target.value)} className="w-full min-w-[200px] px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all" placeholder="Add specific feedback..." />
+                         <input type="text" value={r.remarks || ''} onChange={(e) => writeAllowed && updateRecord(r.studentId, 'remarks', e.target.value)} disabled={!writeAllowed} className="w-full min-w-[200px] px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-600 focus:ring-2 focus:ring-primary-500/20 focus:bg-white transition-all disabled:opacity-70 disabled:cursor-not-allowed" placeholder="Add specific feedback..." />
                       </td>
                     </tr>
                   ))}

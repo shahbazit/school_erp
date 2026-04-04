@@ -96,11 +96,15 @@ function App() {
   const isAdmin = currentRole.toLowerCase() === 'admin';
   const isStudent = currentRole.toLowerCase() === 'student';
   const currentUserId = decodedToken?.id || '';
-  const { hasPermission: baseHasPermission, fetchMyPermissions } = usePermissions();
-  const hasPermission = (key: string) => {
+  const { hasReadPermission, hasWritePermission, fetchMyPermissions } = usePermissions();
+  const checkPermission = (key: string) => {
     if (isAdmin) return true;
-    if (['finance', 'communication', 'infrastructure', 'inventory', 'front_office'].includes(key)) return true;
-    return baseHasPermission(key);
+    return hasReadPermission(key);
+  };
+
+  const checkWritePermission = (key: string) => {
+    if (isAdmin) return true;
+    return hasWritePermission(key);
   };
 
   useAppEffect(() => {
@@ -133,61 +137,62 @@ function App() {
     { label: 'Dashboard', path: '/', permission: true, group: 'dashboard' },
     
     // Students
-    { label: 'Student Directory', path: '/students', permission: hasPermission('students'), group: 'students' },
-    { label: 'Daily Attendance', path: '/student-attendance', permission: hasPermission('students'), group: 'students' },
-    { label: 'Promotion & Transfer', path: '/student-promotion', permission: hasPermission('students'), group: 'students' },
-    { label: 'Certificate & ID', path: '/certificates', permission: hasPermission('students'), group: 'students' },
-    { label: 'Bulk Import', path: '/student-import', permission: hasPermission('students'), group: 'students' },
+    { label: 'Student Directory', path: '/students', permission: checkPermission('student_directory'), group: 'students' },
+    { label: 'Daily Attendance', path: '/student-attendance', permission: checkPermission('student_attendance'), group: 'students' },
+    { label: 'Promotion & Transfer', path: '/student-promotion', permission: checkPermission('student_promotion'), group: 'students' },
+    { label: 'Certificate & ID', path: '/certificates', permission: checkPermission('certificates'), group: 'students' },
+    { label: 'Bulk Import', path: '/student-import', permission: checkPermission('student_import'), group: 'students' },
     
     // Academic
-    { label: 'Exams & Result', path: '/examinations', permission: hasPermission('academic'), group: 'academic' },
+    { label: 'Exams & Result', path: '/examinations', permission: checkPermission('examinations'), group: 'academic' },
+    { label: 'Class Timetables', path: '/timetable', permission: checkPermission('timetable'), group: 'academic' },
+    { label: 'Academic Calendar', path: '/academic-calendar', permission: checkPermission('academic_calendar'), group: 'academic' },
+
     // AI Curriculum
-    { label: 'AI Books Hub', path: '/ai-book-list', permission: hasPermission('academic') && !isStudent, group: 'ai' },
-    { label: 'Chapter Content', path: '/subject-content', permission: hasPermission('academic') && !isStudent, group: 'ai' },
-    { label: 'AI Tutor', path: '/ai-tutor', permission: true, group: 'ai' },
-    { label: 'Class Timetables', path: '/timetable', permission: hasPermission('academic'), group: 'academic' },
-    { label: 'Academic Calendar', path: '/academic-calendar', permission: hasPermission('academic'), group: 'academic' },
+    { label: 'AI Books Hub', path: '/ai-book-list', permission: checkPermission('ai_book_list') && !isStudent, group: 'ai' },
+    { label: 'Chapter Content', path: '/subject-content', permission: checkPermission('subject_content') && !isStudent, group: 'ai' },
+    { label: 'AI Tutor', path: '/ai-tutor', permission: checkPermission('ai_tutor'), group: 'ai' },
     
     // Finance
-    { label: 'Finance Dashboard', path: '/finance-dashboard', permission: hasPermission('finance'), group: 'finance' },
-    { label: 'General Ledger', path: '/financials', permission: hasPermission('finance'), group: 'finance' },
-    { label: 'Fee Collection', path: '/fees/generate', permission: hasPermission('finance'), group: 'finance' },
-    { label: 'Fee Structures', path: '/fees/structures', permission: hasPermission('finance'), group: 'finance' },
-    { label: 'Fee Heads', path: '/fees/heads', permission: hasPermission('finance'), group: 'finance' },
-    { label: 'Fee Policies', path: '/fees/settings', permission: hasPermission('finance'), group: 'finance' },
+    { label: 'Finance Dashboard', path: '/finance-dashboard', permission: checkPermission('finance_dashboard'), group: 'finance' },
+    { label: 'General Ledger', path: '/financials', permission: checkPermission('financials'), group: 'finance' },
+    { label: 'Fee Collection', path: '/fees/generate', permission: checkPermission('fee_collection'), group: 'finance' },
+    { label: 'Fee Structures', path: '/fees/structures', permission: checkPermission('fee_structures'), group: 'finance' },
+    { label: 'Fee Heads', path: '/fees/heads', permission: checkPermission('fee_heads'), group: 'finance' },
+    { label: 'Fee Policies', path: '/fees/settings', permission: checkPermission('fee_policies'), group: 'finance' },
     
     // HR & Payroll
-    { label: 'Employee List', path: '/employees', permission: hasPermission('hr'), group: 'hr' },
-    { label: 'Academic Staff', path: '/teachers', permission: hasPermission('hr'), group: 'hr' },
-    { label: 'Staff Attendance', path: '/attendance', permission: hasPermission('hr'), group: 'hr' },
-    { label: 'Leave Management', path: '/leaves', permission: hasPermission('hr'), group: 'hr' },
-    { label: 'Leave Policies', path: '/leave/settings', permission: hasPermission('hr'), group: 'hr' },
-    { label: 'Staff Payroll', path: '/payroll', permission: hasPermission('hr'), group: 'hr' },
+    { label: 'Employee List', path: '/employees', permission: checkPermission('employees'), group: 'hr' },
+    { label: 'Academic Staff', path: '/teachers', permission: checkPermission('teachers'), group: 'hr' },
+    { label: 'Staff Attendance', path: '/attendance', permission: checkPermission('attendance'), group: 'hr' },
+    { label: 'Leave Management', path: '/leaves', permission: checkPermission('leaves'), group: 'hr' },
+    { label: 'Leave Policies', path: '/leave/settings', permission: checkPermission('leave_settings'), group: 'hr' },
+    { label: 'Staff Payroll', path: '/payroll', permission: checkPermission('payroll'), group: 'hr' },
     
     // Logistics
-    { label: 'Front Office', path: '/front-office', permission: hasPermission('front_office'), group: 'logistics' },
-    { label: 'Communication', path: '/communication', permission: hasPermission('communication'), group: 'logistics' },
-    { label: 'Inventory & Store', path: '/inventory', permission: hasPermission('inventory'), group: 'logistics' },
-    { label: 'Transport Management', path: '/transport', permission: hasPermission('infrastructure'), group: 'logistics' },
-    { label: 'Hostel Management', path: '/hostel', permission: hasPermission('infrastructure'), group: 'logistics' },
-    { label: 'Library Management', path: '/library', permission: hasPermission('infrastructure'), group: 'logistics' },
+    { label: 'Front Office', path: '/front-office', permission: checkPermission('front_office'), group: 'logistics' },
+    { label: 'Communication', path: '/communication', permission: checkPermission('communication'), group: 'logistics' },
+    { label: 'Inventory & Store', path: '/inventory', permission: checkPermission('inventory'), group: 'logistics' },
+    { label: 'Transport Management', path: '/transport', permission: checkPermission('transport'), group: 'logistics' },
+    { label: 'Hostel Management', path: '/hostel', permission: checkPermission('hostel'), group: 'logistics' },
+    { label: 'Library Management', path: '/library', permission: checkPermission('library'), group: 'logistics' },
     
     // Masters
-    { label: 'Academic Sessions', path: '/masters/academic-years', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Class Master', path: '/masters/classes', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Section Master', path: '/masters/sections', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Subject Master', path: '/masters/subjects', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Departments', path: '/masters/departments', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Designations', path: '/masters/designations', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Infrastructure Rooms', path: '/masters/rooms', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'Lab Master', path: '/masters/labs', permission: hasPermission('settings'), group: 'masters' },
-    { label: 'General Lookups', path: '/lookups', permission: hasPermission('settings'), group: 'masters' },
+    { label: 'Academic Sessions', path: '/masters/academic-years', permission: checkPermission('academic_years'), group: 'masters' },
+    { label: 'Class Master', path: '/masters/classes', permission: checkPermission('classes'), group: 'masters' },
+    { label: 'Section Master', path: '/masters/sections', permission: checkPermission('sections'), group: 'masters' },
+    { label: 'Subject Master', path: '/masters/subjects', permission: checkPermission('subjects'), group: 'masters' },
+    { label: 'Departments', path: '/masters/departments', permission: checkPermission('departments'), group: 'masters' },
+    { label: 'Designations', path: '/masters/designations', permission: checkPermission('designations'), group: 'masters' },
+    { label: 'Infrastructure Rooms', path: '/masters/rooms', permission: checkPermission('rooms'), group: 'masters' },
+    { label: 'Lab Master', path: '/masters/labs', permission: checkPermission('labs'), group: 'masters' },
+    { label: 'General Lookups', path: '/lookups', permission: checkPermission('lookups'), group: 'masters' },
     
     // Administration
-    { label: 'Organization Settings', path: '/settings/organization', permission: hasPermission('settings'), group: 'admin' },
-    { label: 'Menu Controls', path: '/settings/permissions', permission: hasPermission('settings'), group: 'admin' },
-    { label: 'User Management', path: '/settings/users', permission: hasPermission('settings'), group: 'admin' },
-    { label: 'System Quick Setup', path: '/settings/setup', permission: hasPermission('settings'), group: 'admin' },
+    { label: 'Organization Settings', path: '/settings/organization', permission: checkPermission('organization_settings'), group: 'admin' },
+    { label: 'Menu Controls', path: '/settings/permissions', permission: checkPermission('permissions'), group: 'admin' },
+    { label: 'User Management', path: '/settings/users', permission: checkPermission('users'), group: 'admin' },
+    { label: 'System Quick Setup', path: '/settings/setup', permission: checkPermission('setup'), group: 'admin' },
   ].filter(item => item.permission === true || item.permission);
 
   const filteredResults = searchQuery.trim() === '' 
@@ -256,7 +261,7 @@ function App() {
             </Link>
 
             {/* 2. Students */}
-            {hasPermission('students') && (
+            {checkPermission('students') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('students')} 
@@ -269,7 +274,7 @@ function App() {
                   <Backpack className={`h-5 w-5 shrink-0 transition-transform ${['/students', '/student-attendance', '/student-promotion', '/certificates', '/student-import'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
                   {sidebarOpen && (
                     <>
-                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Students</span>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">Student Management</span>
                       <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['students'] ? 'rotate-180' : ''}`} />
                     </>
                   )}
@@ -277,14 +282,12 @@ function App() {
                 {sidebarOpen && openMenus['students'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
                     {[
-                      { to: '/students', label: 'Student Directory' },
-                      { to: '/student-attendance', label: 'Daily Attendance' },
-                      { to: '/student-promotion', label: 'Promotion & Transfer' },
-                      { to: '/certificate-formats', label: 'Certificate Formats' },
-                      { to: '/certificates/designer', label: 'Advanced Designer' },
-                      { to: '/certificates', label: 'Certificate & ID' },
-                      { to: '/student-import', label: 'Bulk Import' }
-                    ].map(link => (
+                      { to: '/students', label: 'Student Directory', perm: 'student_directory' },
+                      { to: '/student-attendance', label: 'Daily Attendance', perm: 'student_attendance' },
+                      { to: '/student-promotion', label: 'Promotion & Transfer', perm: 'student_promotion' },
+                      { to: '/certificates', label: 'Certificate & ID', perm: 'certificates' },
+                      { to: '/student-import', label: 'Bulk Import', perm: 'student_import' }
+                    ].filter(l => checkPermission(l.perm)).map(link => (
                       <Link 
                         key={link.to} 
                         to={link.to} 
@@ -299,7 +302,7 @@ function App() {
             )}
 
             {/* 3. Academic */}
-            {(hasPermission('students') || hasPermission('academic')) && (
+            {checkPermission('academic') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('academic')} 
@@ -320,10 +323,10 @@ function App() {
                 {sidebarOpen && openMenus['academic'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
                     {[
-                      { to: '/examinations', label: 'Exams & Result' },
-                      { to: '/timetable', label: 'Class Timetables' },
-                      { to: '/academic-calendar', label: 'Academic Calendar' }
-                    ].map(link => (
+                      { to: '/examinations', label: 'Exams & Result', perm: 'examinations' },
+                      { to: '/timetable', label: 'Class Timetables', perm: 'timetable' },
+                      { to: '/academic-calendar', label: 'Academic Calendar', perm: 'academic_calendar' }
+                    ].filter(l => checkPermission(l.perm)).map(link => (
                       <Link 
                         key={link.to} 
                         to={link.to} 
@@ -338,7 +341,7 @@ function App() {
             )}
 
             {/* 3. Academic - End */}
-            {hasPermission('finance') && (
+            {checkPermission('finance') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('accounts')} 
@@ -370,7 +373,7 @@ function App() {
             )}
 
             {/* 5. HR & Payroll */}
-            {hasPermission('hr') && (
+            {checkPermission('hr') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('hr')} 
@@ -402,7 +405,7 @@ function App() {
             )}
 
             {/* 6. Logistics */}
-            {(hasPermission('inventory') || hasPermission('infrastructure') || hasPermission('front_office')) && (
+            {(checkPermission('inventory') || checkPermission('infrastructure') || checkPermission('front_office')) && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('logistics')} 
@@ -434,7 +437,7 @@ function App() {
             )}
 
             {/* 7. Masters */}
-            {hasPermission('settings') && (
+            {checkPermission('settings') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('masters')} 
@@ -479,7 +482,7 @@ function App() {
             )}
 
             {/* AI Curriculum Section */}
-            {hasPermission('academic') && (
+            {checkPermission('ai') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('ai')} 
@@ -508,7 +511,7 @@ function App() {
             )}
 
             {/* 8. Administration */}
-            {hasPermission('settings') && (
+            {checkPermission('settings') && (
               <div className="space-y-1">
                 <button 
                   onClick={() => sidebarOpen && toggleSubMenu('setup')} 
@@ -725,7 +728,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/login" element={<Navigate to="/" />} />
               <Route path="/register" element={<Navigate to="/" />} />
-              <Route path="/students" element={<Students />} />
+              <Route path="/students" element={<Students checkWritePermission={checkWritePermission} />} />
               <Route path="/student-attendance" element={<StudentAttendance />} />
               <Route path="/student-promotion" element={<StudentPromotion />} />
               <Route path="/certificate-formats" element={<CertificateFormatManager />} />
@@ -762,6 +765,7 @@ function App() {
               <Route path="/masters/classes" element={
                 <MasterDataPage 
                   title="Class" subtitle="Manage school classes and their ordering" endpoint="classes"
+                  writeAllowed={checkWritePermission('classes')}
                   columns={[ { key: 'name', label: 'Class Name' }, { key: 'order', label: 'Sort Order' }, { key: 'isActive', label: 'Status', render: (v) => v ? 'Active' : 'Inactive' } ]}
                   formFields={[ 
                     { name: 'name', label: 'Class Name', type: 'text', required: true },
@@ -773,6 +777,7 @@ function App() {
               <Route path="/masters/sections" element={
                 <MasterDataPage 
                   title="Section" subtitle="Manage academic sections (A, B, C, etc.)" endpoint="sections"
+                  writeAllowed={checkWritePermission('sections')}
                   columns={[ { key: 'name', label: 'Section Name' }, { key: 'isActive', label: 'Status', render: (v) => v ? 'Active' : 'Inactive' } ]}
                   formFields={[ 
                     { name: 'name', label: 'Section Name', type: 'text', required: true },
@@ -783,6 +788,7 @@ function App() {
               <Route path="/masters/subjects" element={
                 <MasterDataPage 
                   title="Subject" subtitle="Manage academic subjects" endpoint="subjects"
+                  writeAllowed={checkWritePermission('subjects')}
                   columns={[ { key: 'code', label: 'Code' }, { key: 'name', label: 'Subject Name' }, { key: 'isActive', label: 'Status' } ]}
                   formFields={[ 
                     { name: 'code', label: 'Subject Code', type: 'text', required: true },
@@ -794,6 +800,7 @@ function App() {
               <Route path="/masters/academic-years" element={
                 <MasterDataPage 
                   title="Academic Year" subtitle="Manage school sessions" endpoint="academic-years"
+                  writeAllowed={checkWritePermission('academic_years')}
                   columns={[ 
                     { key: 'name', label: 'Year' }, 
                     { key: 'startDate', label: 'Starts', render: (v) => <span className="text-slate-600 font-medium">{new Date(v).toLocaleDateString()}</span> }, 
@@ -814,6 +821,7 @@ function App() {
               <Route path="/masters/departments" element={
                 <MasterDataPage 
                   title="Department" subtitle="School departments (Admin, Accounts, etc.)" endpoint="departments"
+                  writeAllowed={checkWritePermission('departments')}
                   columns={[ { key: 'name', label: 'Department Name' }, { key: 'isActive', label: 'Status' } ]}
                   formFields={[ { name: 'name', label: 'Department Name', type: 'text', required: true }, { name: 'isActive', label: 'Active', type: 'checkbox' } ]}
                 />
@@ -821,6 +829,7 @@ function App() {
               <Route path="/masters/designations" element={
                 <MasterDataPage 
                   title="Designation" subtitle="Employee job titles" endpoint="designations"
+                  writeAllowed={checkWritePermission('designations')}
                   columns={[ { key: 'name', label: 'Designation' }, { key: 'isActive', label: 'Status' } ]}
                   formFields={[ { name: 'name', label: 'Designation Name', type: 'text', required: true }, { name: 'isActive', label: 'Active', type: 'checkbox' } ]}
                 />
@@ -828,6 +837,7 @@ function App() {
               <Route path="/masters/rooms" element={
                 <MasterDataPage 
                   title="Room" subtitle="Manage infrastructure rooms" endpoint="rooms"
+                  writeAllowed={checkWritePermission('rooms')}
                   columns={[ { key: 'roomNo', label: 'Room No' }, { key: 'type', label: 'Type' }, { key: 'capacity', label: 'Capacity' } ]}
                   formFields={[ 
                     { name: 'roomNo', label: 'Room Number/Name', type: 'text', required: true },
@@ -840,6 +850,7 @@ function App() {
               <Route path="/masters/labs" element={
                 <MasterDataPage 
                   title="Lab" subtitle="Manage school laboratories" endpoint="labs"
+                  writeAllowed={checkWritePermission('labs')}
                   columns={[ { key: 'name', label: 'Lab Name' }, { key: 'description', label: 'Description' } ]}
                   formFields={[ 
                     { name: 'name', label: 'Lab Name', type: 'text', required: true },
@@ -852,6 +863,7 @@ function App() {
               <Route path="/fees/heads" element={
                 <MasterDataPage 
                   title="Fee Head" subtitle="Define fee categories (Tuition, Bus, etc.)" endpoint="fee/heads"
+                  writeAllowed={checkWritePermission('fee_heads')}
                   columns={[ 
                     { key: 'name', label: 'Name' }, 
                     { key: 'isSelective', label: 'Selective?', render: (v) => v ? 'Yes' : 'No' }, 
@@ -879,6 +891,7 @@ function App() {
         <StudentDetailPanel
           student={quickViewStudent}
           onClose={() => setQuickViewStudent(null)}
+          canEdit={checkWritePermission('student_directory')}
           onEdit={(s) => {
             setQuickViewStudent(null);
             window.location.href = `/students?edit=${s.id}`;

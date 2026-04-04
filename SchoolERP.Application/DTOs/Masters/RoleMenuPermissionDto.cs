@@ -10,12 +10,20 @@ public class MenuPermissionDto
     [Required]
     public string MenuKey { get; set; } = string.Empty;
     
-    public bool IsVisible { get; set; }
+    public bool CanRead { get; set; }
+    public bool CanWrite { get; set; }
 }
 
 public class UpdateMenuPermissionsDto
 {
     public string? RoleName { get; set; }
     public Guid? UserId { get; set; }
-    public List<string> MenuKeys { get; set; } = new();
+    public List<MenuPermissionItemDto> Permissions { get; set; } = new();
+}
+
+public class MenuPermissionItemDto
+{
+    public string MenuKey { get; set; } = string.Empty;
+    public bool CanRead { get; set; }
+    public bool CanWrite { get; set; }
 }

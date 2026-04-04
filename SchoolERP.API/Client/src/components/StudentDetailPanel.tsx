@@ -15,6 +15,7 @@ interface StudentDetailPanelProps {
   student: Student | null;
   onClose: () => void;
   onEdit: (student: Student) => void;
+  canEdit?: boolean;
   className?: string;
   sectionName?: string;
   academicYearName?: string;
@@ -22,7 +23,7 @@ interface StudentDetailPanelProps {
 
 type TabType = 'BASIC' | 'ADMISSION' | 'DOCUMENT' | 'FAMILY' | 'ADDRESS' | 'FINANCE';
 
-export default function StudentDetailPanel({ student, onClose, onEdit, className, sectionName, academicYearName }: StudentDetailPanelProps) {
+export default function StudentDetailPanel({ student, onClose, onEdit, canEdit = true, className, sectionName, academicYearName }: StudentDetailPanelProps) {
   const { formatCurrency, formatDate, settings } = useLocalization();
   const [activeTab, setActiveTab] = useState<TabType>('BASIC');
   const [documents, setDocuments] = useState<any[]>([]);
@@ -103,12 +104,14 @@ export default function StudentDetailPanel({ student, onClose, onEdit, className
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => onEdit(student)}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              Edit Profile
-            </button>
+            {canEdit && (
+              <button 
+                onClick={() => onEdit(student)}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Edit Profile
+              </button>
+            )}
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
               <X className="h-5 w-5" />
             </button>

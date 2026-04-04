@@ -115,7 +115,7 @@ public class EmployeeController : ControllerBase
     // GET /api/employee/short-list
     // ─────────────────────────────────────────────────────
     [HttpGet("short-list")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Roles = "Admin,HR,Staff")] 
     public async Task<IActionResult> GetShortList()
     {
         var employees = await _unitOfWork.Repository<Employee>().GetQueryable()

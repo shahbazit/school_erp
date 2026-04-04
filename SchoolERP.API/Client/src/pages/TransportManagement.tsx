@@ -9,7 +9,11 @@ import { studentApi } from '../api/studentApi';
 import { Student } from '../types';
 import { useLocalization } from '../contexts/LocalizationContext';
 
+import { usePermissions } from '../hooks/usePermissions';
+
 export default function TransportManagement() {
+  const { hasWritePermission } = usePermissions();
+  const writeAllowed = hasWritePermission('transport');
   const [loading, setLoading] = useState(true);
   const [routes, setRoutes] = useState<TransportRoute[]>([]);
   const [vehicles, setVehicles] = useState<TransportVehicle[]>([]);
@@ -140,7 +144,7 @@ export default function TransportManagement() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className={`max-w-7xl mx-auto space-y-6 pb-20 animate-in fade-in duration-500 ${!writeAllowed ? 'is-read-only-view' : ''}`}>
       
       {/* Module Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

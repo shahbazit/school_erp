@@ -34,38 +34,49 @@ public class PermissionController : ControllerBase
     public async Task<IActionResult> GetRolePermissions(string roleName)
     {
         var permissions = await _unitOfWork.Repository<MenuPermission>().GetQueryable()
-            .Where(p => p.RoleName == roleName && p.UserId == null && p.IsVisible)
-            .Select(p => p.MenuKey)
+            .Where(p => p.RoleName == roleName && p.UserId == null)
+            .Select(p => new MenuPermissionItemDto { MenuKey = p.MenuKey, CanRead = p.CanRead, CanWrite = p.CanWrite })
             .ToListAsync();
 
         return Ok(permissions);
     }
 
     [HttpGet("user/{userId}")]
-    public async Task<IActionResult> GetUserPermissions(Guid userId)
+    public async Task<IActionResult> GetUserPermissions(string userId)
     {
+        // Resilient check for GUID format (prevents 400 errors from stale frontend IDs)
+        if (!Guid.TryParse(userId, out var userGuid))
+        {
+            Serilog.Log.Warning("GetPermissionsByUser: Invalid User ID format provided: {UserId}", userId);
+            return NotFound(new { message = "Invalid User ID format." });
+        }
+
         var user = await _unitOfWork.Repository<User>().GetQueryable()
-            .FirstOrDefaultAsync(u => u.Id == userId);
+            .FirstOrDefaultAsync(u => u.Id == userGuid);
         
         if (user == null) return NotFound("User not found");
 
         var rolePerms = await _unitOfWork.Repository<MenuPermission>().GetQueryable()
-            .Where(p => p.RoleName == user.Role && p.UserId == null && p.IsVisible)
-            .Select(p => p.MenuKey)
+            .Where(p => p.RoleName == user.Role && p.UserId == null)
+            .Select(p => new MenuPermissionItemDto { MenuKey = p.MenuKey, CanRead = p.CanRead, CanWrite = p.CanWrite })
             .ToListAsync();
 
         var userPerms = await _unitOfWork.Repository<MenuPermission>().GetQueryable()
-            .Where(p => p.UserId == userId)
+            .Where(p => p.UserId == userGuid)
+            .Select(p => new MenuPermissionItemDto { MenuKey = p.MenuKey, CanRead = p.CanRead, CanWrite = p.CanWrite })
             .ToListAsync();
 
-        var result = new HashSet<string>(rolePerms);
+        // user perms override role perms completely for that menu key
+        var resultDict = rolePerms.ToDictionary(p => p.MenuKey, p => p);
         foreach (var up in userPerms)
         {
-            if (up.IsVisible) result.Add(up.MenuKey);
-            else result.Remove(up.MenuKey);
+            resultDict[up.MenuKey] = up;
         }
 
-        return Ok(result.ToList());
+        return Ok(new { 
+            hasOverrides = userPerms.Any(), 
+            permissions = resultDict.Values.ToList() 
+        });
     }
 
     [HttpGet("menus")]
@@ -76,19 +87,6 @@ public class PermissionController : ControllerBase
             .OrderBy(m => m.SortOrder)
             .ToListAsync();
             
-        // Add hardcoded new modules if not present in DB
-        var keys = menus.Select(m => m.Key).ToHashSet();
-        if (!keys.Contains("students")) menus.Add(new MenuMaster { Key = "students", Label = "Academic Hub", Icon = "backpack", SortOrder = 1, IsActive = true });
-        if (!keys.Contains("hr")) menus.Add(new MenuMaster { Key = "hr", Label = "Human Resources", Icon = "user-cog", SortOrder = 2, IsActive = true });
-        if (!keys.Contains("academics")) menus.Add(new MenuMaster { Key = "academics", Label = "Academics", Icon = "book-open", SortOrder = 3, IsActive = true });
-        if (!keys.Contains("fees")) menus.Add(new MenuMaster { Key = "fees", Label = "Fees & Accounts", Icon = "dollar-sign", SortOrder = 4, IsActive = true });
-        if (!keys.Contains("front_office")) menus.Add(new MenuMaster { Key = "front_office", Label = "Admission & Reception", Icon = "building-2", SortOrder = 5, IsActive = true });
-        if (!keys.Contains("finance")) menus.Add(new MenuMaster { Key = "finance", Label = "Finance & Ledger", Icon = "wallet", SortOrder = 6, IsActive = true });
-        if (!keys.Contains("communication")) menus.Add(new MenuMaster { Key = "communication", Label = "Communication Hub", Icon = "message-circle", SortOrder = 7, IsActive = true });
-        if (!keys.Contains("infrastructure")) menus.Add(new MenuMaster { Key = "infrastructure", Label = "Infrastructure", Icon = "truck", SortOrder = 8, IsActive = true });
-        if (!keys.Contains("inventory")) menus.Add(new MenuMaster { Key = "inventory", Label = "Inventory & Store", Icon = "package", SortOrder = 9, IsActive = true });
-        if (!keys.Contains("settings")) menus.Add(new MenuMaster { Key = "settings", Label = "System Settings", Icon = "settings", SortOrder = 10, IsActive = true });
-
         return Ok(menus);
     }
 
@@ -101,41 +99,68 @@ public class PermissionController : ControllerBase
         if (string.IsNullOrEmpty(roleName) || !Guid.TryParse(userIdStr, out var userId))
             return BadRequest("Could not identify user from token");
 
-        // User specific permissions override or add to role permissions
+        // 1. Get Organization Menu (Allowlist)
+        var orgMenus = await _unitOfWork.Repository<OrganizationMenu>().GetQueryable()
+            .Where(m => m.IsEnabled)
+            .Select(m => m.MenuKey)
+            .ToListAsync();
+
+        // 2. Fetch User and Role permissions
         var rolePerms = await _unitOfWork.Repository<MenuPermission>().GetQueryable()
-            .Where(p => p.RoleName == roleName && p.UserId == null && p.IsVisible)
-            .Select(p => p.MenuKey)
+            .Where(p => p.RoleName == roleName && p.UserId == null)
+            .Select(p => new MenuPermissionItemDto { MenuKey = p.MenuKey, CanRead = p.CanRead, CanWrite = p.CanWrite })
             .ToListAsync();
 
         var userPerms = await _unitOfWork.Repository<MenuPermission>().GetQueryable()
             .Where(p => p.UserId == userId)
+            .Select(p => new MenuPermissionItemDto { MenuKey = p.MenuKey, CanRead = p.CanRead, CanWrite = p.CanWrite })
             .ToListAsync();
 
-        // If user has specific settings, they take priority
-        var result = new HashSet<string>(rolePerms);
+        // Use GroupBy to avoid duplicate key exceptions in ToDictionary
+        var resultDict = rolePerms
+            .GroupBy(p => p.MenuKey)
+            .ToDictionary(g => g.Key, g => g.First());
+
         foreach (var up in userPerms)
         {
-            if (up.IsVisible) result.Add(up.MenuKey);
-            else result.Remove(up.MenuKey);
+            resultDict[up.MenuKey] = up;
         }
 
-        // AUTO-ENABLE new modules for ADMIN
+        // AUTO-ENABLE full access for ADMIN by default to prevent lockout if missing seeded perms
         if (string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase))
         {
-            result.Add("finance");
-            result.Add("communication");
-            result.Add("infrastructure");
-            result.Add("inventory");
+            var adminDefaults = new HashSet<string> { 
+                "dashboard", "students", "student_directory", "student_attendance", "student_promotion", "certificates", "student_import",
+                "academic", "examinations", "timetable", "academic_calendar",
+                "finance", "finance_dashboard", "financials", "fee_collection", "fee_structures", "fee_heads", "fee_policies",
+                "hr", "employees", "teachers", "attendance", "leaves", "leave_settings", "payroll",
+                "logistics", "front_office", "communication", "inventory", "transport", "hostel", "library",
+                "masters", "academic_years", "classes", "sections", "subjects", "departments", "designations", "rooms", "labs", "lookups",
+                "ai", "ai_book_list", "subject_content", "ai_tutor",
+                "admin", "organization_settings", "users", "permissions", "setup" 
+            };
+            foreach(var key in adminDefaults) 
+            {
+                if (!resultDict.ContainsKey(key))
+                {
+                    resultDict[key] = new MenuPermissionItemDto { MenuKey = key, CanRead = true, CanWrite = true };
+                }
+            }
         }
 
-        // FALLBACK FOR ADMIN: If no permissions exist at all for this organization/role, 
-        // give all modules by default so existing users are not broken.
-        if (rolePerms.Count == 0 && userPerms.Count == 0 && string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase))
+        var finalPermissions = resultDict.Values.ToList();
+
+        // Only return menus that are enabled by the Organization (Allowlist)
+        if (orgMenus.Count > 0)
         {
-            return Ok(new[] { "students", "hr", "academics", "fees", "settings", "finance", "communication", "infrastructure", "inventory", "front_office" });
+            var allowedKeys = orgMenus.ToHashSet();
+            finalPermissions = finalPermissions.Where(p => allowedKeys.Contains(p.MenuKey)).ToList();
         }
 
-        return Ok(result.ToList());
+        return Ok(new { 
+            hasOverrides = userPerms.Any(), 
+            permissions = finalPermissions 
+        });
     }
 
     [HttpPost("update")]
@@ -158,19 +183,58 @@ public class PermissionController : ControllerBase
             _unitOfWork.Repository<MenuPermission>().Delete(p);
         }
 
+        // If Reset operation (empty list), we just cleared everything above.
+        if (dto.Permissions == null || dto.Permissions.Count == 0)
+        {
+             return Ok(new { message = "Individual overrides cleared. User will now inherit from Role." });
+        }
         // Add new
-        foreach (var key in dto.MenuKeys)
+        foreach (var item in dto.Permissions)
         {
             await _unitOfWork.Repository<MenuPermission>().AddAsync(new MenuPermission
             {
                 RoleName = dto.RoleName,
                 UserId = dto.UserId,
-                MenuKey = key,
-                IsVisible = true
+                MenuKey = item.MenuKey,
+                CanRead = item.CanRead,
+                CanWrite = item.CanWrite
             });
         }
 
         await _unitOfWork.CompleteAsync();
         return Ok(new { message = "Permissions updated successfully" });
+    }
+
+    [HttpGet("organization")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetOrganizationMenus()
+    {
+        var orgMenus = await _unitOfWork.Repository<OrganizationMenu>().GetQueryable()
+            .ToListAsync();
+        return Ok(orgMenus);
+    }
+
+    [HttpPost("organization")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateOrganizationMenus([FromBody] List<string> enabledMenuKeys)
+    {
+        var existing = await _unitOfWork.Repository<OrganizationMenu>().GetQueryable().ToListAsync();
+        
+        foreach(var m in existing)
+        {
+            _unitOfWork.Repository<OrganizationMenu>().Delete(m);
+        }
+
+        foreach(var key in enabledMenuKeys)
+        {
+            await _unitOfWork.Repository<OrganizationMenu>().AddAsync(new OrganizationMenu 
+            {
+                MenuKey = key,
+                IsEnabled = true
+            });
+        }
+
+        await _unitOfWork.CompleteAsync();
+        return Ok(new { message = "Organization menus updated successfully" });
     }
 }

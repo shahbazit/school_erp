@@ -17,7 +17,9 @@ public class FinanceReportService : IFinanceReportService
     public async Task<List<AccountSummaryDto>> GetAccountSummariesAsync(Guid? academicYearId = null)
     {
         var accounts = await _context.FinancialAccounts
+            .AsNoTracking()
             .Include(a => a.OwnerEmployee)
+            .Where(a => a.IsActive)
             .ToListAsync();
         var summaries = new List<AccountSummaryDto>();
 
@@ -42,9 +44,11 @@ public class FinanceReportService : IFinanceReportService
 
             var transferIn = await _context.OtherIncomes
                 .Where(t => t.FinancialAccountId == account.Id && (t.Category == "[Internal Transfer]" || t.Category == "Internal Transfer"))
+                .Where(t => !academicYearId.HasValue || t.AcademicYearId == academicYearId.Value)
                 .SumAsync(t => (decimal?)t.Amount) ?? 0;
             var transferOut = await _context.OfficeExpenses
                 .Where(t => t.FinancialAccountId == account.Id && (t.Category == "[Internal Transfer]" || t.Category == "Internal Transfer"))
+                .Where(t => !academicYearId.HasValue || t.AcademicYearId == academicYearId.Value)
                 .SumAsync(t => (decimal?)t.Amount) ?? 0;
 
             summaries.Add(new AccountSummaryDto

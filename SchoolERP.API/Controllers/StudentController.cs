@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SchoolERP.API.Attributes;
 using SchoolERP.Application.DTOs.Fees;
 using SchoolERP.Application.DTOs.Student;
 using SchoolERP.Application.Interfaces;
@@ -25,7 +26,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin,Teacher")]
+    [RequireModulePermission("students", requiresWrite: false)]
     public async Task<IActionResult> GetAllStudents(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
@@ -160,7 +161,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [RequireModulePermission("students", requiresWrite: true)]
     public async Task<IActionResult> AddStudent([FromBody] CreateStudentDto dto)
     {
         // For debugging 400 errors, log the actual incoming JSON if ModelState is invalid
@@ -276,7 +277,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("bulk/validate")]
-    [Authorize(Roles = "Admin")]
+    [RequireModulePermission("students", requiresWrite: true)]
     public async Task<IActionResult> BulkValidateStudents([FromBody] IEnumerable<CreateStudentDto> dtos)
     {
         if (dtos == null || !dtos.Any()) return BadRequest("No students provided.");
@@ -349,7 +350,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("bulk")]
-    [Authorize(Roles = "Admin")]
+    [RequireModulePermission("students", requiresWrite: true)]
     public async Task<IActionResult> BulkAddStudents([FromBody] IEnumerable<CreateStudentDto> dtos)
     {
         if (dtos == null || !dtos.Any()) return BadRequest("No students provided.");
@@ -590,7 +591,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("{id}/update")]
-    [Authorize(Roles = "Admin")]
+    [RequireModulePermission("students", requiresWrite: true)]
     public async Task<IActionResult> UpdateStudent(Guid id, [FromBody] UpdateStudentDto dto)
     {
         var student = await _unitOfWork.Repository<Student>().GetQueryable()
@@ -826,7 +827,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("{id}/delete")]
-    [Authorize(Roles = "Admin")]
+    [RequireModulePermission("students", requiresWrite: true)]
     public async Task<IActionResult> DeleteStudent(Guid id) // Soft Delete
     {
         var student = await _unitOfWork.Repository<Student>().GetByIdAsync(id);

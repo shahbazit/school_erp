@@ -53,9 +53,10 @@ interface MasterPageProps {
     visibleIf?: (formData: any) => boolean;
   }[];
   renderToolbar?: () => React.ReactNode;
+  writeAllowed?: boolean;
 }
 
-export default function MasterDataPage({ title, subtitle, endpoint, columns, formFields, renderToolbar }: MasterPageProps) {
+export default function MasterDataPage({ title, subtitle, endpoint, columns, formFields, renderToolbar, writeAllowed = true }: MasterPageProps) {
   const { masters, loading, error, fetchMasters, addMaster, updateMaster, removeMaster } = useMasters(endpoint);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -151,13 +152,15 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
         </div>
         <div className="flex gap-2">
           {renderToolbar?.()}
-          <button 
-            onClick={handleOpenAddModal}
-            className="btn-primary"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add New {title}
-          </button>
+          {writeAllowed && (
+            <button 
+              onClick={handleOpenAddModal}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add New {title}
+            </button>
+          )}
         </div>
       </div>
 
@@ -180,7 +183,7 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
                 {columns.map(col => (
                   <th key={col.key} className="px-6 py-4">{col.label}</th>
                 ))}
-                <th className="px-6 py-4 text-right">Actions</th>
+                {writeAllowed && <th className="px-6 py-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/80">
@@ -209,24 +212,26 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
                         )}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => handleOpenEditModal(item)}
-                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors shadow-sm bg-white"
-                        >
-                          <span className="sr-only">Edit</span>
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(item.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white"
-                        >
-                          <span className="sr-only">Delete</span>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {writeAllowed && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleOpenEditModal(item)}
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors shadow-sm bg-white"
+                          >
+                            <span className="sr-only">Edit</span>
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(item.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white"
+                          >
+                            <span className="sr-only">Delete</span>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

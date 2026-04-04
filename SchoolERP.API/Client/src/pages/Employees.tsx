@@ -15,6 +15,7 @@ import { masterApi } from '../api/masterApi';
 import { leaveApi, type LeavePlanDto } from '../api/leaveApi';
 import apiClient from '../api/apiClient'
 import { useLocalization } from '../contexts/LocalizationContext';
+import { usePermissions } from '../hooks/usePermissions';
 
 // --- Constants ---
 const EMPLOYMENT_TYPES = [
@@ -26,6 +27,8 @@ const EMPLOYMENT_TYPES = [
 
 export default function Employees() {
   const { formatCurrency, formatDate, settings } = useLocalization();
+  const { hasWritePermission } = usePermissions();
+  const writeAllowed = hasWritePermission('employee_directory');
   const [employees, setEmployees] = useState<EmployeeDto[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -316,7 +319,7 @@ export default function Employees() {
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className={`max-w-7xl mx-auto space-y-6 ${!writeAllowed ? 'is-read-only-view' : ''}`}>
       
       {/* Directory Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm">

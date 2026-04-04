@@ -7,7 +7,7 @@ import { Student } from '../types';
 import { toast } from 'react-toastify';
 import { masterApi } from '../api/masterApi';
 
-export default function Students() {
+export default function Students({ checkWritePermission }: { checkWritePermission: (key: string) => boolean }) {
   const { students, fetchStudents, loading, error, removeStudent, addStudent, updateStudent } = useStudents();
   const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem('student_search') || '');
   const [selectedSession, setSelectedSession] = useState(() => localStorage.getItem('student_session') || '');
@@ -140,8 +140,10 @@ export default function Students() {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  const writeAllowed = useMemo(() => checkWritePermission('student_directory'), [checkWritePermission]);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+    <div className={`max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 ${!writeAllowed ? 'is-read-only-view' : ''}`}>
       
       {/* Header & Stats Strip */}
       <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between mb-8">
@@ -252,10 +254,12 @@ export default function Students() {
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <button onClick={handleOpenAddModal} className="btn-primary flex-1 sm:flex-none py-2.5 px-5 shadow-sm shadow-primary-500/20">
-            <Plus className="h-4 w-4 mr-2" />
-            New Student
-          </button>
+          {writeAllowed && (
+            <button onClick={handleOpenAddModal} className="btn-primary flex-1 sm:flex-none py-2.5 px-5 shadow-sm shadow-primary-500/20">
+              <Plus className="h-4 w-4 mr-2" />
+              New Student
+            </button>
+          )}
         </div>
       </div>
 
@@ -349,31 +353,35 @@ export default function Students() {
                           <Eye className="h-4 w-4" />
                         </button>
 
-                        <button 
-                          onClick={() => window.location.href = `/fees/student/${student.id}`}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
-                          title="Collect Fee"
-                        >
-                          <CreditCard className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleOpenEditModal(student)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (window.confirm(`Are you sure you want to deactivate ${student.firstName}?`)) {
-                              removeStudent(student.id!);
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                          title="Deactivate"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {writeAllowed && (
+                          <>
+                            <button 
+                              onClick={() => window.location.href = `/fees/student/${student.id}`}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors"
+                              title="Collect Fee"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleOpenEditModal(student)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to deactivate ${student.firstName}?`)) {
+                                  removeStudent(student.id!);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              title="Deactivate"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -409,6 +417,7 @@ export default function Students() {
       <StudentDetailPanel
         student={selectedStudent}
         onClose={() => setSelectedStudent(null)}
+        canEdit={writeAllowed}
         onEdit={(s) => {
           setSelectedStudent(null);
           handleOpenEditModal(s);

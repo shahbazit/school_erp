@@ -28,6 +28,10 @@ public class OrganizationMiddleware
 
         // 2. Fallback to Header (X-Organization-Id) if claim not found OR even if found (header can override for multi-tenant switching)
         var orgHeader = context.Request.Headers["X-Organization-Id"].FirstOrDefault();
+        
+        // Sanitize header (ignore common stale values from localStorage)
+        if (orgHeader == "undefined" || orgHeader == "null") orgHeader = null;
+
         if (!string.IsNullOrEmpty(orgHeader) && Guid.TryParse(orgHeader, out var headerOrgId))
         {
             // If we have both, we can decide priority. Usually Claim is more secure, Header is more flexible.

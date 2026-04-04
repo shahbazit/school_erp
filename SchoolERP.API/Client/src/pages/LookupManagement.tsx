@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLookups } from '../hooks/useMasters';
+import { usePermissions } from '../hooks/usePermissions';
 import { LookupType, Lookup } from '../types';
 import { Plus, Edit2, Trash2, Search, Settings2 } from 'lucide-react';
 import { GenericModal } from '../components/GenericModal';
@@ -26,6 +27,8 @@ const lookupTypeOptions = [
 ];
 
 export default function LookupManagement() {
+  const { hasWritePermission } = usePermissions();
+  const writeAllowed = hasWritePermission('lookups');
   const [selectedType, setSelectedType] = useState<LookupType>(LookupType.Relation);
   const { lookups, loading, error, fetchLookups, addLookup, updateLookup, removeLookup } = useLookups(selectedType);
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,13 +82,15 @@ export default function LookupManagement() {
           <h1 className="text-2xl font-bold text-slate-900">Reference Lookups</h1>
           <p className="text-slate-500 text-sm mt-1">Manage fixed value lists for the system</p>
         </div>
-        <button 
-          onClick={handleOpenAddModal}
-          className="btn-primary flex items-center justify-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add New {lookupTypeOptions.find(o => o.value === selectedType)?.label}
-        </button>
+        {writeAllowed && (
+          <button 
+            onClick={handleOpenAddModal}
+            className="btn-primary flex items-center justify-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add New {lookupTypeOptions.find(o => o.value === selectedType)?.label}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -134,7 +139,7 @@ export default function LookupManagement() {
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Description</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                {writeAllowed && <th className="px-6 py-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/80">
@@ -168,24 +173,26 @@ export default function LookupManagement() {
                         {lookup.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => handleOpenEditModal(lookup)}
-                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (window.confirm('Delete this entry?')) removeLookup(lookup.id);
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {writeAllowed && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleOpenEditModal(lookup)}
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm('Delete this entry?')) removeLookup(lookup.id);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

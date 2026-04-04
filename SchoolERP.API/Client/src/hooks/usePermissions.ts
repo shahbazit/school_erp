@@ -1,15 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient from '../api/apiClient';
+import { useGlobalPermissions } from '../contexts/PermissionContext';
 
-export function usePermissions(roleId?: string) {
-  const [permissions, setPermissions] = useState<string[]>([]);
+export interface PermissionItem {
+  menuKey: string;
+  canRead: boolean;
+  canWrite: boolean;
+}
+
+export function usePermissions(roleId?: string, isUserRef: boolean = false) {
+  const global = useGlobalPermissions();
+  const [localPermissions, setLocalPermissions] = useState<PermissionItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchPermissions = useCallback(async (id: string) => {
+  const fetchPermissions = useCallback(async (id: string, isUser: boolean = false) => {
     setLoading(true);
     try {
-      const response = await apiClient.get<string[]>(`/permission/role/${id}`);
-      setPermissions(response.data);
+      const endpoint = isUser ? `/permission/user/${id}` : `/permission/role/${id}`;
+      const response = await apiClient.get<any>(endpoint);
+      const perms = Array.isArray(response.data) ? response.data : (response.data.permissions || []);
+      setLocalPermissions(perms);
     } catch (err) {
       console.error('Failed to fetch permissions', err);
     } finally {
@@ -17,31 +27,33 @@ export function usePermissions(roleId?: string) {
     }
   }, []);
 
-  const fetchMyPermissions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get<string[]>('/permission/my');
-      setPermissions(response.data);
-    } catch (err) {
-      console.error('Failed to fetch my permissions', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (roleId) {
-      fetchPermissions(roleId);
+      fetchPermissions(roleId, isUserRef);
     }
-  }, [roleId, fetchPermissions]);
+  }, [roleId, isUserRef, fetchPermissions]);
 
-  const hasPermission = useCallback((menuKey: string) => {
-    return permissions.includes(menuKey);
-  }, [permissions]);
+  const hasReadPermission = useCallback((menuKey: string) => {
+    if (roleId) {
+      if (global.isAdmin) return true;
+      return localPermissions.some(p => p.menuKey === menuKey && p.canRead);
+    }
+    return global.hasReadPermission(menuKey);
+  }, [roleId, localPermissions, global]);
 
-  const updatePermissions = async (roleId: string, menuKeys: string[]) => {
+  const hasWritePermission = useCallback((menuKey: string) => {
+    if (roleId) {
+      if (global.isAdmin) return true;
+      return localPermissions.some(p => p.menuKey === menuKey && p.canWrite);
+    }
+    return global.hasWritePermission(menuKey);
+  }, [roleId, localPermissions, global]);
+
+  const updatePermissionsBulk = async (updateDto: any) => {
     try {
-      await apiClient.post('/permission/update', { roleId, menuKeys });
+      await apiClient.post('/permission/update', updateDto);
+      // If we just updated permissions, we should probably trigger a global refresh
+      global.refreshPermissions();
       return true;
     } catch (err) {
       console.error('Failed to update permissions', err);
@@ -49,5 +61,18 @@ export function usePermissions(roleId?: string) {
     }
   };
 
-  return { permissions, loading, fetchPermissions, fetchMyPermissions, hasPermission, updatePermissions };
+  if (!roleId) {
+    return { 
+        permissions: global.permissions, 
+        loading: global.loading, 
+        fetchPermissions, 
+        fetchMyPermissions: global.refreshPermissions, 
+        hasReadPermission: global.hasReadPermission, 
+        hasWritePermission: global.hasWritePermission, 
+        updatePermissionsBulk, 
+        isAdmin: global.isAdmin 
+    };
+  }
+
+  return { permissions: localPermissions, loading, fetchPermissions, fetchMyPermissions: global.refreshPermissions, hasReadPermission, hasWritePermission, updatePermissionsBulk, isAdmin: global.isAdmin };
 }
