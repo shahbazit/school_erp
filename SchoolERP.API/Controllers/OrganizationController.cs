@@ -29,7 +29,7 @@ public class OrganizationController : ControllerBase
 
         // Organizations table is global (not tenant-filtered)
         var org = await _db.Organizations.FirstOrDefaultAsync(o => o.Id == orgId);
-        if (org == null) return NotFound("Organization not found.");
+        if (org == null) return NotFound(new { message = "Organization not found." });
 
         return Ok(new OrganizationSettingsDto
         {
@@ -61,14 +61,14 @@ public class OrganizationController : ControllerBase
         });
     }
 
-    [HttpPut("settings")]
+    [HttpPost("settings/update")]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateOrganizationSettingsDto dto)
     {
         var orgId = _organizationService.GetOrganizationId();
         if (orgId == Guid.Empty) return Unauthorized();
 
         var org = await _db.Organizations.FirstOrDefaultAsync(o => o.Id == orgId);
-        if (org == null) return NotFound("Organization not found.");
+        if (org == null) return NotFound(new { message = "Organization not found." });
 
         // Update fields
         org.Name = dto.Name;

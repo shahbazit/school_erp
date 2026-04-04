@@ -13,6 +13,7 @@ public interface IInventoryService
     // Transactions
     Task<List<InventoryTransactionDto>> GetInventoryTransactionsAsync();
     Task<InventoryTransactionDto> CreateInventoryTransactionAsync(CreateInventoryTransactionRequest request);
+    Task<InventoryTransactionDto> UpdateTransactionPaymentAsync(Guid id, UpdatePaymentStatusRequest request);
 
     // Suppliers
     Task<List<InventorySupplierDto>> GetSuppliersAsync();

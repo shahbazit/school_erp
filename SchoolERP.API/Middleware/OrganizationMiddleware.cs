@@ -38,6 +38,11 @@ public class OrganizationMiddleware
         if (organizationId.HasValue && organizationId.Value != Guid.Empty)
         {
             context.Items["OrganizationId"] = organizationId.Value;
+            Serilog.Log.Information("OrganizationMiddleware: Resolved OrgId {OrgId} for path {Path}", organizationId.Value, context.Request.Path);
+        }
+        else 
+        {
+            Serilog.Log.Warning("OrganizationMiddleware: Could not resolve OrganizationId for path {Path}", context.Request.Path);
         }
 
         await _next(context);

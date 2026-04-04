@@ -3,6 +3,7 @@ import { useMasters } from '../hooks/useMasters';
 import { Plus, Edit2, Trash2, Search, ArrowRight } from 'lucide-react';
 import { GenericModal } from '../components/GenericModal';
 import { masterApi } from '../api/masterApi';
+import { toast } from 'react-toastify';
 
 function SelectField({ field, value, onChange }: { field: any, value: any, onChange: (val: any) => void }) {
   const [options, setOptions] = useState<{ label: string; value: any }[]>(field.options || []);
@@ -115,7 +116,19 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
     } else {
       success = await addMaster(scrubbedData);
     }
-    if (success) setIsModalOpen(false);
+    if (success) {
+      toast.success(`${title} ${editingMaster ? 'updated' : 'created'} successfully!`);
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleDelete = async (id: any) => {
+    if (window.confirm(`Delete this ${title.toLowerCase()} record?`)) {
+      const success = await removeMaster(id);
+      if (success) {
+        toast.info(`${title} record deleted.`);
+      }
+    }
   };
 
   const filteredMasters = masters.filter(m => 
@@ -158,12 +171,6 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
           className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full shadow-sm transition-shadow focus:shadow-md"
         />
       </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 animate-in slide-in-from-top-2">
-          {error}
-        </div>
-      )}
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto min-h-[300px]">
@@ -208,14 +215,14 @@ export default function MasterDataPage({ title, subtitle, endpoint, columns, for
                           onClick={() => handleOpenEditModal(item)}
                           className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors shadow-sm bg-white"
                         >
+                          <span className="sr-only">Edit</span>
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button 
-                          onClick={() => {
-                            if (window.confirm('Delete this record?')) removeMaster(item.id);
-                          }}
+                          onClick={() => handleDelete(item.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white"
                         >
+                          <span className="sr-only">Delete</span>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>

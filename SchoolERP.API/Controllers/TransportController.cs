@@ -21,10 +21,10 @@ public class TransportController : ControllerBase
     [HttpPost("vehicles")]
     public async Task<IActionResult> CreateVehicle(CreateTransportVehicleDto dto) => Ok(await _transportService.CreateVehicleAsync(dto));
 
-    [HttpPut("vehicles/{id}")]
+    [HttpPost("vehicles/{id}/update")]
     public async Task<IActionResult> UpdateVehicle(Guid id, CreateTransportVehicleDto dto) => Ok(await _transportService.UpdateVehicleAsync(id, dto));
 
-    [HttpDelete("vehicles/{id}")]
+    [HttpPost("vehicles/{id}/delete")]
     public async Task<IActionResult> DeleteVehicle(Guid id) => Ok(await _transportService.DeleteVehicleAsync(id));
 
     [HttpGet("routes")]
@@ -33,10 +33,10 @@ public class TransportController : ControllerBase
     [HttpPost("routes")]
     public async Task<IActionResult> CreateRoute(CreateTransportRouteDto dto) => Ok(await _transportService.CreateRouteAsync(dto));
 
-    [HttpPut("routes/{id}")]
+    [HttpPost("routes/{id}/update")]
     public async Task<IActionResult> UpdateRoute(Guid id, CreateTransportRouteDto dto) => Ok(await _transportService.UpdateRouteAsync(id, dto));
 
-    [HttpDelete("routes/{id}")]
+    [HttpPost("routes/{id}/delete")]
     public async Task<IActionResult> DeleteRoute(Guid id) => Ok(await _transportService.DeleteRouteAsync(id));
 
     [HttpGet("assignments")]
@@ -45,7 +45,7 @@ public class TransportController : ControllerBase
     [HttpPost("assignments")]
     public async Task<IActionResult> AssignTransport(CreateTransportAssignmentDto dto) => Ok(await _transportService.AssignTransportAsync(dto));
 
-    [HttpDelete("assignments/{id}")]
+    [HttpPost("assignments/{id}/delete")]
     public async Task<IActionResult> RemoveAssignment(Guid id) => Ok(await _transportService.RemoveAssignmentAsync(id));
 
     // Stoppages
@@ -55,10 +55,10 @@ public class TransportController : ControllerBase
     [HttpPost("stoppages")]
     public async Task<IActionResult> CreateStoppage(CreateTransportStoppageDto dto) => Ok(await _transportService.CreateStoppageAsync(dto));
 
-    [HttpPut("stoppages/{id}")]
+    [HttpPost("stoppages/{id}/update")]
     public async Task<IActionResult> UpdateStoppage(Guid id, CreateTransportStoppageDto dto) => Ok(await _transportService.UpdateStoppageAsync(id, dto));
 
-    [HttpDelete("stoppages/{id}")]
+    [HttpPost("stoppages/{id}/delete")]
     public async Task<IActionResult> DeleteStoppage(Guid id) => Ok(await _transportService.DeleteStoppageAsync(id));
 }
 

@@ -111,7 +111,7 @@ public class FinanceController : ControllerBase
         return Ok(account);
     }
 
-    [HttpPut("accounts/{id}")]
+    [HttpPost("accounts/{id}/update")]
     public async Task<IActionResult> UpdateAccount(Guid id, FinancialAccount account)
     {
         var existing = await _context.FinancialAccounts.FindAsync(id);
@@ -127,12 +127,13 @@ public class FinanceController : ControllerBase
         return Ok(existing);
     }
 
-    [HttpDelete("accounts/{id}")]
+    [HttpPost("accounts/{id}/delete")]
     public async Task<IActionResult> DeleteAccount(Guid id)
     {
         var existing = await _context.FinancialAccounts.FindAsync(id);
         if (existing == null) return NotFound();
 
+        // Perform soft delete or hard delete? Let's stay hard delete for now as per previous logic.
         _context.FinancialAccounts.Remove(existing);
         await _context.SaveChangesAsync();
         return Ok(new { message = "Account deleted successfully." });

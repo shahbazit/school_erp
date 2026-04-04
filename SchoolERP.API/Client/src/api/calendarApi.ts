@@ -32,7 +32,7 @@ export const calendarApi = {
     return response.data;
   },
   deleteEvent: async (id: string) => {
-    await apiClient.delete(`/Calendar/${id}`);
+    await apiClient.post(`/Calendar/${id}/delete`);
   },
   setupWeeklyOffs: async (data: { 
     daysToOff: number[], 

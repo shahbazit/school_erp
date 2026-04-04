@@ -18,6 +18,7 @@ export const studentApi = {
     courseId?: string;
     academicYear?: string;
     isActive?: boolean;
+    status?: string;
     sortBy?: string;
   }): Promise<PaginatedResponse<Student>> => {
     const response = await apiClient.get<PaginatedResponse<Student>>('/student', { params });

@@ -49,6 +49,7 @@ public class StudentDto
     public string? EmergencyContactRelation { get; set; }
 
     public bool IsActive { get; set; }
+    public string? Status { get; set; }
     public bool IsMobileVerified { get; set; }
     public bool IsEmailVerified { get; set; }
     

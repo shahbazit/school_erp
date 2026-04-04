@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
   GraduationCap, Settings, LogOut, Bell, Menu, ChevronDown, 
-  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search, BookOpen
+  LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search, BookOpen, Sparkles, Calendar
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -42,12 +42,19 @@ import AcademicCalendar from './pages/AcademicCalendar';
 import OrganizationSettings from './pages/OrganizationSettings';
 import FinanceDashboard from './pages/FinanceDashboard';
 import PortalLogin from './pages/PortalLogin';
+import CertificateFormatManager from './pages/CertificateFormatManager';
+import CustomCertificateDesigner from './pages/CustomCertificateDesigner';
+import SubjectContent from './pages/SubjectContent';
+import AiBookList from './pages/AiBookList';
+import AiTutor from './pages/AiTutor';
 import { usePermissions } from './hooks/usePermissions';
 import { useEffect as useAppEffect, useMemo } from 'react';
 import { studentApi } from './api/studentApi';
 import { masterApi } from './api/masterApi';
 import { Student } from './types';
 import StudentDetailPanel from './components/StudentDetailPanel';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
@@ -87,6 +94,7 @@ function App() {
 
   const currentRole = (decodedToken?.Role || decodedToken?.role || decodedToken?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || 'Guest').toString();
   const isAdmin = currentRole.toLowerCase() === 'admin';
+  const isStudent = currentRole.toLowerCase() === 'student';
   const currentUserId = decodedToken?.id || '';
   const { hasPermission: baseHasPermission, fetchMyPermissions } = usePermissions();
   const hasPermission = (key: string) => {
@@ -133,6 +141,10 @@ function App() {
     
     // Academic
     { label: 'Exams & Result', path: '/examinations', permission: hasPermission('academic'), group: 'academic' },
+    // AI Curriculum
+    { label: 'AI Books Hub', path: '/ai-book-list', permission: hasPermission('academic') && !isStudent, group: 'ai' },
+    { label: 'Chapter Content', path: '/subject-content', permission: hasPermission('academic') && !isStudent, group: 'ai' },
+    { label: 'AI Tutor', path: '/ai-tutor', permission: true, group: 'ai' },
     { label: 'Class Timetables', path: '/timetable', permission: hasPermission('academic'), group: 'academic' },
     { label: 'Academic Calendar', path: '/academic-calendar', permission: hasPermission('academic'), group: 'academic' },
     
@@ -198,20 +210,25 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Auth initialIsLogin={true} onAuthSuccess={() => setIsAuthenticated(true)} />} />
-        <Route path="/portal" element={<PortalLogin onAuthSuccess={() => setIsAuthenticated(true)} />} />
-        <Route path="/register" element={<Auth initialIsLogin={false} onAuthSuccess={() => setIsAuthenticated(true)} />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Navigate to="/portal" />} />
-      </Routes>
+      <>
+        <ToastContainer position="top-right" autoClose={3000} limit={3} newestOnTop={true} />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Auth initialIsLogin={true} onAuthSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="/portal" element={<PortalLogin onAuthSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="/register" element={<Auth initialIsLogin={false} onAuthSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<Navigate to="/portal" />} />
+        </Routes>
+      </>
     );
   }
 
   return (
-    <div className="flex bg-slate-50 h-screen w-screen max-w-full text-slate-800 relative overflow-hidden font-sans">
+    <>
+      <ToastContainer position="top-right" autoClose={3000} theme="colored" limit={3} newestOnTop={true} />
+      <div className="flex bg-slate-50 h-screen w-screen max-w-full text-slate-800 relative overflow-hidden font-sans">
       
       {/* Sidebar Wrapper - Constant width to prevent layout shift */}
       <div className="shrink-0 relative z-50 w-0 md:w-20">
@@ -263,6 +280,8 @@ function App() {
                       { to: '/students', label: 'Student Directory' },
                       { to: '/student-attendance', label: 'Daily Attendance' },
                       { to: '/student-promotion', label: 'Promotion & Transfer' },
+                      { to: '/certificate-formats', label: 'Certificate Formats' },
+                      { to: '/certificates/designer', label: 'Advanced Designer' },
                       { to: '/certificates', label: 'Certificate & ID' },
                       { to: '/student-import', label: 'Bulk Import' }
                     ].map(link => (
@@ -318,7 +337,7 @@ function App() {
               </div>
             )}
 
-            {/* 4. Finance */}
+            {/* 3. Academic - End */}
             {hasPermission('finance') && (
               <div className="space-y-1">
                 <button 
@@ -459,6 +478,35 @@ function App() {
               </div>
             )}
 
+            {/* AI Curriculum Section */}
+            {hasPermission('academic') && (
+              <div className="space-y-1">
+                <button 
+                  onClick={() => sidebarOpen && toggleSubMenu('ai')} 
+                  className={`w-full flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                    ['/ai-book-list', '/subject-content'].includes(location.pathname)
+                      ? (sidebarOpen ? 'px-4 bg-primary-50/50 text-primary-700' : 'justify-center bg-primary-50/50 text-primary-700 shadow-sm')
+                      : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                  }`}
+                >
+                  <Sparkles className={`h-5 w-5 shrink-0 transition-transform ${['/ai-book-list', '/subject-content'].includes(location.pathname) ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  {sidebarOpen && (
+                    <>
+                      <span className="ml-3 font-medium text-sm truncate flex-1 text-left">AI Curriculum</span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${openMenus['ai'] ? 'rotate-180' : ''}`} />
+                    </>
+                  )}
+                </button>
+                {sidebarOpen && openMenus['ai'] && (
+                  <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
+                    <Link to="/ai-book-list" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/ai-book-list' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Manage Books</Link>
+                    <Link to="/subject-content" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/subject-content' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Chapter Content</Link>
+                    <Link to="/ai-tutor" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/ai-tutor' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>AI Learning Tutor</Link>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 8. Administration */}
             {hasPermission('settings') && (
               <div className="space-y-1">
@@ -528,18 +576,19 @@ function App() {
                 e.stopPropagation();
                 setSidebarOpen(!sidebarOpen);
               }}
-              className="p-2 -ml-2 mr-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+              className="p-2 -ml-2 mr-4 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all active:scale-90"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </button>
             
-            <div className="relative ml-2">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400" />
+            <div className="relative ml-2 group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
               </div>
               <input
                 type="text"
-                className="block w-full md:w-64 pl-10 pr-3 py-1.5 rounded-lg text-sm bg-white hover:bg-slate-50 focus:bg-slate-100 focus:outline-none border-0 transition-all placeholder:text-slate-400"
+                placeholder="Search students or navigation..."
+                className="block w-full md:w-72 pl-10 pr-4 py-2 rounded-xl text-sm bg-slate-100/50 hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-primary-500/10 focus:outline-none border border-transparent focus:border-primary-500/30 transition-all placeholder:text-slate-400 shadow-sm"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -613,13 +662,19 @@ function App() {
           
           <div className="flex items-center space-x-4">
             {currentSession && (
-              <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                Session: {currentSession}
-              </span>
+              <div className="hidden sm:flex items-center px-4 py-1.5 rounded-xl bg-indigo-50/50 border border-indigo-100/50 shadow-sm transition-all hover:bg-indigo-50 hover:shadow group">
+                <div className="h-8 w-8 rounded-lg bg-white shadow-sm border border-indigo-100 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                  <Calendar className="h-4 w-4 text-indigo-600" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 leading-tight">Current Session</span>
+                  <span className="text-sm font-extrabold text-indigo-900 leading-tight">{currentSession}</span>
+                </div>
+              </div>
             )}
-            <button className="p-1.5 text-slate-400 hover:text-slate-600 relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+            <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl relative transition-all active:scale-95 group">
+              <Bell className="h-5 w-5 group-hover:rotate-12 transition-transform" />
+              <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white border border-white"></span>
             </button>
             <div className="relative">
               <button 
@@ -627,16 +682,16 @@ function App() {
                   e.stopPropagation();
                   setProfileOpen(!profileOpen);
                 }}
-                className="flex items-center cursor-pointer border-l border-slate-200 pl-4 group hover:bg-slate-100/50 py-1 transition-colors"
+                className="flex items-center cursor-pointer bg-white border border-slate-100 hover:border-primary-100 hover:bg-primary-50/30 px-3 py-1.5 rounded-xl transition-all shadow-sm hover:shadow group"
               >
-                <div className="h-8 w-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm shrink-0 ring-2 ring-white group-hover:ring-primary-100 transition-all">
+                <div className="h-8 w-8 rounded-lg bg-primary-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-md group-hover:scale-105 transition-transform">
                   {userName.substring(0, 2).toUpperCase()}
                 </div>
-                 <div className="ml-2 hidden md:block text-left">
-                   <p className="text-xs font-normal text-slate-700 leading-tight">{userName}</p>
-                   <p className="text-[10px] text-slate-500 uppercase tracking-tight">School: {organizationName}</p>
+                 <div className="ml-3 hidden md:block text-left mr-2">
+                   <p className="text-sm font-bold text-slate-700 leading-none mb-1">{userName}</p>
+                   <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Admin Panel</p>
                  </div>
-                <ChevronDown className={`h-4 w-4 text-slate-400 ml-2 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {profileOpen && (
@@ -673,6 +728,8 @@ function App() {
               <Route path="/students" element={<Students />} />
               <Route path="/student-attendance" element={<StudentAttendance />} />
               <Route path="/student-promotion" element={<StudentPromotion />} />
+              <Route path="/certificate-formats" element={<CertificateFormatManager />} />
+              <Route path="/certificates/designer" element={<CustomCertificateDesigner />} />
               <Route path="/certificates" element={<CertificateGenerator />} />
               <Route path="/student-import" element={<StudentImport />} />
               <Route path="/transport" element={<TransportManagement />} />
@@ -697,6 +754,9 @@ function App() {
               <Route path="/settings/organization" element={<OrganizationSettings />} />
               <Route path="/timetable" element={<Timetable />} />
               <Route path="/academic-calendar" element={<AcademicCalendar />} />
+              <Route path="/ai-book-list" element={<AiBookList />} />
+              <Route path="/subject-content" element={<SubjectContent />} />
+              <Route path="/ai-tutor" element={<AiTutor />} />
               
               {/* Academic Masters */}
               <Route path="/masters/classes" element={
@@ -828,6 +888,7 @@ function App() {
         />
       )}
     </div>
+    </>
   );
 }
 

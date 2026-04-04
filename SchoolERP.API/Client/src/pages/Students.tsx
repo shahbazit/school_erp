@@ -4,21 +4,28 @@ import { Search, Plus, Edit2, Trash2, Eye, UserPlus, Users, GraduationCap, Arrow
 import StudentModal from '../components/StudentModal';
 import StudentDetailPanel from '../components/StudentDetailPanel';
 import { Student } from '../types';
+import { toast } from 'react-toastify';
 import { masterApi } from '../api/masterApi';
 
 export default function Students() {
   const { students, fetchStudents, loading, error, removeStudent, addStudent, updateStudent } = useStudents();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSession, setSelectedSession] = useState('');
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSection, setSelectedSection] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => localStorage.getItem('student_search') || '');
+  const [selectedSession, setSelectedSession] = useState(() => localStorage.getItem('student_session') || '');
+  const [selectedClass, setSelectedClass] = useState(() => localStorage.getItem('student_class') || '');
+  const [selectedSection, setSelectedSection] = useState(() => localStorage.getItem('student_section') || '');
   
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [modalDefaultTab, setModalDefaultTab] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    localStorage.setItem('student_search', searchTerm);
+    localStorage.setItem('student_session', selectedSession);
+    localStorage.setItem('student_class', selectedClass);
+    localStorage.setItem('student_section', selectedSection);
+  }, [searchTerm, selectedSession, selectedClass, selectedSection]);
 
   // Masters mapping
   const [classesList, setClassesList] = useState<any[]>([]);
@@ -32,7 +39,7 @@ export default function Students() {
       // Pre-select current session if none selected
       const current = years.find((y: any) => y.isCurrent);
       if (current && !selectedSession) {
-        setSelectedSession(current.id);
+        setSelectedSession(current.name);
       }
     }).catch(console.error);
 
@@ -101,14 +108,23 @@ export default function Students() {
   };
 
   const handleSaveStudent = async (studentData: any) => {
-    if (editingStudent && editingStudent.id) {
-      const success = await updateStudent(editingStudent.id, studentData);
-      if (success && selectedStudent?.id === editingStudent.id) {
-        // Update selected student view if it's open
-        setSelectedStudent({ ...studentData, id: editingStudent.id });
+    try {
+      if (editingStudent && editingStudent.id) {
+        const result = await updateStudent(editingStudent.id, studentData);
+        if (result) {
+          toast.success(`Student "${studentData.firstName}" successfully updated.`);
+          if (selectedStudent?.id === editingStudent.id) {
+            setSelectedStudent({ ...studentData, id: editingStudent.id });
+          }
+        }
+      } else {
+        const result = await addStudent(studentData);
+        if (result) {
+          toast.success(`New student "${studentData.firstName}" enrolled successfully.`);
+        }
       }
-    } else {
-      await addStudent(studentData);
+    } catch (err) {
+      // Errors handled globally by apiClient
     }
   };
 
@@ -182,7 +198,7 @@ export default function Students() {
             >
               <option value="">All Sessions</option>
               {academicYearsList.map(y => (
-                <option key={y.id} value={y.id}>{y.name}</option>
+                <option key={y.id} value={y.name}>{y.name}</option>
               ))}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -243,11 +259,6 @@ export default function Students() {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 flex items-center">
-          <span className="font-semibold mr-2">Error:</span> {error}
-        </div>
-      )}
 
       {/* Data Table */}
       <div className="glass-card overflow-hidden max-w-full">
@@ -319,11 +330,13 @@ export default function Students() {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                        student.isActive 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        student.status === 'Promoted' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                        student.status === 'Detained' ? 'bg-orange-50 text-orange-600 border border-orange-100' :
+                        student.status === 'Completed' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                        student.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
+                        'bg-slate-100 text-slate-500 border border-slate-200'
                       }`}>
-                        {student.isActive ? 'Active' : 'Inactive'}
+                        {student.status || (student.isActive ? 'Active' : 'Inactive')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

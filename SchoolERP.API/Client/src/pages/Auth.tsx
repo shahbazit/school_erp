@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { GraduationCap, Home, CheckCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -45,6 +46,7 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
         password: formData.password
       });
       if (success) {
+        toast.success("Welcome back! Login successful.");
         onAuthSuccess();
       }
     } else {
@@ -58,6 +60,7 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
         });
         
         if (response && response.success) {
+          toast.info("Initial registration successful. Proceeding to school details.");
           setRegistrationUid(response.token || null);
           setStep(2);
         }
@@ -72,6 +75,7 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
         });
 
         if (success) {
+          toast.success("Registration completed successfully!");
           setVerifySuccess(true);
           setTimeout(() => {
             onAuthSuccess();
@@ -161,11 +165,6 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
           </div>
 
 
-          {error && !verifySuccess && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-xs border border-red-100 shadow-sm mb-6 font-medium">
-              {error}
-            </div>
-          )}
 
           {verifySuccess ? (
             <div className="text-center animate-pulse">

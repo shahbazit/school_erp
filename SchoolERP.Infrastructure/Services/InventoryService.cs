@@ -102,6 +102,7 @@ public class InventoryService : IInventoryService
     {
         return await _context.InventoryTransactions
             .Include(t => t.Item)
+            .Include(t => t.Supplier)
             .OrderByDescending(t => t.TransactionDate)
             .Select(t => new InventoryTransactionDto
             {
@@ -110,10 +111,17 @@ public class InventoryService : IInventoryService
                 ItemName = t.Item != null ? t.Item.Name : "Deleted Item",
                 Type = t.Type,
                 Quantity = t.Quantity,
+                UnitPrice = t.UnitPrice,
+                TotalAmount = t.TotalAmount,
                 Reference = t.Reference,
                 Entity = t.Entity,
                 HandledBy = t.HandledBy,
-                TransactionDate = t.TransactionDate
+                Notes = t.Notes,
+                TransactionDate = t.TransactionDate,
+                SupplierId = t.SupplierId,
+                SupplierName = t.Supplier != null ? t.Supplier.Name : t.Entity,
+                PaymentStatus = t.PaymentStatus,
+                AmountPaid = t.AmountPaid,
             })
             .ToListAsync();
     }
@@ -123,48 +131,61 @@ public class InventoryService : IInventoryService
         var item = await _context.InventoryItems.FindAsync(request.ItemId);
         if (item == null) throw new Exception("Item not found");
 
+        // For purchases: default payment status to Unpaid if not provided
+        var paymentStatus = request.Type == InventoryTransactionType.Purchase
+            ? (request.PaymentStatus ?? "Unpaid")
+            : null; // Issues/Adjustments/Returns don't have vendor payments
+
         var transaction = new InventoryTransaction
         {
             ItemId = request.ItemId,
             Type = request.Type,
             Quantity = request.Quantity,
+            UnitPrice = request.UnitPrice,
+            TotalAmount = request.Quantity * request.UnitPrice,
             Reference = request.Reference,
             Entity = request.Entity,
             HandledBy = request.HandledBy,
-            TransactionDate = DateTime.UtcNow
+            Notes = request.Notes,
+            TransactionDate = DateTime.UtcNow,
+            SupplierId = request.Type == InventoryTransactionType.Purchase ? request.SupplierId : null,
+            PaymentStatus = paymentStatus,
+            AmountPaid = request.AmountPaid
         };
 
         _context.InventoryTransactions.Add(transaction);
 
-        // Update stock
-        if (request.Type == InventoryTransactionType.Purchase || request.Type == InventoryTransactionType.Return)
+        // Update item stock
+        switch (request.Type)
         {
-            item.CurrentStock += request.Quantity;
-        }
-        else if (request.Type == InventoryTransactionType.Issue)
-        {
-            item.CurrentStock -= request.Quantity;
-        }
-        else if (request.Type == InventoryTransactionType.Adjustment)
-        {
-            // For adjustment, quantity can be positive or negative
-            item.CurrentStock += request.Quantity;
+            case InventoryTransactionType.Purchase:
+            case InventoryTransactionType.Return:
+                item.CurrentStock += request.Quantity;
+                break;
+            case InventoryTransactionType.Issue:
+                item.CurrentStock -= request.Quantity;
+                break;
+            case InventoryTransactionType.Adjustment:
+                item.CurrentStock += request.Quantity; // Can be negative quantity for reduction
+                break;
         }
 
         await _context.SaveChangesAsync();
 
-        return new InventoryTransactionDto
-        {
-            Id = transaction.Id,
-            ItemId = transaction.ItemId,
-            ItemName = item.Name,
-            Type = transaction.Type,
-            Quantity = transaction.Quantity,
-            Reference = transaction.Reference,
-            Entity = transaction.Entity,
-            HandledBy = transaction.HandledBy,
-            TransactionDate = transaction.TransactionDate
-        };
+        return (await GetInventoryTransactionsAsync()).First(t => t.Id == transaction.Id);
+    }
+
+    public async Task<InventoryTransactionDto> UpdateTransactionPaymentAsync(Guid id, UpdatePaymentStatusRequest request)
+    {
+        var transaction = await _context.InventoryTransactions.FindAsync(id);
+        if (transaction == null) throw new Exception("Transaction not found");
+
+        transaction.PaymentStatus = request.PaymentStatus;
+        transaction.AmountPaid = request.AmountPaid;
+
+        await _context.SaveChangesAsync();
+
+        return (await GetInventoryTransactionsAsync()).First(t => t.Id == id);
     }
 
     #endregion

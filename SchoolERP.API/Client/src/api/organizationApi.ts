@@ -35,7 +35,7 @@ export const organizationApi = {
   },
 
   updateSettings: async (data: Partial<OrganizationSettings>): Promise<{ message: string }> => {
-    const res = await apiClient.put('/organization/settings', data);
+    const res = await apiClient.post('/organization/settings/update', data);
     return res.data;
   },
 };

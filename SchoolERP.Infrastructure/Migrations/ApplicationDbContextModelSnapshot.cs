@@ -327,6 +327,224 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.ToTable("AdmissionEnquiries", "dbo");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.AiChatHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChapterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChapterId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId", "ChapterId");
+
+                    b.ToTable("AiChatHistories", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.AiUsageLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FeatureName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AiUsageLogs", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.CertificateFormat", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FooterLeft")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FooterRight")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HeaderText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("LogoScale")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaperSize")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PerPage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PrimaryColor")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("ShowAddress")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("ShowLogo")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("ShowSeal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("TemplateId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("OrganizationId", "TemplateId")
+                        .IsUnique();
+
+                    b.ToTable("CertificateFormats", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.ChapterContent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChapterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ContentType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentValue")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("PageNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VectorEmbedding")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChapterId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("ChapterContents", "dbo");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.City", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1687,6 +1905,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1702,8 +1923,14 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<Guid>("ItemId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PaymentStatus")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,2)");
@@ -1711,11 +1938,20 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("Reference")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1728,6 +1964,8 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasIndex("ItemId");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("SupplierId");
 
                     b.ToTable("InventoryTransactions", "dbo");
                 });
@@ -3532,6 +3770,111 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.ToTable("Subjects", "dbo");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectBook", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AcademicClassId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AcademicClassId1")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CoverImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SubjectId1")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcademicClassId");
+
+                    b.HasIndex("AcademicClassId1");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SubjectId1");
+
+                    b.ToTable("SubjectBooks", "dbo");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectChapter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SubjectBookId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Summary")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("SubjectBookId");
+
+                    b.ToTable("SubjectChapters", "dbo");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherClassAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4189,6 +4532,39 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("Class");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.AiChatHistory", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.SubjectChapter", "Chapter")
+                        .WithMany()
+                        .HasForeignKey("ChapterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chapter");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.AiUsageLog", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.ChapterContent", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.SubjectChapter", "Chapter")
+                        .WithMany("Contents")
+                        .HasForeignKey("ChapterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chapter");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.City", b =>
                 {
                     b.HasOne("SchoolERP.Domain.Entities.State", "State")
@@ -4444,10 +4820,17 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasOne("SchoolERP.Domain.Entities.InventoryItem", "Item")
                         .WithMany("Transactions")
                         .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SchoolERP.Domain.Entities.InventorySupplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Item");
+
+                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.LeaveApplication", b =>
@@ -4622,12 +5005,13 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.HasOne("SchoolERP.Domain.Entities.AcademicClass", "Class")
                         .WithMany()
                         .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("SchoolERP.Domain.Entities.AcademicSection", "Section")
                         .WithMany()
-                        .HasForeignKey("SectionId");
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SchoolERP.Domain.Entities.Student", "Student")
                         .WithMany("AcademicRecords")
@@ -4738,6 +5122,44 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("FeeHead");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectBook", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.AcademicClass", "AcademicClass")
+                        .WithMany()
+                        .HasForeignKey("AcademicClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolERP.Domain.Entities.AcademicClass", null)
+                        .WithMany("SubjectBooks")
+                        .HasForeignKey("AcademicClassId1");
+
+                    b.HasOne("SchoolERP.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SchoolERP.Domain.Entities.Subject", null)
+                        .WithMany("Books")
+                        .HasForeignKey("SubjectId1");
+
+                    b.Navigation("AcademicClass");
+
+                    b.Navigation("Subject");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectChapter", b =>
+                {
+                    b.HasOne("SchoolERP.Domain.Entities.SubjectBook", "SubjectBook")
+                        .WithMany("Chapters")
+                        .HasForeignKey("SubjectBookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SubjectBook");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherClassAssignment", b =>
@@ -4900,6 +5322,11 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("Vehicle");
                 });
 
+            modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicClass", b =>
+                {
+                    b.Navigation("SubjectBooks");
+                });
+
             modelBuilder.Entity("SchoolERP.Domain.Entities.AcademicYear", b =>
                 {
                     b.Navigation("FeeStructures");
@@ -4972,6 +5399,21 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("EnrolledCourses");
 
                     b.Navigation("ExamResults");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.Subject", b =>
+                {
+                    b.Navigation("Books");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectBook", b =>
+                {
+                    b.Navigation("Chapters");
+                });
+
+            modelBuilder.Entity("SchoolERP.Domain.Entities.SubjectChapter", b =>
+                {
+                    b.Navigation("Contents");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.TeacherProfile", b =>

@@ -64,9 +64,11 @@ builder.Services.AddScoped<IHostelService, HostelService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<ILibraryService, LibraryService>();
 builder.Services.AddScoped<IFinanceReportService, FinanceReportService>();
+builder.Services.AddScoped<ISubjectContentService, SubjectContentService>();
+builder.Services.AddHttpClient<IOpenAIService, OpenAIService>();
 
 var jwtSettings = new JwtSettings();
-builder.Configuration.Bind(nameof(jwtSettings), jwtSettings);
+builder.Configuration.GetSection("JwtSettings").Bind(jwtSettings);
 builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtSettings));
 
 // Database Context
@@ -239,6 +241,20 @@ using (var scope = app.Services.CreateScope())
         if (existingAdmin != null)
         {
             var isModified = false;
+
+            // Ensure OrganizationId is valid for the admin (fixes 404 on dashboard after manual DB resets)
+            var orgExists = context.Organizations.Any(o => o.Id == existingAdmin.OrganizationId);
+            if (!orgExists)
+            {
+                var firstOrg = context.Organizations.FirstOrDefault();
+                if (firstOrg != null)
+                {
+                    existingAdmin.OrganizationId = firstOrg.Id;
+                    Log.Warning("Repaired broken OrganizationId for user {Email}. Linked to {OrgName}.", adminEmail, firstOrg.Name);
+                    isModified = true;
+                }
+            }
+
             if (existingAdmin.LockoutEnd != null)
             {
                 existingAdmin.LockoutEnd = null;

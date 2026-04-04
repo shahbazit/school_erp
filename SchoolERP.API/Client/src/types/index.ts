@@ -111,6 +111,7 @@ export interface Student {
   emergencyContactNumber?: string;
   emergencyContactRelation?: string;
   isActive: boolean;
+  status?: string;
   isMobileVerified: boolean;
   isEmailVerified: boolean;
   enrolledCourses: StudentCourseDto[];

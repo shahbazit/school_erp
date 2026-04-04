@@ -43,19 +43,19 @@ export const hostelApi = {
   // Hostels
   getHostels: () => apiClient.get<Hostel[]>('/hostel'),
   createHostel: (data: Partial<Hostel>) => apiClient.post<Hostel>('/hostel', data),
-  updateHostel: (id: string, data: Partial<Hostel>) => apiClient.put<Hostel>(`/hostel/${id}`, data),
-  deleteHostel: (id: string) => apiClient.delete(`/hostel/${id}`),
+  updateHostel: (id: string, data: Partial<Hostel>) => apiClient.post<Hostel>(`/hostel/${id}/update`, data),
+  deleteHostel: (id: string) => apiClient.post(`/hostel/${id}/delete`),
 
   // Rooms
   getRooms: () => apiClient.get<HostelRoom[]>('/hostel/rooms'),
   getRoomsByHostel: (hostelId: string) => apiClient.get<HostelRoom[]>(`/hostel/rooms/by-hostel/${hostelId}`),
   createRoom: (data: Partial<HostelRoom>) => apiClient.post<HostelRoom>('/hostel/rooms', data),
-  updateRoom: (id: string, data: Partial<HostelRoom>) => apiClient.put<HostelRoom>(`/hostel/rooms/${id}`, data),
-  deleteRoom: (id: string) => apiClient.delete(`/hostel/rooms/${id}`),
+  updateRoom: (id: string, data: Partial<HostelRoom>) => apiClient.post<HostelRoom>(`/hostel/rooms/${id}/update`, data),
+  deleteRoom: (id: string) => apiClient.post(`/hostel/rooms/${id}/delete`),
 
   // Assignments
   getAssignments: () => apiClient.get<HostelAssignment[]>('/hostel/assignments'),
   assignRoom: (data: { studentId: string; roomId: string; startDate: string; endDate?: string }) => 
     apiClient.post<HostelAssignment>('/hostel/assignments', data),
-  removeAssignment: (id: string) => apiClient.delete(`/hostel/assignments/${id}`),
+  removeAssignment: (id: string) => apiClient.post(`/hostel/assignments/${id}/delete`),
 };

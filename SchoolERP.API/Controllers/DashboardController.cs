@@ -10,23 +10,42 @@ using SchoolERP.Domain.Enums;
 
 namespace SchoolERP.API.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/dashboard")]
 [ApiController]
 [Authorize]
 public class DashboardController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IOrganizationService _organizationService;
 
-    public DashboardController(ApplicationDbContext context, ICurrentUserService currentUserService)
+    public DashboardController(ApplicationDbContext context, ICurrentUserService currentUserService, IOrganizationService organizationService)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _organizationService = organizationService;
     }
 
     [HttpGet("admin/summary")]
     public async Task<IActionResult> GetAdminSummary()
     {
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) 
+        {
+            Serilog.Log.Warning("GetAdminSummary: Unauthorized - OrgId is empty.");
+            return Unauthorized();
+        }
+
+        // Validate organization existence (prevents 404 after DB reset)
+        var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
+        if (!orgExists) 
+        {
+            Serilog.Log.Error("GetAdminSummary: Organization {OrgId} NOT FOUND in database.", orgId);
+            return NotFound(new { message = "Organization not found." });
+        }
+
+        Serilog.Log.Information("GetAdminSummary: Fetching summary for OrgId {OrgId}", orgId);
+
         var today = DateTime.Today;
         var thisMonth = new DateTime(today.Year, today.Month, 1);
         var lastMonth = thisMonth.AddMonths(-1);
@@ -186,6 +205,13 @@ public class DashboardController : ControllerBase
     [HttpGet("teacher/summary")]
     public async Task<IActionResult> GetTeacherSummary(Guid? employeeId)
     {
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return Unauthorized();
+
+        // Validate organization existence
+        var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
+        if (!orgExists) return NotFound(new { message = "Organization not found." });
+
         var userId = _currentUserService.UserId;
         Employee? employee;
 

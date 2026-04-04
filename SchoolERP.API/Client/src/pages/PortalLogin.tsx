@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { GraduationCap, Home, Users, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface PortalLoginProps {
   onAuthSuccess: () => void;
@@ -29,6 +30,7 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
       schoolDomain: formData.schoolDomain
     });
     if (success) {
+      toast.success(`Welcome to the ${role === 'student' ? 'Student' : 'Parent'} Portal!`);
       onAuthSuccess();
     }
   };
@@ -102,11 +104,6 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-xs font-bold shadow-sm animate-in fade-in slide-in-from-top-1 duration-300">
-                {error}
-              </div>
-            )}
 
             <div className="space-y-5">
               {/* Domain Input */}

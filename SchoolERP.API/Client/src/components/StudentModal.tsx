@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, User, BookOpen, Users, MapPin, ChevronLeft, ChevronRight, Check, CreditCard, Plus, Trash2, Settings, TrendingDown, FilePlus, Upload, FileText, Download } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { Student, CreateStudentDto, UpdateStudentDto, AssignCourseDto } from '../types';
 import { masterApi } from '../api/masterApi';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -117,7 +118,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       
       const currentYear = years.find((y: any) => y.isCurrent);
       if (currentYear && !initialData) {
-        setFormData(prev => ({ ...prev, academicYear: currentYear.id }));
+        setFormData(prev => ({ ...prev, academicYear: currentYear.name }));
       }
     } catch {
       // silently fail, selects remain empty
@@ -184,14 +185,23 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.mobileNumber.trim()) newErrors.mobileNumber = 'Mobile number is required';
+    if (!formData.gender) newErrors.gender = 'Gender is required';
     if (!formData.classId) newErrors.classId = 'Class is required';
+    if (!formData.sectionId) newErrors.sectionId = 'Section is required';
     if (!formData.academicYear) newErrors.academicYear = 'Academic Year is required';
+    if (!formData.admissionDate) newErrors.admissionDate = 'Admission date is required';
+    
     if (!formData.fatherName?.trim() && !formData.motherName?.trim() && !formData.guardianName?.trim()) {
-      newErrors.guardianInfo = "At least one Parent/Guardian name is required (Father, Mother, or Guardian)";
+      const msg = "At least one Parent/Guardian name is required (Father, Mother, or Guardian)";
+      newErrors.guardianInfo = msg;
+      toast.error(msg, { toastId: 'guardian-missing' });
     }
+    
     setErrors(newErrors);
+    
     if (Object.keys(newErrors).length > 0) {
-      if (newErrors.firstName || newErrors.lastName || newErrors.mobileNumber || newErrors.gender || newErrors.classId || newErrors.academicYear || newErrors.guardianInfo) {
+      const basicErrors = ['firstName', 'lastName', 'mobileNumber', 'gender', 'classId', 'sectionId', 'academicYear', 'admissionDate', 'guardianInfo'];
+      if (basicErrors.some(field => newErrors[field])) {
         setActiveTab('basic');
       }
     }
@@ -270,18 +280,18 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
     const renderBasicTab = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {renderInput('firstName', 'Student Name (First) *', 'text')}
-        {renderInput('lastName', 'Last Name *', 'text')}
+        {renderInput('firstName', 'Student Name (First)', 'text', undefined, true)}
+        {renderInput('lastName', 'Last Name', 'text', undefined, true)}
         {renderInput('fatherName', "Father's Name", 'text')}
         {renderInput('motherName', "Mother's Name", 'text')}
-        {renderInput('mobileNumber', 'Contact Number *', 'tel')}
+        {renderInput('mobileNumber', 'Contact Number', 'tel', undefined, true)}
         {renderInput('dateOfBirth', 'Date Of Birth', 'date')}
-        {renderInput('gender', 'Gender', 'select', ['Male', 'Female', 'Other'])}
+        {renderInput('gender', 'Gender', 'select', ['Male', 'Female', 'Other'], true)}
         {renderInput('admissionNo', 'Admission Number', 'text')}
-        {renderInput('admissionDate', 'Date Of Admission', 'date')}
+        {renderInput('admissionDate', 'Date Of Admission', 'date', undefined, true)}
         {renderInput('ledgerNumber', 'Ledger Number', 'text')}
-        {renderInput('classId', 'Admission in Class *', 'select', classes)}
-        {renderInput('sectionId', 'Admission in Section *', 'select', sections)}
+        {renderInput('classId', 'Admission in Class', 'select', classes, true)}
+        {renderInput('sectionId', 'Admission in Section', 'select', sections, true)}
         {renderInput('rollNumber', 'Roll Number', 'text')}
         {renderInput('srnNumber', 'SRN Number', 'text')}
         {renderInput('permanentEducationNo', 'Permanent Education No', 'text')}
@@ -290,8 +300,14 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
         {renderInput('medium', 'Medium', 'text')}
         {renderInput('enrollmentSchoolName', 'Enrollment School Name', 'text')}
         {renderInput('openingBalance', 'Opening Balance', 'number')}
-        {renderInput('academicYear', 'Academic Year *', 'select', academicYears)}
+        {renderInput('academicYear', 'Academic Year (Session)', 'select', academicYears.map(y => ({ id: y.name, name: y.name })), true, !!initialData)}
       </div>
+      {initialData && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] text-slate-400 font-medium">
+          <Settings className="h-3 w-3" />
+          <span>Note: Use the <strong>Promotion & Transfer</strong> module to move this student to a different session or class.</span>
+        </div>
+      )}
     </div>
   );
 
@@ -378,16 +394,20 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
     </div>
   );
 
-  const renderInput = (name: string, label: string, type: string, options?: any[]) => {
+  const renderInput = (name: string, label: string, type: string, options?: any[], required?: boolean, disabled?: boolean) => {
     return (
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</label>
+        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1">
+          {label}
+          {required && <span className="text-red-500 font-bold">*</span>}
+        </label>
         {type === 'select' ? (
           <select 
             name={name} 
             value={(formData as any)[name] || ''} 
             onChange={handleChange} 
-            className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 transition-all ${errors[name] ? 'border-red-300 focus:ring-red-400/30' : 'border-slate-200 focus:ring-primary-500/30'}`}
+            disabled={disabled}
+            className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 transition-all ${errors[name] ? 'border-red-300 focus:ring-red-400/30' : 'border-slate-200 focus:ring-primary-500/30 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed'}`}
           >
             <option value="">Select...</option>
             {options?.map((opt: any) => (
@@ -402,10 +422,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
             name={name} 
             value={(formData as any)[name] || ''} 
             onChange={handleChange}
-            className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 transition-all ${errors[name] ? 'border-red-300 focus:ring-red-400/30' : 'border-slate-200 focus:ring-primary-500/30'}`} 
+            disabled={disabled}
+            className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 transition-all ${errors[name] ? 'border-red-300 focus:ring-red-400/30' : 'border-slate-200 focus:ring-primary-500/30 disabled:opacity-60 disabled:bg-slate-100 disabled:cursor-not-allowed'}`} 
           />
         )}
-        {errors[name] && <p className="text-xs text-red-500">{errors[name]}</p>}
+        {errors[name] && <p className="text-xs text-red-500 font-medium">{errors[name]}</p>}
       </div>
     );
   };
@@ -823,7 +844,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
 
   const hasErrorsOnTab = (tabId: string) => {
     const tabFields: Record<string, string[]> = {
-      basic: ['firstName', 'lastName', 'mobileNumber', 'classId', 'academicYear', 'guardianInfo'],
+      basic: ['firstName', 'lastName', 'mobileNumber', 'gender', 'classId', 'sectionId', 'academicYear', 'admissionDate', 'guardianInfo'],
       admission: [],
       document: [],
       family: [],
@@ -883,13 +904,6 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           {/* Modal Body */}
           <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
-            {serverError && (
-               <div className="mb-6 bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
-                  <Settings className="h-5 w-5 animate-pulse" />
-                  <p className="text-sm font-semibold">{serverError}</p>
-               </div>
-            )}
-
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {tabContent[activeTab]}
             </div>

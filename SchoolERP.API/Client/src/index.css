@@ -71,3 +71,57 @@
     scrollbar-width: none;    /* Firefox */
   }
 }
+
+/* 🖨️ Global Print Fixes */
+@media print {
+  /* Hide all UI navigation elements */
+  header, 
+  aside, 
+  .glass-nav,
+  .print\:hidden,
+  button:not(.print\:block),
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  /* Reset layout constraints for printing */
+  html, body {
+    background: white !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Target the main scrollable area */
+  .flex-1, 
+  main, 
+  .p-6 {
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: transparent !important;
+  }
+
+  /* Reset main container height and overflow */
+  div.flex.h-screen.w-screen {
+    height: auto !important;
+    width: auto !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Remove shadows and borders that look bad on paper */
+  .glass-card, 
+  .shadow-xl, 
+  .shadow-2xl, 
+  .shadow-lg {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

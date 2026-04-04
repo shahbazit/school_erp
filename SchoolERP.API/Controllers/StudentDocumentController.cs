@@ -81,7 +81,7 @@ public class StudentDocumentController : ControllerBase
         });
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public async Task<IActionResult> DeleteDocument(Guid id)
     {
         var document = await _context.StudentDocuments.FindAsync(id);

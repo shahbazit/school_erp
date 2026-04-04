@@ -21,10 +21,10 @@ public class HostelController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateHostel(CreateHostelDto dto) => Ok(await _hostelService.CreateHostelAsync(dto));
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     public async Task<IActionResult> UpdateHostel(Guid id, CreateHostelDto dto) => Ok(await _hostelService.UpdateHostelAsync(id, dto));
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public async Task<IActionResult> DeleteHostel(Guid id) => Ok(await _hostelService.DeleteHostelAsync(id));
 
     [HttpGet("rooms")]
@@ -36,10 +36,10 @@ public class HostelController : ControllerBase
     [HttpPost("rooms")]
     public async Task<IActionResult> CreateRoom(CreateHostelRoomDto dto) => Ok(await _hostelService.CreateRoomAsync(dto));
 
-    [HttpPut("rooms/{id}")]
+    [HttpPost("rooms/{id}/update")]
     public async Task<IActionResult> UpdateRoom(Guid id, CreateHostelRoomDto dto) => Ok(await _hostelService.UpdateRoomAsync(id, dto));
 
-    [HttpDelete("rooms/{id}")]
+    [HttpPost("rooms/{id}/delete")]
     public async Task<IActionResult> DeleteRoom(Guid id) => Ok(await _hostelService.DeleteRoomAsync(id));
 
     [HttpGet("assignments")]
@@ -48,6 +48,6 @@ public class HostelController : ControllerBase
     [HttpPost("assignments")]
     public async Task<IActionResult> AssignRoom(CreateHostelAssignmentDto dto) => Ok(await _hostelService.AssignRoomAsync(dto));
 
-    [HttpDelete("assignments/{id}")]
+    [HttpPost("assignments/{id}/delete")]
     public async Task<IActionResult> RemoveAssignment(Guid id) => Ok(await _hostelService.RemoveAssignmentAsync(id));
 }

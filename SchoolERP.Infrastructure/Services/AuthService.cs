@@ -328,6 +328,23 @@ public class AuthService : IAuthService
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, user.Role)
         };
 
+        if (user.Role.Equals("Student", StringComparison.OrdinalIgnoreCase))
+        {
+            var student = await _dbContext.Students
+                .Include(s => s.AcademicRecords)
+                .FirstOrDefaultAsync(s => s.Email == user.Email || s.MobileNumber == user.MobileNumber);
+
+            if (student != null)
+            {
+                claims.Add(new System.Security.Claims.Claim("StudentId", student.Id.ToString()));
+                var currentAcademic = student.AcademicRecords.FirstOrDefault(a => a.IsCurrent);
+                if (currentAcademic != null)
+                {
+                    claims.Add(new System.Security.Claims.Claim("AcademicClassId", currentAcademic.ClassId.ToString()));
+                }
+            }
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),

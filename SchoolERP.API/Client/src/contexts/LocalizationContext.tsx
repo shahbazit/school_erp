@@ -16,11 +16,22 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = async () => {
+    const token = localStorage.getItem('token');
+    const organizationId = localStorage.getItem('organizationId');
+
+    if (!token || !organizationId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await organizationApi.getSettings();
       setSettings(data);
-    } catch (err) {
-      console.error('Failed to fetch localization settings:', err);
+    } catch (err: any) {
+      // 401/404 are handled by apiClient interceptor
+      if (err.response?.status !== 401 && err.response?.status !== 404) {
+        console.error('Failed to fetch localization settings:', err);
+      }
     } finally {
       setLoading(false);
     }

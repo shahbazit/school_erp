@@ -37,7 +37,7 @@ public class CalendarController : ControllerBase
         return Ok(new { Id = id });
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public async Task<IActionResult> DeleteEvent(Guid id)
     {
         var result = await _calendarService.DeleteEvent(id);

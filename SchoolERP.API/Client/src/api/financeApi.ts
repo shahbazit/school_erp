@@ -66,15 +66,15 @@ export const financeApi = {
   getPLSummary: () => apiClient.get<ProfitLossSummary>('/finance/pl-summary'),
   
   // Account Summaries (The "3 persons" requirement)
-  getAccountSummaries: (academicYearId?: string) => apiClient.get<AccountSummary[]>(`/Finance/accounts`, { params: { academicYearId } }),
-  getAccountLedger: (id: string, params?: any) => apiClient.get<TransactionDetail[]>(`/Finance/accounts/${id}/ledger`, { params }),
+  getAccountSummaries: (academicYearId?: string) => apiClient.get<AccountSummary[]>(`/finance/accounts`, { params: { academicYearId } }),
+  getAccountLedger: (id: string, params?: any) => apiClient.get<TransactionDetail[]>(`/finance/accounts/${id}/ledger`, { params }),
   
   // Financial Account Master Management
-  listAccounts: () => apiClient.get<FinancialAccount[]>('/Finance/list-accounts'),
-  createAccount: (data: Partial<FinancialAccount>) => apiClient.post<FinancialAccount>('/Finance/accounts', data),
-  updateAccount: (id: string, data: Partial<FinancialAccount>) => apiClient.put<FinancialAccount>(`/Finance/accounts/${id}`, data),
-  deleteAccount: (id: string) => apiClient.delete(`/Finance/accounts/${id}`),
-  transferFunds: (data: any) => apiClient.post('/Finance/transfer', data),
+  listAccounts: () => apiClient.get<FinancialAccount[]>('/finance/list-accounts'),
+  createAccount: (data: Partial<FinancialAccount>) => apiClient.post<FinancialAccount>('/finance/accounts', data),
+  updateAccount: (id: string, data: Partial<FinancialAccount>) => apiClient.post<FinancialAccount>(`/finance/accounts/${id}/update`, data),
+  deleteAccount: (id: string) => apiClient.post(`/finance/accounts/${id}/delete`),
+  transferFunds: (data: any) => apiClient.post('/finance/transfer', data),
 
   // Ledger Exports
   exportLedger: (params?: any) => apiClient.get('/finance/export', { params, responseType: 'blob' })

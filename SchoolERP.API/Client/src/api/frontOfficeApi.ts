@@ -32,12 +32,12 @@ export const frontOfficeApi = {
   // Enquiries
   getEnquiries: () => apiClient.get<AdmissionEnquiry[]>('/crm/enquiries'),
   createEnquiry: (data: Partial<AdmissionEnquiry>) => apiClient.post<AdmissionEnquiry>('/crm/enquiries', data),
-  updateEnquiry: (id: string, data: Partial<AdmissionEnquiry>) => apiClient.put(`/crm/enquiries/${id}`, data),
-  deleteEnquiry: (id: string) => apiClient.delete(`/crm/enquiries/${id}`),
+  updateEnquiry: (id: string, data: Partial<AdmissionEnquiry>) => apiClient.post(`/crm/enquiries/${id}/update`, data),
+  deleteEnquiry: (id: string) => apiClient.post(`/crm/enquiries/${id}/delete`),
 
   // Visitors
   getVisitors: () => apiClient.get<VisitorLog[]>('/crm/visitors'),
   recordVisitor: (data: Partial<VisitorLog>) => apiClient.post<VisitorLog>('/crm/visitors', data),
   checkOutVisitor: (id: string) => apiClient.post(`/crm/visitors/${id}/checkout`),
-  deleteVisitor: (id: string) => apiClient.delete(`/crm/visitors/${id}`)
+  deleteVisitor: (id: string) => apiClient.post(`/crm/visitors/${id}/delete`)
 };

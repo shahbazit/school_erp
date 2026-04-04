@@ -16,6 +16,7 @@ import {
     InventoryTransactionType
 } from '../api/inventoryApi';
 import { toast } from 'react-hot-toast';
+import { FileText, CheckCircle, Clock, AlertCircle as AlertCircleIcon } from 'lucide-react';
 
 
 export default function InventoryStore() {
@@ -50,15 +51,16 @@ export default function InventoryStore() {
         inventoryApi.getItems(),
         inventoryApi.getTransactions(),
         inventoryApi.getSuppliers(),
-        inventoryApi.getCategories()
+        inventoryApi.getCategories(),
       ]);
       setItems(itemsRes.data);
       setTransactions(transRes.data);
       setSuppliers(suppsRes.data);
       setCategories(catsRes.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch inventory data', error);
-      toast.error('Failed to load inventory data');
+      const msg = error.response?.data?.title || error.message;
+      toast.error('Sync Error: ' + msg);
     } finally {
       setLoading(false);
     }
@@ -67,11 +69,17 @@ export default function InventoryStore() {
   const handleUpsertItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const categoryId = formData.get('categoryId') as string;
+    if(!categoryId) {
+        toast.error('Please select a category');
+        return;
+    }
+
     const data = {
       id: editingItem?.id,
       name: formData.get('name') as string,
       code: formData.get('code') as string,
-      categoryId: formData.get('categoryId') as string,
+      categoryId: categoryId,
       unit: formData.get('unit') as string,
       minQuantity: Number(formData.get('minQuantity')),
       unitPrice: Number(formData.get('unitPrice')),
@@ -103,7 +111,7 @@ export default function InventoryStore() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = {
-      id: editingSupplier?.id || '',
+      id: editingSupplier?.id,
       name: formData.get('name') as string,
       contactPerson: formData.get('contactPerson') as string,
       phone: formData.get('phone') as string,
@@ -127,7 +135,7 @@ export default function InventoryStore() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const data = {
-      id: editingCategory?.id || '',
+      id: editingCategory?.id,
       name: formData.get('name') as string,
       description: formData.get('description') as string,
     };
@@ -146,30 +154,58 @@ export default function InventoryStore() {
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const itemId = formData.get('itemId') as string;
+    if(!itemId) {
+        toast.error('Please select an item');
+        return;
+    }
+
+    const isPurchase = transactionType === InventoryTransactionType.Purchase;
+
     const data = {
-      itemId: formData.get('itemId') as string,
+      itemId: itemId,
       type: transactionType,
       quantity: Number(formData.get('quantity')),
+      unitPrice: Number(formData.get('unitPrice')),
       reference: formData.get('reference') as string,
       entity: formData.get('entity') as string,
       handledBy: formData.get('handledBy') as string,
+      notes: formData.get('notes') as string,
+      // Vendor payment fields (only relevant for purchases)
+      supplierId: isPurchase ? (formData.get('supplierId') as string || undefined) : undefined,
+      paymentStatus: isPurchase ? (formData.get('paymentStatus') as string || 'Unpaid') : undefined,
+      amountPaid: isPurchase ? Number(formData.get('amountPaid') || 0) : 0,
     };
 
     try {
       await inventoryApi.createTransaction(data);
-      toast.success('Transaction recorded');
+      toast.success('Transaction recorded successfully');
       setShowTransactionModal(false);
       fetchData();
-    } catch (error) {
-      toast.error('Failed to record transaction');
+    } catch (error: any) {
+      console.error('Transaction failure', error);
+      const msg = error.response?.data?.title || error.message;
+      toast.error('Transaction Failed: ' + msg);
     }
   };
 
+  const totalSales = transactions.filter(t => t.type === InventoryTransactionType.Issue).reduce((acc, t) => acc + (t.totalAmount || 0), 0);
+  const totalPurchases = transactions.filter(t => t.type === InventoryTransactionType.Purchase).reduce((acc, t) => acc + (t.totalAmount || 0), 0);
+  
+  // Real profit calculation would use Weighted Average Cost, but we can do a simple estimate
+  const estimatedProfit = transactions
+    .filter(t => t.type === InventoryTransactionType.Issue && t.unitPrice > 0)
+    .reduce((acc, t) => {
+        const item = items.find(i => i.id === t.itemId);
+        const costBasis = item?.unitPrice || 0; // Current base price as cost estimate
+        return acc + (t.totalAmount - (costBasis * t.quantity));
+    }, 0);
+
   const metrics = [
-    { label: 'Total In-Stock Items', value: items.length.toString(), icon: Package, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Stock Valuation', value: formatCurrency(items.reduce((acc, i) => acc + (i.currentStock * i.unitPrice), 0)), icon: Package, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'Low Stock Alerts', value: items.filter(i => i.currentStock <= i.minQuantity).length.toString(), icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Total Transactions', value: transactions.length.toString(), icon: History, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Total Suppliers', value: suppliers.length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Monthly Sales', value: formatCurrency(totalSales), icon: ShoppingCart, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Est. Gross Profit', value: formatCurrency(estimatedProfit), icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
 
   if (loading && items.length === 0) {
@@ -344,6 +380,7 @@ export default function InventoryStore() {
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Transaction</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Entity/Party</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Handler</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Value</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Qty</th>
                              </tr>
                           </thead>
@@ -374,6 +411,10 @@ export default function InventoryStore() {
                                           </div>
                                        </td>
                                        <td className="px-6 py-4 text-right">
+                                          <p className="text-sm font-bold text-slate-800">{formatCurrency(t.totalAmount || 0)}</p>
+                                          <p className="text-[9px] text-slate-400">@{formatCurrency(t.unitPrice)}</p>
+                                       </td>
+                                       <td className="px-6 py-4 text-right">
                                           <span className={`text-sm font-bold ${
                                              t.type === InventoryTransactionType.Purchase ? 'text-emerald-600' : 'text-amber-600'
                                           }`}>
@@ -384,7 +425,7 @@ export default function InventoryStore() {
                                  ))
                              ) : (
                                  <tr>
-                                     <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic text-sm">
+                                     <td colSpan={5} className="px-6 py-8 text-center text-slate-400 italic text-sm">
                                          No transactions found.
                                      </td>
                                  </tr>
@@ -643,10 +684,10 @@ export default function InventoryStore() {
           </div>
       )}
 
-      {activeTab === 'transactions' && (
+       {activeTab === 'transactions' && (
         <div className="glass-card animate-in fade-in slide-in-from-right-4 duration-500 border-none ring-1 ring-slate-100">
            <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h2 className="text-lg font-bold text-slate-800">Transaction History</h2>
+              <h2 className="text-lg font-bold text-slate-800">Operational History & Invoicing</h2>
               <div className="flex gap-2">
                 <button 
                     onClick={() => {
@@ -674,10 +715,11 @@ export default function InventoryStore() {
                  <thead className="bg-slate-50/50">
                     <tr>
                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Date & Type</th>
-                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Item</th>
-                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Entity/Ref</th>
-                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Handler</th>
-                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Quantity</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Item Details</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Reference/Source</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic">Transaction Value</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Qty</th>
+                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-tight italic text-right">Invoice</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-100">
@@ -693,13 +735,28 @@ export default function InventoryStore() {
                           </td>
                           <td className="px-6 py-4">
                              <p className="text-sm font-bold text-slate-800">{t.itemName}</p>
+                             <p className="text-[10px] text-slate-400 font-medium">Rate: {formatCurrency(t.unitPrice)}</p>
                           </td>
                           <td className="px-6 py-4">
                              <p className="text-sm text-slate-600 font-medium">{t.entity || '-'}</p>
                              <p className="text-[10px] text-slate-400 italic">Ref: {t.reference || 'N/A'}</p>
                           </td>
                           <td className="px-6 py-4">
-                             <span className="text-xs text-slate-500">{t.handledBy}</span>
+                             <div className="flex flex-col">
+                                <span className={`text-sm font-black ${t.type === InventoryTransactionType.Purchase ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {t.type === InventoryTransactionType.Purchase ? '-' : '+'}{formatCurrency(t.totalAmount || 0)}
+                                </span>
+                                {t.type === InventoryTransactionType.Purchase && (
+                                    <span className={`text-[10px] font-bold flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full w-fit ${
+                                        t.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-600' : 
+                                        t.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
+                                    }`}>
+                                        {t.paymentStatus === 'Paid' ? <CheckCircle className="h-2.5 w-2.5" /> : 
+                                         t.paymentStatus === 'Partial' ? <Clock className="h-2.5 w-2.5" /> : <AlertCircleIcon className="h-2.5 w-2.5" />}
+                                        {t.paymentStatus || 'Unpaid'}
+                                    </span>
+                                )}
+                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">
                              <span className={`text-sm font-bold ${
@@ -707,6 +764,16 @@ export default function InventoryStore() {
                              }`}>
                                 {t.type === InventoryTransactionType.Purchase ? `+${t.quantity}` : `-${t.quantity}`}
                              </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <button 
+                                onClick={() => {
+                                    toast.success(`Downloading Invoice ${t.reference || t.id.substring(0,8)}...`);
+                                }}
+                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                             >
+                                <FileText className="h-4 w-4" />
+                             </button>
                           </td>
                        </tr>
                     ))}
@@ -782,45 +849,77 @@ export default function InventoryStore() {
                       </button>
                   </div>
                   <form onSubmit={handleCreateTransaction} className="p-6 space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Select Item</label>
-                        <select name="itemId" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
-                            <option value="">Select Item</option>
-                            {items.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.currentStock})</option>)}
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Quantity</label>
-                            <input name="quantity" type="number" step="0.01" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Reference No</label>
-                            <input name="reference" placeholder="Bill/Slip No" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">{transactionType === InventoryTransactionType.Purchase ? 'Supplier' : 'Issued To'}</label>
-                            {transactionType === InventoryTransactionType.Purchase ? (
-                                <select name="entity" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
-                                    <option value="">Select Supplier</option>
-                                    {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                                </select>
-                            ) : (
-                                <input name="entity" placeholder="Recipient Name" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
-                            )}
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Handled By</label>
-                            <input name="handledBy" defaultValue="Admin" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
-                        </div>
-                      </div>
-                      <div className="pt-4 flex gap-3">
-                          <button type="button" onClick={() => setShowTransactionModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
-                          <button type="submit" className={`flex-1 px-6 py-3 ${transactionType === InventoryTransactionType.Purchase ? 'bg-emerald-600' : 'bg-indigo-600'} text-white font-bold rounded-2xl shadow-lg transition-all`}>
-                            {transactionType === InventoryTransactionType.Purchase ? 'Confirm Purchase' : 'Confirm Issue'}
-                          </button>
-                      </div>
-                  </form>
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Select Item</label>
+                         <select name="itemId" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none">
+                             <option value="">Select Item</option>
+                             {items.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.currentStock})</option>)}
+                         </select>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Quantity</label>
+                             <input name="quantity" type="number" step="0.01" required className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Rate / Unit Price</label>
+                             <input name="unitPrice" type="number" step="0.01" required placeholder="e.g. 250" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Reference No</label>
+                             <input name="reference" placeholder="Bill/Slip No" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">{transactionType === InventoryTransactionType.Purchase ? 'Issued To / Entity' : 'Issued To'}</label>
+                             <input name="entity" placeholder="Recipient / Dept Name" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Handled By</label>
+                             <input name="handledBy" defaultValue="Admin" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Notes</label>
+                             <input name="notes" placeholder="Optional notes" className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-indigo-100 outline-none" />
+                         </div>
+                       </div>
+
+                       {/* Vendor Payment Section — only for Purchases */}
+                       {transactionType === InventoryTransactionType.Purchase && (
+                         <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                           <p className="text-xs font-bold text-amber-700 uppercase mb-3 flex items-center gap-1.5">
+                             <Clock className="h-3.5 w-3.5" /> Vendor Payment (Internal Tracking Only)
+                           </p>
+                           <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Supplier</label>
+                                 <select name="supplierId" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none">
+                                     <option value="">Select Supplier</option>
+                                     {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                 </select>
+                             </div>
+                             <div>
+                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Payment Status</label>
+                                 <select name="paymentStatus" defaultValue="Unpaid" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none">
+                                     <option value="Unpaid">Unpaid</option>
+                                     <option value="Partial">Partial</option>
+                                     <option value="Paid">Paid</option>
+                                 </select>
+                             </div>
+                             <div className="col-span-2">
+                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Amount Paid to Vendor</label>
+                                 <input name="amountPaid" type="number" step="0.01" defaultValue="0" placeholder="0.00" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none" />
+                             </div>
+                           </div>
+                         </div>
+                       )}
+
+                       <div className="pt-2 flex gap-3">
+                           <button type="button" onClick={() => setShowTransactionModal(false)} className="flex-1 px-6 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors">Cancel</button>
+                           <button type="submit" className={`flex-1 px-6 py-3 ${transactionType === InventoryTransactionType.Purchase ? 'bg-emerald-600' : 'bg-indigo-600'} text-white font-bold rounded-2xl shadow-lg transition-all`}>
+                             {transactionType === InventoryTransactionType.Purchase ? 'Confirm Purchase' : 'Confirm Issue'}
+                           </button>
+                       </div>
+                   </form>
               </div>
           </div>
       )}

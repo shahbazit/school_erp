@@ -110,6 +110,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<LibraryBookIssue> LibraryBookIssues { get; set; } = null!;
     public DbSet<FinancialAccount> FinancialAccounts { get; set; } = null!;
 
+    // Certificate Formats
+    public DbSet<CertificateFormat> CertificateFormats { get; set; } = null!;
+
+    // AI & Subject Content
+    public DbSet<SubjectChapter> SubjectChapters { get; set; } = null!;
+    public DbSet<ChapterContent> ChapterContents { get; set; } = null!;
+    public DbSet<SubjectBook> SubjectBooks { get; set; } = null!;
+    public DbSet<AiUsageLog> AiUsageLogs { get; set; } = null!;
+    public DbSet<AiChatHistory> AiChatHistories { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -157,6 +167,11 @@ public class ApplicationDbContext : DbContext
         builder.Entity<TransportRoute>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<TransportStoppage>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<TransportAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SubjectChapter>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<ChapterContent>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SubjectBook>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AiUsageLog>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<AiChatHistory>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<Hostel>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<HostelRoom>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<HostelAssignment>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
@@ -172,6 +187,9 @@ public class ApplicationDbContext : DbContext
         builder.Entity<LibraryBook>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<LibraryBookIssue>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
         builder.Entity<FinancialAccount>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<CertificateFormat>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<SubjectChapter>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
+        builder.Entity<ChapterContent>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
 
         // Master Query Filters
         builder.Entity<AcademicClass>().HasQueryFilter(e => IgnoreTenant || e.OrganizationId == CurrentOrganizationId);
@@ -250,21 +268,55 @@ public class ApplicationDbContext : DbContext
         builder.Entity<InventorySupplier>().HasIndex(e => e.OrganizationId);
         builder.Entity<InventoryTransaction>().HasIndex(e => e.OrganizationId);
 
+        // InventoryTransaction -> InventoryItem (no cascade to avoid issues with stock)
+        builder.Entity<InventoryTransaction>()
+            .HasOne(t => t.Item)
+            .WithMany(i => i.Transactions)
+            .HasForeignKey(t => t.ItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // InventoryTransaction -> InventorySupplier (optional, purchases only)
+        builder.Entity<InventoryTransaction>()
+            .HasOne(t => t.Supplier)
+            .WithMany()
+            .HasForeignKey(t => t.SupplierId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Library Indexes
         builder.Entity<LibraryCategory>().HasIndex(e => e.OrganizationId);
         builder.Entity<LibraryBook>().HasIndex(e => e.OrganizationId);
         builder.Entity<LibraryBookIssue>().HasIndex(e => e.OrganizationId);
         builder.Entity<FinancialAccount>().HasIndex(e => e.OrganizationId);
+        builder.Entity<CertificateFormat>().HasIndex(e => e.OrganizationId);
+        builder.Entity<SubjectChapter>().HasIndex(e => e.OrganizationId);
+        builder.Entity<ChapterContent>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AiUsageLog>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AiChatHistory>().HasIndex(e => e.OrganizationId);
+        builder.Entity<AiChatHistory>().HasIndex(e => new { e.UserId, e.ChapterId });
+        // One format per template per org
+        builder.Entity<CertificateFormat>().HasIndex(e => new { e.OrganizationId, e.TemplateId }).IsUnique();
         
         // Ensure no duplicate attendance per student per day
         builder.Entity<StudentAttendance>().HasIndex(e => new { e.OrganizationId, e.StudentId, e.AttendanceDate }).IsUnique();
 
         // Student relationships for new collections
-        builder.Entity<StudentAcademic>()
-            .HasOne(sa => sa.Student)
-            .WithMany(s => s.AcademicRecords)
-            .HasForeignKey(sa => sa.StudentId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<StudentAcademic>(entity =>
+        {
+            entity.HasOne(sa => sa.Student)
+                .WithMany(s => s.AcademicRecords)
+                .HasForeignKey(sa => sa.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sa => sa.Class)
+                .WithMany()
+                .HasForeignKey(sa => sa.ClassId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(sa => sa.Section)
+                .WithMany()
+                .HasForeignKey(sa => sa.SectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
         builder.Entity<StudentDocument>()
             .HasOne(sd => sd.Student)
@@ -610,6 +662,31 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(bi => bi.EmployeeId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Subject Book, Chapter & Content Relationships
+        builder.Entity<SubjectBook>()
+            .HasOne(b => b.AcademicClass)
+            .WithMany()
+            .HasForeignKey(b => b.AcademicClassId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SubjectBook>()
+            .HasOne(b => b.Subject)
+            .WithMany()
+            .HasForeignKey(b => b.SubjectId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<SubjectChapter>()
+            .HasOne(sc => sc.SubjectBook)
+            .WithMany(sb => sb.Chapters)
+            .HasForeignKey(sc => sc.SubjectBookId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ChapterContent>()
+            .HasOne(cc => cc.Chapter)
+            .WithMany(sc => sc.Contents)
+            .HasForeignKey(cc => cc.ChapterId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())

@@ -25,11 +25,11 @@ export const homeworkApi = {
         return response.data;
     },
     update: async (id: string, data: any) => {
-        const response = await apiClient.put(`/homework/${id}`, data);
+        const response = await apiClient.post(`/homework/${id}/update`, data);
         return response.data;
     },
     delete: async (id: string) => {
-        const response = await apiClient.delete(`/homework/${id}`);
+        const response = await apiClient.post(`/homework/${id}/delete`);
         return response.data;
     }
 };

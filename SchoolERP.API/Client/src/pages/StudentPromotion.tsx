@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Users, GraduationCap, Check, AlertCircle, Search, Filter, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Users, GraduationCap, Check, Search, Filter, ArrowRight, AlertTriangle, X } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { masterApi } from '../api/masterApi';
 import { studentApi } from '../api/studentApi';
 import { promotionApi, BulkPromotionRequestDto } from '../api/promotionApi';
 import { Student } from '../types';
 
-export default function StudentPromotion() {
+export default function StudentPromotion(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,11 @@ export default function StudentPromotion() {
   // Student Selection
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [studentActions, setStudentActions] = useState<Record<string, 'Promote' | 'Detain' | 'PassOut' | 'Withdraw'>>({});
+  
+  // Confirmation state
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmData, setConfirmData] = useState<{ count: number, fromClass: string, fromYear: string, toClass: string, toYear: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -74,6 +80,13 @@ export default function StudentPromotion() {
       const filtered = response.data;
       setStudents(filtered);
       setSelectedStudentIds(new Set(filtered.map(s => s.id as string)));
+      
+      // Default all to 'Promote'
+      const initialActions: Record<string, any> = {};
+      filtered.forEach(s => {
+        initialActions[s.id as string] = 'Promote';
+      });
+      setStudentActions(initialActions);
     } catch (err) {
       setError('Failed to fetch students.');
     } finally {
@@ -81,11 +94,28 @@ export default function StudentPromotion() {
     }
   };
 
+  const handleActionChange = (id: string, action: 'Promote' | 'Detain' | 'PassOut' | 'Withdraw') => {
+    setStudentActions(prev => ({ ...prev, [id]: action }));
+    // Automatically select if action is changed
+    const next = new Set(selectedStudentIds);
+    next.add(id);
+    setSelectedStudentIds(next);
+  };
+
+  const setAllActions = (action: 'Promote' | 'Detain' | 'PassOut' | 'Withdraw') => {
+    const next = { ...studentActions };
+    selectedStudentIds.forEach(id => {
+      next[id] = action;
+    });
+    setStudentActions(next);
+  };
+
   const toggleSelectAll = () => {
-    if (selectedStudentIds.size === students.length) {
+    const activeStudents = students.filter(s => s.status === 'Active');
+    if (selectedStudentIds.size === activeStudents.length) {
       setSelectedStudentIds(new Set());
     } else {
-      setSelectedStudentIds(new Set(students.map(s => s.id as string)));
+      setSelectedStudentIds(new Set(activeStudents.map(s => s.id as string)));
     }
   };
 
@@ -101,34 +131,62 @@ export default function StudentPromotion() {
       setError('No students selected.');
       return;
     }
-    if (!targetClassId || !targetYear) {
-      setError('Please select Target Class and Academic Year.');
+
+    // Check if any 'Promote' or 'Detain' actions exist
+    const needsTarget = Array.from(selectedStudentIds).some(id => 
+      studentActions[id] === 'Promote'
+    );
+
+    if (needsTarget && (!targetClassId || !targetYear)) {
+      const msg = 'Please select Target Class and Academic Year for continuing students.';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
+    const sourceClass = classesList.find(c => c.id === sourceClassId)?.name || 'Selected Class';
+    const targetClass = classesList.find(c => c.id === targetClassId)?.name || 'Target Class';
+    
+    setConfirmData({
+      count: selectedStudentIds.size,
+      fromClass: sourceClass,
+      fromYear: sourceYear,
+      toClass: targetClass,
+      toYear: targetYear
+    });
+    setShowConfirm(true);
+  };
+
+  const executePromotion = async () => {
+    setShowConfirm(false);
     setIsSubmitting(true);
     setError(null);
     try {
       const request: BulkPromotionRequestDto = {
-        targetClassId,
+        targetClassId: targetClassId || undefined,
         targetSectionId: targetSectionId || undefined,
         targetAcademicYear: targetYear,
-        students: Array.from(selectedStudentIds).map(id => ({
-          studentId: id,
-          isPromoted: true // Simple implementation: all selected are promoted
-        }))
+        students: Array.from(selectedStudentIds).map(id => {
+          const s = students.find(std => std.id === id);
+          return {
+            studentId: id,
+            action: studentActions[id],
+            newRollNumber: s?.rollNumber
+          };
+        })
       };
 
       const result = await promotionApi.bulkPromote(request);
       if (result.success) {
         setSuccess(result.message);
+        toast.success("Bulk promotion/transfer completed!");
         setStudents([]);
         setSelectedStudentIds(new Set());
       } else {
         setError(result.message);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Promotion failed.');
+      setError(err.message || "Failed to complete promotion process");
     } finally {
       setIsSubmitting(false);
     }
@@ -237,7 +295,7 @@ export default function StudentPromotion() {
                     onChange={(e) => setTargetSectionId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:bg-white transition-all outline-none"
                   >
-                    <option value="">No Change / None</option>
+                    <option value="">No Change / Keep Current</option>
                     {sectionsList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
@@ -253,15 +311,30 @@ export default function StudentPromotion() {
               <div className="flex items-center gap-3">
                 <input 
                   type="checkbox" 
-                  checked={students.length > 0 && selectedStudentIds.size === students.length}
+                  checked={students.length > 0 && students.filter(s => s.status === 'Active').every(s => selectedStudentIds.has(s.id as string))}
                   onChange={toggleSelectAll}
                   className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
                 />
-                <h3 className="text-sm font-bold text-slate-700">Eligible Students ({students.length})</h3>
+                <h3 className="text-sm font-bold text-slate-700">Student List ({students.length})</h3>
               </div>
-              <span className="text-xs font-semibold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full">
-                {selectedStudentIds.size} Selected
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Bulk Action:</span>
+                <div className="flex bg-slate-100 p-1 rounded-lg">
+                  {(['Promote', 'Detain', 'PassOut', 'Withdraw'] as const).map(act => (
+                    <button
+                      key={act}
+                      onClick={() => setAllActions(act)}
+                      disabled={selectedStudentIds.size === 0}
+                      className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md transition-all hover:bg-white hover:shadow-sm disabled:opacity-50"
+                    >
+                      {act}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs font-semibold text-primary-600 bg-primary-50 px-2.5 py-1 rounded-full ml-2">
+                  {selectedStudentIds.size} Selected
+                </span>
+              </div>
             </div>
             <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
               <table className="w-full text-left text-sm border-collapse">
@@ -290,7 +363,8 @@ export default function StudentPromotion() {
                             type="checkbox" 
                             checked={selectedStudentIds.has(s.id as string)}
                             onChange={() => toggleSelectStudent(s.id as string)}
-                            className="w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                            disabled={s.status !== 'Active'}
+                            className={`w-4 h-4 text-primary-600 rounded border-slate-300 focus:ring-primary-500 ${s.status !== 'Active' ? 'opacity-30 cursor-not-allowed' : ''}`}
                           />
                         </td>
                         <td className="px-6 py-4">
@@ -300,19 +374,41 @@ export default function StudentPromotion() {
                             </div>
                             <div>
                               <p className="font-bold text-slate-800">{s.firstName} {s.lastName}</p>
-                              <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{s.admissionNo}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{s.admissionNo}</p>
+                                {s.status !== 'Active' && (
+                                  <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
+                                    s.status === 'Promoted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                    s.status === 'Detained' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                    'bg-slate-100 text-slate-500 border-slate-200'
+                                  }`}>
+                                    {s.status}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-slate-500 font-medium">{s.rollNumber || '—'}</td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${
-                            selectedStudentIds.has(s.id as string) 
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                              : 'bg-slate-50 text-slate-400 border border-slate-100'
-                          }`}>
-                            {selectedStudentIds.has(s.id as string) ? 'To Promote' : 'Stay'}
-                          </span>
+                          <select
+                            value={studentActions[s.id as string]}
+                            onChange={(e) => handleActionChange(s.id as string, e.target.value as any)}
+                            disabled={s.status !== 'Active'}
+                            className={`text-[10px] font-bold uppercase px-2 py-1.5 rounded-md border outline-none transition-all ${
+                              selectedStudentIds.has(s.id as string) 
+                                ? studentActions[s.id as string] === 'Promote' ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                : studentActions[s.id as string] === 'PassOut' ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                : studentActions[s.id as string] === 'Withdraw' ? 'bg-orange-50 text-orange-600 border-orange-200'
+                                : 'bg-amber-50 text-amber-600 border-amber-200'
+                                : 'bg-slate-50 text-slate-400 border-slate-200'
+                            }`}
+                          >
+                            <option value="Promote">Promote</option>
+                            <option value="Detain">Detain</option>
+                            <option value="PassOut">Pass Out</option>
+                            <option value="Withdraw">Withdraw</option>
+                          </select>
                         </td>
                       </tr>
                     ))
@@ -320,37 +416,101 @@ export default function StudentPromotion() {
                 </tbody>
               </table>
             </div>
-            
             <div className="p-6 bg-slate-50/80 border-t border-slate-100">
-               {error && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm animate-in slide-in-from-top-2">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
-                  <p className="font-medium">{error}</p>
+              {success ? (
+                <div className="mb-6 p-8 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+                  <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4 shadow-sm ring-8 ring-emerald-50">
+                    <Check className="h-8 w-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800">Process Completed!</h3>
+                  <p className="text-slate-600 mt-1 max-w-xs">{success}</p>
+                  <button 
+                    onClick={() => setSuccess(null)}
+                    className="mt-6 px-6 py-2 bg-white border border-emerald-200 text-emerald-600 rounded-xl text-sm font-bold hover:bg-emerald-50 transition-colors shadow-sm"
+                  >
+                    Manage More Students
+                  </button>
                 </div>
+              ) : (
+                <button 
+                  onClick={handlePromote}
+                  disabled={isSubmitting || selectedStudentIds.size === 0}
+                  className="w-full btn-primary py-3.5 text-base shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 group"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                       <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                       Processing Bulk Action...
+                    </div>
+                  ) : (
+                    <>
+                      <GraduationCap className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                      Complete Bulk Promotion / Transfer
+                    </>
+                  )}
+                </button>
               )}
-              {success && (
-                <div className="mb-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3 text-emerald-600 text-sm animate-in slide-in-from-top-2">
-                  <Check className="h-5 w-5 shrink-0 shadow-sm shadow-emerald-500/20" />
-                  <p className="font-medium">{success}</p>
-                </div>
-              )}
-
-              <button 
-                onClick={handlePromote}
-                disabled={isSubmitting || selectedStudentIds.size === 0}
-                className="w-full btn-primary py-3 py-3 text-base shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? 'Processing...' : (
-                  <>
-                    <Check className="h-5 w-5" />
-                    Complete Bulk Promotion
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirm && confirmData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setShowConfirm(false)} />
+          <div className="relative w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500 animate-bounce cursor-default">
+                <AlertTriangle className="h-8 w-8" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-slate-800 tracking-tight">Confirm Promotion</h3>
+                <p className="text-sm text-slate-500">Please review the promotion details carefully.</p>
+              </div>
+              
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Process Count</span>
+                  <span className="text-sm font-bold text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md">{confirmData.count} Students</span>
+                </div>
+                <div className="h-px bg-slate-100" />
+                <div className="grid grid-cols-2 gap-4 text-left">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">From (Current)</p>
+                    <p className="text-xs font-bold text-slate-700">{confirmData.fromClass}</p>
+                    <p className="text-[10px] text-slate-500">{confirmData.fromYear}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">To (Next)</p>
+                    <p className="text-xs font-bold text-emerald-600">{confirmData.toClass}</p>
+                    <p className="text-[10px] text-emerald-500">{confirmData.toYear}</p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-400 font-medium px-4">
+                This action will update academic records and cannot be undone. All future fee calculations for these students will be based on target class settings.
+              </p>
+            </div>
+            
+            <div className="flex border-t border-slate-100">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 px-4 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors uppercase tracking-widest border-r border-slate-100"
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={executePromotion}
+                className="flex-1 px-4 py-4 text-sm font-bold text-primary-600 hover:bg-primary-50 transition-all uppercase tracking-widest"
+              >
+                Yes, Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -55,7 +55,7 @@ public class HomeworkController : ControllerBase
         return homework;
     }
 
-    [HttpPut("{id}")]
+    [HttpPost("{id}/update")]
     public async Task<IActionResult> Update(Guid id, Homework homework)
     {
         if (id != homework.Id) return BadRequest();
@@ -70,7 +70,7 @@ public class HomeworkController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpPost("{id}/delete")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var homework = await _context.Homeworks.FindAsync(id);

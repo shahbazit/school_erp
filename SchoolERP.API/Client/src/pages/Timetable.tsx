@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -32,7 +32,7 @@ const DAYS_OF_WEEK = [
   { id: 6, name: 'Saturday' }
 ];
 
-export default function Timetable() {
+export default function Timetable(): React.ReactElement {
   // State
   const [timetables, setTimetables] = useState<TimetableDto[]>([]);
   const [selected, setSelected] = useState<TimetableDto | null>(null);
@@ -306,9 +306,21 @@ export default function Timetable() {
                   <div className={`p-2 rounded-xl ${selected?.id === t.id ? 'bg-white/20' : 'bg-primary-50 text-primary-600'}`}>
                     <School className="h-5 w-5" />
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); handleEdit(t.id); }} className={`p-1.5 rounded-lg ${selected?.id === t.id ? 'hover:bg-white/10' : 'hover:bg-slate-100 text-slate-400'}`}><Edit className="h-3.5 w-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }} className={`p-1.5 rounded-lg ${selected?.id === t.id ? 'hover:bg-red-400' : 'hover:bg-red-50 text-red-400'}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                  <div className="flex gap-2 transition-opacity">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleEdit(t.id); }} 
+                      className={`p-2 rounded-xl transition-all ${selected?.id === t.id ? 'bg-white/20 hover:bg-white/30' : 'bg-slate-100 hover:bg-primary-50 text-slate-400 hover:text-primary-600'}`}
+                      title="Edit Timetable"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDelete(t.id); }} 
+                      className={`p-2 rounded-xl transition-all ${selected?.id === t.id ? 'bg-red-400/20 hover:bg-red-400/30' : 'bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600'}`}
+                      title="Delete Timetable"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -329,7 +341,11 @@ export default function Timetable() {
         {/* Timetable Detail View */}
         <div className="lg:col-span-2 xl:col-span-3">
           {selected ? (
-            <TimetablePreview t={selected} />
+            <TimetablePreview 
+              t={selected} 
+              onEdit={() => handleEdit(selected.id)} 
+              onDelete={() => handleDelete(selected.id)} 
+            />
           ) : (
             <div className="h-full min-h-[500px] flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 p-10 text-center">
               <div className="p-6 bg-white rounded-3xl shadow-xl shadow-slate-200/50 mb-6">
@@ -540,7 +556,7 @@ export default function Timetable() {
 
 // ── Sub-component for Timetable Preview ─────────────────────────────────────
 
-function TimetablePreview({ t }: { t: TimetableDto }) {
+function TimetablePreview({ t, onEdit, onDelete }: { t: TimetableDto, onEdit: () => void, onDelete: () => void }): React.ReactElement | null {
   const [data, setData] = useState<TimetableDto | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -580,8 +596,20 @@ function TimetablePreview({ t }: { t: TimetableDto }) {
             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-0.5">{data.name} • {data.academicYearName}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-           <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 shadow-sm transition-all active:scale-95"><FileText className="h-5 w-5" /></button>
+        <div className="flex gap-3">
+           <button 
+            onClick={onEdit}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm"
+          >
+            <Edit className="h-4 w-4" /> Edit
+          </button>
+          <button 
+            onClick={onDelete}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm border border-red-100"
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </button>
+          <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 shadow-sm transition-all active:scale-95" title="Print/Export"><FileText className="h-5 w-5" /></button>
         </div>
       </div>
 

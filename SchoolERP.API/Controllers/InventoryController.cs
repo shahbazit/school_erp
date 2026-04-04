@@ -26,7 +26,7 @@ public class InventoryController : ControllerBase
     [HttpPost("items")]
     public async Task<IActionResult> UpsertItem(UpsertInventoryItemRequest request) => Ok(await _inventoryService.UpsertInventoryItemAsync(request));
 
-    [HttpDelete("items/{id}")]
+    [HttpPost("items/{id}/delete")]
     public async Task<IActionResult> DeleteItem(Guid id)
     {
         await _inventoryService.DeleteInventoryItemAsync(id);
@@ -43,6 +43,20 @@ public class InventoryController : ControllerBase
     [HttpPost("transactions")]
     public async Task<IActionResult> CreateTransaction(CreateInventoryTransactionRequest request) => Ok(await _inventoryService.CreateInventoryTransactionAsync(request));
 
+    [HttpPost("transactions/{id}/payment/update")]
+    public async Task<IActionResult> UpdatePayment(Guid id, UpdatePaymentStatusRequest request)
+    {
+        try
+        {
+            var result = await _inventoryService.UpdateTransactionPaymentAsync(id, request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     #endregion
 
     #region Suppliers
@@ -53,7 +67,7 @@ public class InventoryController : ControllerBase
     [HttpPost("suppliers")]
     public async Task<IActionResult> UpsertSupplier(InventorySupplierDto request) => Ok(await _inventoryService.UpsertSupplierAsync(request));
 
-    [HttpDelete("suppliers/{id}")]
+    [HttpPost("suppliers/{id}/delete")]
     public async Task<IActionResult> DeleteSupplier(Guid id)
     {
         await _inventoryService.DeleteSupplierAsync(id);
@@ -70,7 +84,7 @@ public class InventoryController : ControllerBase
     [HttpPost("categories")]
     public async Task<IActionResult> UpsertCategory(InventoryCategoryDto request) => Ok(await _inventoryService.UpsertCategoryAsync(request));
 
-    [HttpDelete("categories/{id}")]
+    [HttpPost("categories/{id}/delete")]
     public async Task<IActionResult> DeleteCategory(Guid id)
     {
         await _inventoryService.DeleteCategoryAsync(id);

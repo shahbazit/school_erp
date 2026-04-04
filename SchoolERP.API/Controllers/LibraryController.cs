@@ -44,7 +44,7 @@ public class LibraryController : ControllerBase
         return Ok(category);
     }
 
-    [HttpPut("categories/{id}")]
+    [HttpPost("categories/{id}/update")]
     public async Task<IActionResult> UpdateCategory(Guid id, LibraryCategoryDto dto)
     {
         var category = await _libraryService.GetCategoryByIdAsync(id);
@@ -57,7 +57,7 @@ public class LibraryController : ControllerBase
         return Ok(category);
     }
 
-    [HttpDelete("categories/{id}")]
+    [HttpPost("categories/{id}/delete")]
     public async Task<IActionResult> DeleteCategory(Guid id)
     {
         await _libraryService.DeleteCategoryAsync(id);
@@ -103,7 +103,7 @@ public class LibraryController : ControllerBase
         return Ok(MapBookToDto(book));
     }
 
-    [HttpPut("books/{id}")]
+    [HttpPost("books/{id}/update")]
     public async Task<IActionResult> UpdateBook(Guid id, LibraryBookDto dto)
     {
         var book = await _libraryService.GetBookByIdAsync(id);
@@ -127,7 +127,7 @@ public class LibraryController : ControllerBase
         return Ok(MapBookToDto(book));
     }
 
-    [HttpDelete("books/{id}")]
+    [HttpPost("books/{id}/delete")]
     public async Task<IActionResult> DeleteBook(Guid id)
     {
         await _libraryService.DeleteBookAsync(id);

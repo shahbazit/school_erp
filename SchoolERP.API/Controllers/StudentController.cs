@@ -34,6 +34,7 @@ public class StudentController : ControllerBase
         [FromQuery] Guid? sectionId = null,
         [FromQuery] Guid? courseId = null,
         [FromQuery] bool? isActive = null,
+        [FromQuery] string? status = null,
         [FromQuery] string? academicYear = null,
         [FromQuery] string sortBy = "Name" // Name, AdmissionNo
     )
@@ -47,7 +48,33 @@ public class StudentController : ControllerBase
         // Filters applied to academic mapping
         if (classId.HasValue) academicQuery = academicQuery.Where(sa => sa.ClassId == classId.Value);
         if (sectionId.HasValue) academicQuery = academicQuery.Where(sa => sa.SectionId == sectionId.Value);
-        if (!string.IsNullOrWhiteSpace(academicYear)) academicQuery = academicQuery.Where(sa => sa.AcademicYear == academicYear);
+        if (!string.IsNullOrWhiteSpace(status)) academicQuery = academicQuery.Where(sa => sa.Status == status);
+        if (!string.IsNullOrWhiteSpace(academicYear))
+        {
+            // Resolve the name and potential ID for the given academicYear input
+            string? ayName = null;
+            Guid? ayId = null;
+
+            if (Guid.TryParse(academicYear, out var parsedId))
+            {
+                ayId = parsedId;
+                var ay = await _unitOfWork.Repository<AcademicYear>().GetByIdAsync(parsedId);
+                if (ay != null) ayName = ay.Name;
+            }
+            else
+            {
+                ayName = academicYear;
+                var ay = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+                    .FirstOrDefaultAsync(y => y.Name.ToLower() == academicYear.Trim().ToLower());
+                if (ay != null) ayId = ay.Id;
+            }
+
+            // Filter by Name OR ID in the AcademicYear column (handles both migration states)
+            var ayIdString = ayId?.ToString();
+            academicQuery = academicQuery.Where(sa => 
+                (ayName != null && sa.AcademicYear == ayName) || 
+                (ayIdString != null && sa.AcademicYear == ayIdString));
+        }
 
         // Search applied to Student info
         if (!string.IsNullOrWhiteSpace(search))
@@ -80,6 +107,7 @@ public class StudentController : ControllerBase
             dto.SectionId = sa.SectionId;
             dto.AcademicYear = sa.AcademicYear;
             dto.RollNumber = sa.RollNumber;
+            dto.Status = sa.Status;
             return dto;
         }).ToList();
 
@@ -146,23 +174,46 @@ public class StudentController : ControllerBase
             return BadRequest(new { Errors = errors, Message = "Validation failed" });
         }
         // Academic Year Validation
-        var ay = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
-            .FirstOrDefaultAsync(ay => ay.IsActive && ay.Name.Equals(dto.AcademicYear.Trim(), StringComparison.OrdinalIgnoreCase));
+        AcademicYear? ay = null;
+        if (Guid.TryParse(dto.AcademicYear, out var ayGuid))
+        {
+            ay = await _unitOfWork.Repository<AcademicYear>().GetByIdAsync(ayGuid);
+        }
+        else
+        {
+            var ayNameTrimmed = (dto.AcademicYear ?? "").Trim().ToLower();
+            ay = await _unitOfWork.Repository<AcademicYear>().GetQueryable()
+                .FirstOrDefaultAsync(a => a.IsActive && a.Name.ToLower() == ayNameTrimmed);
+        }
+
         if (ay == null) return BadRequest(new { Message = $"Academic Year '{dto.AcademicYear}' is not valid or active." });
 
         // Duplicate Check (Name + Mobile)
-        var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
-        var mobile = dto.MobileNumber.Trim();
+        var firstNameTrimmed = (dto.FirstName ?? "").Trim();
+        var lastNameTrimmed = (dto.LastName ?? "").Trim();
+        var fullName = $"{firstNameTrimmed} {lastNameTrimmed}".ToLower();
+        var mobile = (dto.MobileNumber ?? "").Trim();
+
         var isDuplicate = await _unitOfWork.Repository<Student>().GetQueryable()
-            .AnyAsync(s => (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && s.MobileNumber == mobile);
+            .AnyAsync(s => (s.FirstName.ToLower() + " " + s.LastName.ToLower()) == fullName && s.MobileNumber == mobile);
         
         if (isDuplicate) return BadRequest(new { Message = $"Student '{fullName}' with mobile '{mobile}' already exists." });
 
         if (!string.IsNullOrWhiteSpace(dto.AdmissionNo))
         {
+            var admTrimmed = dto.AdmissionNo.Trim().ToLower();
             var isAdmDup = await _unitOfWork.Repository<Student>().GetQueryable()
-                .AnyAsync(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase));
+                .AnyAsync(s => s.AdmissionNo.ToLower() == admTrimmed);
             if (isAdmDup) return BadRequest(new { Message = $"Admission No '{dto.AdmissionNo}' is already taken." });
+        }
+
+        // Email Duplicate Check
+        if (!string.IsNullOrWhiteSpace(dto.Email))
+        {
+            var emailTrimmed = dto.Email.Trim().ToLower();
+            var isEmailDup = await _unitOfWork.Repository<Student>().GetQueryable()
+                .AnyAsync(s => s.Email != null && s.Email.ToLower() == emailTrimmed);
+            if (isEmailDup) return BadRequest(new { Message = $"Email '{dto.Email}' is already registered with another student." });
         }
 
         var (resolvedClassId, resolvedSectionId) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
@@ -177,7 +228,7 @@ public class StudentController : ControllerBase
             StudentId = student.Id,
             ClassId = resolvedClassId,
             SectionId = resolvedSectionId,
-            AcademicYear = dto.AcademicYear.Trim(),
+            AcademicYear = ay?.Name ?? dto.AcademicYear.Trim(),
             RollNumber = dto.RollNumber,
             IsCurrent = true,
             Status = "Active"
@@ -238,7 +289,7 @@ public class StudentController : ControllerBase
             .Where(ay => ay.IsActive).ToListAsync();
         
         var existingStudents = await _unitOfWork.Repository<Student>().GetQueryable()
-            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo })
+            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo, s.Email })
             .ToListAsync();
         
         var internalTrack = new HashSet<string>();
@@ -256,19 +307,37 @@ public class StudentController : ControllerBase
             else if (!activeAcademicYears.Any(ay => ay.Name.Equals(dto.AcademicYear.Trim(), StringComparison.OrdinalIgnoreCase)))
                 rowErrors.Add($"Academic Year '{dto.AcademicYear}' not found.");
 
-            var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
-            var mobile = dto.MobileNumber.Trim();
+            var firstNameTrimmed = (dto.FirstName ?? "").Trim();
+            var lastNameTrimmed = (dto.LastName ?? "").Trim();
+            var fullName = $"{firstNameTrimmed} {lastNameTrimmed}".ToLower();
+            var mobile = (dto.MobileNumber ?? "").Trim();
             var dupKey = $"{fullName}|{mobile}";
 
-            if (existingStudents.Any(s => (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && s.MobileNumber == mobile))
+            if (existingStudents.Any(s => (s.FirstName.ToLower() + " " + s.LastName.ToLower()) == fullName && s.MobileNumber == mobile))
                 rowErrors.Add("Student already exists in database (Name + Mobile).");
             
             if (internalTrack.Contains(dupKey))
                 rowErrors.Add("Duplicate entry found within this file.");
             else internalTrack.Add(dupKey);
 
-            if (!string.IsNullOrWhiteSpace(dto.AdmissionNo) && existingStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)))
-                rowErrors.Add("Admission Number is already taken.");
+            if (!string.IsNullOrWhiteSpace(dto.AdmissionNo))
+            {
+                var admTrimmed = dto.AdmissionNo.Trim().ToLower();
+                if (existingStudents.Any(s => s.AdmissionNo?.ToLower() == admTrimmed))
+                    rowErrors.Add("Admission Number is already taken.");
+            }
+
+            // Email Duplicate check in validation
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var emailTrimmed = dto.Email.Trim().ToLower();
+                if (existingStudents.Any(s => s.Email?.ToLower() == emailTrimmed))
+                    rowErrors.Add($"Email '{dto.Email}' is already registered with another student.");
+                
+                if (internalTrack.Contains(emailTrimmed))
+                    rowErrors.Add($"Duplicate email '{dto.Email}' found within this file.");
+                else internalTrack.Add(emailTrimmed);
+            }
 
             var (resolvedClassId, _) = await ResolveAcademicIds(dto.ClassId, dto.ClassName, dto.SectionId, dto.SectionName);
             if (resolvedClassId == Guid.Empty) rowErrors.Add($"Class '{dto.ClassName ?? dto.ClassId}' not found.");
@@ -293,7 +362,7 @@ public class StudentController : ControllerBase
             .Where(ay => ay.IsActive).ToListAsync();
         
         var existingStudents = await _unitOfWork.Repository<Student>().GetQueryable()
-            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo })
+            .Select(s => new { s.FirstName, s.LastName, s.MobileNumber, s.AdmissionNo, s.Email })
             .ToListAsync();
         
         var toAddStudents = new List<Student>();
@@ -323,13 +392,15 @@ public class StudentController : ControllerBase
             }
 
             // Duplicacy Check (Name + Mobile)
-            var fullName = $"{dto.FirstName.Trim()} {dto.LastName.Trim()}".ToLower();
-            var mobile = dto.MobileNumber.Trim();
+            var firstNameTrimmed = (dto.FirstName ?? "").Trim();
+            var lastNameTrimmed = (dto.LastName ?? "").Trim();
+            var fullName = $"{firstNameTrimmed} {lastNameTrimmed}".ToLower();
+            var mobile = (dto.MobileNumber ?? "").Trim();
             var duplicateKey = $"{fullName}|{mobile}";
 
             // Check against existing database
             if (existingStudents.Any(s => 
-                (s.FirstName + " " + s.LastName).Equals(fullName, StringComparison.OrdinalIgnoreCase) && 
+                (s.FirstName.ToLower() + " " + s.LastName.ToLower()) == fullName && 
                 s.MobileNumber == mobile))
             {
                 rowErrors.Add($"Student '{fullName}' with mobile '{mobile}' already exists in the system.");
@@ -348,10 +419,29 @@ public class StudentController : ControllerBase
             // Admission No Duplicacy (if provided)
             if (!string.IsNullOrWhiteSpace(dto.AdmissionNo))
             {
-                if (existingStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)) ||
-                    toAddStudents.Any(s => s.AdmissionNo.Equals(dto.AdmissionNo.Trim(), StringComparison.OrdinalIgnoreCase)))
+                var admTrimmed = dto.AdmissionNo.Trim().ToLower();
+                if (existingStudents.Any(s => s.AdmissionNo?.ToLower() == admTrimmed))
                 {
                     rowErrors.Add($"Admission Number '{dto.AdmissionNo}' is already taken.");
+                }
+            }
+
+            // Email Duplicacy
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var emailTrimmed = dto.Email.Trim().ToLower();
+                if (existingStudents.Any(s => s.Email?.ToLower() == emailTrimmed))
+                {
+                    rowErrors.Add($"Email '{dto.Email}' is already registered in the system.");
+                }
+                
+                if (internalTrack.Contains(emailTrimmed))
+                {
+                    rowErrors.Add($"Duplicate email '{dto.Email}' found within the import list.");
+                }
+                else
+                {
+                    internalTrack.Add(emailTrimmed);
                 }
             }
 
@@ -510,6 +600,15 @@ public class StudentController : ControllerBase
 
         if (student == null) return NotFound();
 
+        // Email Duplicate Check on Update
+        if (!string.IsNullOrWhiteSpace(dto.Email))
+        {
+            var emailTrimmed = dto.Email.Trim().ToLower();
+            var isEmailDup = await _unitOfWork.Repository<Student>().GetQueryable()
+                .AnyAsync(s => s.Email != null && s.Email.ToLower() == emailTrimmed && s.Id != id);
+            if (isEmailDup) return BadRequest(new { Message = $"Email '{dto.Email}' is already registered with another student." });
+        }
+
         student.FirstName = dto.FirstName;
         student.LastName = dto.LastName;
         student.Gender = dto.Gender;
@@ -594,17 +693,37 @@ public class StudentController : ControllerBase
         {
             currentAcademic.ClassId = Guid.TryParse(dto.ClassId, out var cidUpd) ? cidUpd : currentAcademic.ClassId;
             currentAcademic.SectionId = Guid.TryParse(dto.SectionId, out var sidUpd) ? sidUpd : currentAcademic.SectionId;
-            currentAcademic.AcademicYear = dto.AcademicYear ?? currentAcademic.AcademicYear;
+            
+            if (!string.IsNullOrWhiteSpace(dto.AcademicYear))
+            {
+                if (Guid.TryParse(dto.AcademicYear, out var ayGuidUpd))
+                {
+                    var ayUpd = await _unitOfWork.Repository<AcademicYear>().GetByIdAsync(ayGuidUpd);
+                    if (ayUpd != null) currentAcademic.AcademicYear = ayUpd.Name;
+                }
+                else
+                {
+                    currentAcademic.AcademicYear = dto.AcademicYear;
+                }
+            }
+            
             currentAcademic.RollNumber = dto.RollNumber ?? currentAcademic.RollNumber;
             _unitOfWork.Repository<StudentAcademic>().Update(currentAcademic);
         }
         else if (!string.IsNullOrEmpty(dto.ClassId) && !string.IsNullOrEmpty(dto.AcademicYear)) 
         {
+             var resolvedAYName = dto.AcademicYear;
+             if (Guid.TryParse(dto.AcademicYear, out var ayGuidNew))
+             {
+                 var ayNew = await _unitOfWork.Repository<AcademicYear>().GetByIdAsync(ayGuidNew);
+                 if (ayNew != null) resolvedAYName = ayNew.Name;
+             }
+
              var newAcademic = new StudentAcademic {
                  StudentId = student.Id,
                  ClassId = Guid.Parse(dto.ClassId),
                  SectionId = Guid.TryParse(dto.SectionId, out var sidN) ? sidN : null,
-                 AcademicYear = dto.AcademicYear,
+                 AcademicYear = resolvedAYName,
                  RollNumber = dto.RollNumber,
                  IsCurrent = true,
                  Status = "Active"
@@ -814,6 +933,7 @@ public class StudentController : ControllerBase
             SectionId = currentAcademic?.SectionId,
             RollNumber = currentAcademic?.RollNumber,
             AcademicYear = currentAcademic?.AcademicYear,
+            Status = currentAcademic?.Status,
             EnrolledCourses = student.EnrolledCourses.Select(ec => new StudentCourseDto
             {
                 CourseId = ec.CourseId,

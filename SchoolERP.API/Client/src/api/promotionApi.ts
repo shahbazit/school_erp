@@ -2,12 +2,12 @@ import apiClient from './apiClient';
 
 export interface PromoteStudentDto {
   studentId: string;
-  isPromoted: boolean;
+  action: 'Promote' | 'Detain' | 'PassOut' | 'Withdraw';
   newRollNumber?: string;
 }
 
 export interface BulkPromotionRequestDto {
-  targetClassId: string;
+  targetClassId?: string;
   targetSectionId?: string;
   targetAcademicYear: string;
   students: PromoteStudentDto[];

@@ -43,15 +43,15 @@ export const libraryApi = {
   // Categories
   getCategories: () => apiClient.get<LibraryCategory[]>('/library/categories'),
   createCategory: (data: Partial<LibraryCategory>) => apiClient.post<LibraryCategory>('/library/categories', data),
-  updateCategory: (id: string, data: Partial<LibraryCategory>) => apiClient.put<LibraryCategory>(`/library/categories/${id}`, data),
-  deleteCategory: (id: string) => apiClient.delete(`/library/categories/${id}`),
+  updateCategory: (id: string, data: Partial<LibraryCategory>) => apiClient.post<LibraryCategory>(`/library/categories/${id}/update`, data),
+  deleteCategory: (id: string) => apiClient.post(`/library/categories/${id}/delete`),
 
   // Books
   getBooks: () => apiClient.get<LibraryBook[]>('/library/books'),
   getBook: (id: string) => apiClient.get<LibraryBook>(`/library/books/${id}`),
   createBook: (data: Partial<LibraryBook>) => apiClient.post<LibraryBook>('/library/books', data),
-  updateBook: (id: string, data: Partial<LibraryBook>) => apiClient.put<LibraryBook>(`/library/books/${id}`, data),
-  deleteBook: (id: string) => apiClient.delete(`/library/books/${id}`),
+  updateBook: (id: string, data: Partial<LibraryBook>) => apiClient.post<LibraryBook>(`/library/books/${id}/update`, data),
+  deleteBook: (id: string) => apiClient.post(`/library/books/${id}/delete`),
 
   // Issue/Return
   getIssues: () => apiClient.get<LibraryBookIssue[]>('/library/issues'),

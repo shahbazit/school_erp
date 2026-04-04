@@ -44,7 +44,7 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
     public virtual async Task<ActionResult<TDto>> Get(Guid id)
     {
         var entity = await _unitOfWork.Repository<TEntity>().GetByIdAsync(id);
-        if (entity == null) return NotFound();
+        if (entity == null) return NotFound(new { message = "Record not found or access denied." });
         return Ok(MapToDto(entity));
     }
 
@@ -61,7 +61,7 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
     public virtual async Task<ActionResult> Update(Guid id, TUpdateDto dto)
     {
         var entity = await _unitOfWork.Repository<TEntity>().GetByIdAsync(id);
-        if (entity == null) return NotFound();
+        if (entity == null) return NotFound(new { message = "Record not found or access denied." });
 
         MapToEntity(dto, entity);
         _unitOfWork.Repository<TEntity>().Update(entity);
@@ -74,7 +74,7 @@ public abstract class BaseMasterController<TEntity, TDto, TCreateDto, TUpdateDto
     public virtual async Task<ActionResult> Delete(Guid id)
     {
         var entity = await _unitOfWork.Repository<TEntity>().GetByIdAsync(id);
-        if (entity == null) return NotFound();
+        if (entity == null) return NotFound(new { message = "Record not found or access denied." });
 
         _unitOfWork.Repository<TEntity>().Delete(entity);
         await _unitOfWork.CompleteAsync();
