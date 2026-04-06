@@ -26,6 +26,7 @@ export interface OrganizationSettings {
   currencyCode?: string;
   dateFormat?: string;
   timeZone?: string;
+  domain: string;
 }
 
 export const organizationApi = {

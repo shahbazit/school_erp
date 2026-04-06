@@ -199,8 +199,13 @@ export default function SubjectContent() {
         try {
             const data = await subjectContentApi.getChapterDetails(selectedChapterId);
             setChapterDetails(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load details', error);
+            if (error?.response?.status === 404) {
+                // Chapter was deleted or does not exist
+                setSelectedChapterId('');
+                setChapterDetails(null);
+            }
         }
     };
 
@@ -610,12 +615,6 @@ export default function SubjectContent() {
                                                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest pl-0.5">Ready to save to chapter</p>
                                                     </div>
                                                 </div>
-                                                <button 
-                                                    onClick={() => setPendingSegments([...pendingSegments, { text: '', page: '' }])}
-                                                    className="px-4 py-2 bg-white text-primary-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-200 hover:border-primary-600 hover:bg-primary-50 flex items-center gap-2 shadow-sm"
-                                                >
-                                                    <Plus className="h-3 w-3" /> Add Another Segment
-                                                </button>
                                             </div>
                                             
                                             <div className="space-y-4 relative z-10">
@@ -671,6 +670,15 @@ export default function SubjectContent() {
                                                         )}
                                                     </div>
                                                 ))}
+                                            </div>
+
+                                            <div className="flex justify-center relative z-10">
+                                                <button 
+                                                    onClick={() => setPendingSegments([...pendingSegments, { text: '', page: '' }])}
+                                                    className="px-6 py-2.5 bg-white text-primary-600 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 border-dashed border-slate-200 hover:border-primary-600 hover:bg-primary-50 flex items-center gap-2 shadow-sm active:scale-95"
+                                                >
+                                                    <Plus className="h-4 w-4" /> Add Another Segment
+                                                </button>
                                             </div>
 
                                             <button

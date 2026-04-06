@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { GraduationCap, Home, CheckCircle } from 'lucide-react';
+import { GraduationCap, Home, CheckCircle, Users, Shield, ArrowRight } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 interface AuthProps {
-  onAuthSuccess: () => void;
+  onAuthSuccess: (isFirstTime?: boolean) => void;
   initialIsLogin?: boolean;
 }
 
 export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps) {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [loginRole] = useState<'institution'>('institution');
   const [step, setStep] = useState(1);
@@ -41,13 +42,17 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
     e.preventDefault();
 
     if (isLogin) {
-      const success = await login({ 
+      const result = await login({ 
         email: formData.email, 
         password: formData.password
       });
-      if (success) {
-        toast.success("Welcome back! Login successful.");
-        onAuthSuccess();
+      if (result.success) {
+        if (result.requiresPasswordChange) {
+           navigate('/force-password-change');
+        } else {
+           toast.success("Welcome back! Login successful.");
+           onAuthSuccess();
+        }
       }
     } else {
       if (step === 1) {
@@ -78,7 +83,7 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
           toast.success("Registration completed successfully!");
           setVerifySuccess(true);
           setTimeout(() => {
-            onAuthSuccess();
+            onAuthSuccess(true);
           }, 1500);
         }
       }
@@ -115,13 +120,13 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
                       <span className={`flex items-center justify-center rounded-full w-6 h-6 shadow-sm ${step === 1 ? 'bg-primary-600 text-white' : 'bg-green-500 text-white'}`}>
                           {step > 1 ? <CheckCircle className="h-3.5 w-3.5" /> : '1'}
                       </span>
-                      <span className={`${step === 1 ? 'font-bold text-slate-900' : 'text-slate-500'}`}>Personal Details</span>
+                      <span className={`${step === 1 ? 'font-bold text-slate-900' : 'text-slate-500'}`}>Admin Account</span>
                   </li>
                   <li className="flex items-center gap-3 text-xs text-slate-500">
                       <span className={`flex items-center justify-center rounded-full w-6 h-6 ${step === 2 ? 'bg-primary-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>
                           2
                       </span>
-                      <span className={`${step === 2 ? 'font-bold text-slate-900' : 'text-slate-500'}`}>School Details & OTP</span>
+                      <span className={`${step === 2 ? 'font-bold text-slate-900' : 'text-slate-500'}`}>School Details</span>
                   </li>
               </ul>
             )}
@@ -160,11 +165,18 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
               {isLogin ? 'Institution Login' : (step === 1 ? 'Create Account' : 'School Details')}
             </h5>
             <p className="text-slate-500 text-xs m-0">
-              {isLogin ? 'Official workspace access for school faculty.' : `Step ${step} of 2: ${step === 1 ? 'Personal Details' : 'Institute Information'}`}
+              {isLogin ? 'Official workspace access for school faculty.' : `Step ${step} of 2: ${step === 1 ? 'Primary Administrator' : 'Institute Information'}`}
             </p>
           </div>
 
 
+
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+               <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500"></div>
+               <p className="text-[11px] font-medium text-red-600 m-0">{error}</p>
+            </div>
+          )}
 
           {verifySuccess ? (
             <div className="text-center animate-pulse">
@@ -201,54 +213,66 @@ export default function Auth({ onAuthSuccess, initialIsLogin = true }: AuthProps
               ) : (
                 <>
                   {step === 1 ? (
-                    <div className="animate-in fade-in slide-in-from-right-2 duration-300">
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">First Name</label>
-                          <input name="firstName" required value={formData.firstName} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
+                    <div className="animate-in fade-in slide-in-from-right-2 duration-300 space-y-6">
+                      
+                      {/* Section: Authorized Contact */}
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                        <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60">
+                           <Users className="h-4 w-4 text-primary-600" />
+                           <span className="text-xs font-black uppercase text-slate-900 tracking-wider">Authorized Contact</span>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Last Name</label>
-                          <input name="lastName" required value={formData.lastName} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">First name</label>
+                            <input name="firstName" required value={formData.firstName} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Last name</label>
+                            <input name="lastName" required value={formData.lastName} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Mobile Number</label>
+                          <input name="mobileNumber" type="tel" required value={formData.mobileNumber} onChange={handleChange} placeholder="e.g. 9876543210" className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
                         </div>
                       </div>
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Mobile Number</label>
-                        <input name="mobileNumber" type="tel" required value={formData.mobileNumber} onChange={handleChange} placeholder="e.g. 9876543210" className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Work Email</label>
-                        <input name="email" type="email" required value={formData.email} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Password</label>
-                        <input name="password" type="password" required value={formData.password} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
+
+                      {/* Section: Account Credentials */}
+                      <div className="p-4 rounded-xl bg-white border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)]">
+                        <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60">
+                           <Shield className="h-4 w-4 text-emerald-600" />
+                           <span className="text-xs font-black uppercase text-slate-900 tracking-wider">Account Credentials</span>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Work Email</label>
+                          <input name="email" type="email" required value={formData.email} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                        </div>
+                        <div className="mb-0">
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Create Password</label>
+                          <input name="password" type="password" required value={formData.password} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="animate-in fade-in slide-in-from-right-2 duration-300">
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">School/Institute Name</label>
-                        <input name="schoolName" required value={formData.schoolName} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Preferred Domain (e.g. myschool.com)</label>
-                        <input name="schoolDomain" required value={formData.schoolDomain} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">City</label>
-                          <input name="city" required value={formData.city} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">OTP (from Email)</label>
-                          <input name="otp" required maxLength={6} value={formData.otp} onChange={handleChange} placeholder="000000" className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all text-center tracking-widest font-bold" />
-                        </div>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Institute Address</label>
-                        <textarea name="address" rows={2} value={formData.address} onChange={handleChange} className="w-full bg-slate-50 border-0 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 outline-none transition-all" />
-                      </div>
+              ) : (
+                <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">School/Institute Name</label>
+                    <input name="schoolName" required value={formData.schoolName} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Preferred Domain (e.g. myschool.com)</label>
+                    <input name="schoolDomain" required value={formData.schoolDomain} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 mb-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">City</label>
+                      <input name="city" required value={formData.city} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Institute Address</label>
+                    <textarea name="address" rows={2} value={formData.address} onChange={handleChange} className="w-full bg-white border border-slate-200 px-3 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 outline-none transition-all shadow-sm" />
+                  </div>
                     </div>
                   )}
                 </>

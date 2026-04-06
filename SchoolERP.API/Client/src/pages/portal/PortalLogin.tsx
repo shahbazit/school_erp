@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { GraduationCap, Home, Users, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
 import { toast } from 'react-toastify';
 
@@ -9,7 +9,7 @@ interface PortalLoginProps {
 }
 
 export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
-  const [role, setRole] = useState<'student' | 'parent'>('student');
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     schoolDomain: '',
     identifier: '',
@@ -24,14 +24,18 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login({
+    const result = await login({
       email: formData.identifier,
       password: formData.password,
       schoolDomain: formData.schoolDomain
     });
-    if (success) {
-      toast.success(`Welcome to the ${role === 'student' ? 'Student' : 'Parent'} Portal!`);
-      onAuthSuccess();
+    if (result.success) {
+      if (result.requiresPasswordChange) {
+        navigate('/force-password-change');
+      } else {
+        toast.success(`Welcome to the Community Portal!`);
+        onAuthSuccess();
+      }
     }
   };
 
@@ -53,17 +57,13 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
           <div className="mx-auto max-w-[320px]">
             <h1 className="text-2xl font-black mb-4">Your secondary home.</h1>
             <p className="text-xs text-slate-500 mb-0 leading-relaxed mx-auto max-w-[280px]">
-              Access your academic records, stay updated with school events, and manage your progress in one simple place.
+              Access academic records, stay updated with school events, and manage progress in one simple place for both students and parents.
             </p>
 
             <div className="mt-12 space-y-4 text-left">
-              <div className={`p-5 rounded-2xl border transition-all duration-300 ${role === 'student' ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-500/5 transform scale-105' : 'bg-transparent border-slate-200 opacity-40'}`}>
-                <p className="text-[10px] font-bold text-emerald-600 uppercase mb-2 tracking-widest">Student Portal</p>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">View grades, attendance, and join virtual classrooms effortlessly.</p>
-              </div>
-              <div className={`p-5 rounded-2xl border transition-all duration-300 ${role === 'parent' ? 'bg-white border-amber-200 shadow-xl shadow-amber-500/5 transform scale-105' : 'bg-transparent border-slate-200 opacity-40'}`}>
-                <p className="text-[10px] font-bold text-amber-600 uppercase mb-2 tracking-widest">Parent Dashboard</p>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">Monitor your ward's daily activities and manage fee payments securely.</p>
+              <div className="p-5 rounded-2xl border bg-white border-emerald-200 shadow-xl shadow-emerald-500/5 transition-all duration-300">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase mb-2 tracking-widest">Unified Access</p>
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">One secure login for students and parents to access grades, attendance, and fee management.</p>
               </div>
             </div>
           </div>
@@ -82,26 +82,15 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
         <div className="w-full max-w-[380px]">
           <div className="mb-10 text-center lg:text-left">
             <h5 className="font-black text-slate-900 text-2xl mb-1.5">Portal Login</h5>
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Secure access for the school community.</p>
+            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Access for Students & Parents</p>
           </div>
 
-          {/* Role Switcher Tabs */}
-          <div className="flex p-1 bg-slate-100/80 rounded-2xl mb-10">
-            <button 
-              onClick={() => setRole('student')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${role === 'student' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Users className="h-4 w-4" />
-              Student
-            </button>
-            <button 
-              onClick={() => setRole('parent')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${role === 'parent' ? 'bg-white text-amber-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Users className="h-4 w-4" />
-              Parent
-            </button>
-          </div>
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+               <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500"></div>
+               <p className="text-[11px] font-medium text-red-600 m-0">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -128,7 +117,7 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
               {/* Identifier Input */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
-                  {role === 'student' ? 'Admission Number' : 'Registered Mobile'}
+                  Admission No / Mobile / Email
                 </label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -139,7 +128,7 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
                     required 
                     value={formData.identifier} 
                     onChange={handleChange} 
-                    placeholder={role === 'student' ? 'ADM101' : '9876543210'} 
+                    placeholder="ADM101 or 9876543210" 
                     className="w-full bg-slate-50 border-0 pl-11 pr-4 py-3.5 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary-500/50 outline-none transition-all placeholder:text-slate-400"
                   />
                 </div>
@@ -171,7 +160,7 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-4 rounded-xl text-xs font-black text-white shadow-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50 ${role === 'student' ? 'bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-700' : 'bg-amber-600 shadow-amber-500/20 hover:bg-amber-700'}`}
+              className="w-full py-4 rounded-xl text-xs font-black text-white shadow-xl transition-all flex items-center justify-center gap-2 group disabled:opacity-50 bg-emerald-600 shadow-emerald-500/20 hover:bg-emerald-700"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

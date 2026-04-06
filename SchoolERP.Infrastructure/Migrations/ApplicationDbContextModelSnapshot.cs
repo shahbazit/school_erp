@@ -2919,14 +2919,18 @@ namespace SchoolERP.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Mobile")
+                    b.Property<string>("LastName")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
+                    b.Property<string>("Mobile")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("OtpCode")
@@ -3364,6 +3368,9 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PreviousSchool")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrimaryContact")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RegistrationNumber")
@@ -4413,6 +4420,9 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("ForcePasswordChange")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("HasConsentedToTerms")
                         .HasColumnType("bit");

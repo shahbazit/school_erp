@@ -4,9 +4,10 @@ import {
     FileText, MessageSquare, Layout, BookMarked, 
     Loader2, Book as BookIcon, HelpCircle
 } from 'lucide-react';
-import { subjectContentApi } from '../api/subjectContentApi';
-import { masterApi } from '../api/masterApi';
+import { subjectContentApi } from '../../api/subjectContentApi';
+import { masterApi } from '../../api/masterApi';
 import { useSearchParams } from 'react-router-dom';
+import { usePortal } from '../../contexts/PortalContext';
 
 interface Book {
     id: string;
@@ -44,15 +45,31 @@ export default function AiTutor() {
 
     const currentRole = (decodedToken?.Role || decodedToken?.role || decodedToken?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || 'Guest').toString();
     const isStudent = currentRole.toLowerCase() === 'student';
+    const isPortalUser = ['student', 'parent', 'portal'].includes(currentRole.toLowerCase());
     const studentClassId = decodedToken?.AcademicClassId || decodedToken?.academicClassId || '';
+
+    const { selectedWard } = usePortal();
 
     const [classes, setClasses] = useState<any[]>([]);
     const [subjects, setSubjects] = useState<any[]>([]);
     const [books, setBooks] = useState<Book[]>([]);
     
-    const [selectedClassId, setSelectedClassId] = useState<string>(isStudent ? studentClassId : '');
+    // For portal users, class is locked to the selected ward's class
+    const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedBookId, setSelectedBookId] = useState<string>(urlBookId || '');
+
+    useEffect(() => {
+        if (isPortalUser && selectedWard) {
+            setSelectedClassId(selectedWard.classId);
+            // Optionally clear subject/book if class changes significantly, 
+            // but usually switching wards might mean same class or different.
+            // Resetting ensures we don't show books from previous ward's class.
+            setSelectedSubjectId('');
+            setSelectedBookId('');
+            setChapters([]);
+        }
+    }, [selectedWard, isPortalUser]);
 
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [selectedChapterId, setSelectedChapterId] = useState<string>('');
@@ -117,8 +134,12 @@ export default function AiTutor() {
             setLoading(true);
             try {
                 // Background load master data
-                if (!isStudent) {
+                if (!isPortalUser) {
                     masterApi.getAll('classes').then(setClasses);
+                } else if (selectedWard) {
+                    setSelectedClassId(selectedWard.classId);
+                } else if (isStudent) {
+                    setSelectedClassId(studentClassId);
                 }
                 masterApi.getAll('subjects').then(setSubjects);
 
@@ -130,17 +151,22 @@ export default function AiTutor() {
                         const bClassId = book.academicClassId || book.AcademicClassId;
                         const bSubId = book.subjectId || book.SubjectId;
 
-                        setSelectedClassId(bClassId);
-                        setSelectedSubjectId(bSubId);
-                        setSelectedBookId(bId);
-                        
-                        // Load books list right away
-                        const availableBooks = await subjectContentApi.getBooks(bClassId, bSubId);
-                        setBooks(availableBooks);
+                        // Only allow if it's the student's class (if student)
+                        if (isStudent && bClassId !== studentClassId) {
+                            console.warn("Attempted to access book from different class");
+                        } else {
+                            setSelectedClassId(bClassId);
+                            setSelectedSubjectId(bSubId);
+                            setSelectedBookId(bId);
+                            
+                            // Load books list right away
+                            const availableBooks = await subjectContentApi.getBooks(bClassId, bSubId);
+                            setBooks(availableBooks);
 
-                        // Load chapters for initial state
-                        const chs = await subjectContentApi.getChapters(bId);
-                        setChapters(chs);
+                            // Load chapters for initial state
+                            const chs = await subjectContentApi.getChapters(bId);
+                            setChapters(chs);
+                        }
                     }
                 }
             } catch (e) {
@@ -150,16 +176,16 @@ export default function AiTutor() {
             }
         };
         init();
-    }, [urlBookId]);
+    }, [urlBookId, studentClassId]);
 
     useEffect(() => {
-        if (selectedClassId && selectedSubjectId) {
+        if (selectedClassId) {
             const currentBook = books.find(b => String(b.id || b.Id) === String(selectedBookId));
             if (!currentBook || (currentBook.academicClassId !== selectedClassId && currentBook.AcademicClassId !== selectedClassId)) {
                 loadBooks();
             }
         }
-    }, [selectedClassId, selectedSubjectId]);
+    }, [selectedClassId, selectedSubjectId, isPortalUser]);
 
     useEffect(() => {
         if (selectedBookId) {
@@ -179,11 +205,11 @@ export default function AiTutor() {
             const history = await subjectContentApi.getChatHistory(chapterId);
             console.log("Loaded history nodes:", history?.length || 0);
             
-            const historyArray = Array.isArray(history) ? history : [];
+            const historyArray = Array.isArray(history) ? history : (history?.Value || history?.value || []);
             const mapped = historyArray.map((h: any) => ({
                 role: ((h.role || h.Role) === 'user' ? 'user' : 'ai') as 'user' | 'ai',
                 content: String(h.content || h.Content)
-            }));
+            })); dormant_mapped: { console.log('Parsed history:', mapped.length); }
             setChatHistory(mapped);
         } catch (e) {
             console.error("Failed to load history", e);
@@ -242,9 +268,10 @@ export default function AiTutor() {
     };
 
     const loadBooks = async () => {
-        if (!selectedClassId || !selectedSubjectId) return;
+        if (!selectedClassId) return; // For students, subjectId can be empty to get all books
+        if (!isPortalUser && !selectedSubjectId) return; // Admin needs both
         try {
-            const data = await subjectContentApi.getBooks(selectedClassId, selectedSubjectId);
+            const data = await subjectContentApi.getBooks(selectedClassId, selectedSubjectId || undefined);
             setBooks(data);
         } catch (error) {
             console.error('Failed to load books', error);
@@ -256,7 +283,19 @@ export default function AiTutor() {
         setLoading(true);
         try {
             const data = await subjectContentApi.getChapters(selectedBookId);
-            const chaptersArray = Array.isArray(data) ? data : [];
+            let chaptersArray = Array.isArray(data) ? data : [];
+            
+            // "show only ready chapters" for student
+            if (isPortalUser) {
+                // Students only see chapters that have content or a summary generated.
+                // Note: .contents is not in the DTO, so we rely on summary or flags if added later.
+                chaptersArray = chaptersArray.filter(c => 
+                    (c.summary && c.summary.length > 5) || 
+                    (c as any).isReady === true ||
+                    (c as any).IsReady === true
+                );
+            }
+            
             setChapters(chaptersArray);
             
             if (chaptersArray.length > 0) {
@@ -278,8 +317,28 @@ export default function AiTutor() {
         try {
             const data = await subjectContentApi.getChapterDetails(selectedChapterId);
             setChapterDetails(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load details', error);
+            if (error?.response?.status === 404) {
+                // The chapter doesn't exist (e.g. deleted by admin or DB wiped but kept in localStorage)
+                setChapterDetails(null);
+                
+                // Clear from recents
+                const raw = localStorage.getItem('ai_tutor_recents');
+                if (raw) {
+                    try {
+                        const recents = JSON.parse(raw);
+                        const updated = recents.filter((r: any) => r.chapterId !== selectedChapterId);
+                        localStorage.setItem('ai_tutor_recents', JSON.stringify(updated));
+                        setRecentChats(updated);
+                    } catch (e) {
+                        console.error('Failed to parse recents', e);
+                    }
+                }
+                
+                // Reset selection
+                setSelectedChapterId('');
+            }
         }
     };
 
@@ -331,24 +390,77 @@ export default function AiTutor() {
         }
     };
 
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
+
+    if (isPortalUser && !selectedBookId) {
+        return (
+            <div className="max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-500">
+                <div className="bg-white rounded-[2rem] p-6 md:p-10 text-slate-800 border border-slate-100 shadow-sm relative overflow-hidden mb-8">
+                    <div className="absolute right-0 top-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl -mr-20 -mt-20" />
+                    <div className="relative">
+                        <div className="inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-xl mb-4 border border-blue-100">
+                            <Sparkles className="h-4 w-4 text-blue-500" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 leading-none">AI Learning Tutor</span>
+                        </div>
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 mb-2">My Library</h1>
+                        <p className="text-slate-500 text-sm md:text-base font-medium">Select a book to start learning with your AI companion.</p>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center p-12"><Loader2 className="h-12 w-12 text-blue-500 animate-spin" /></div>
+                ) : books.length === 0 ? (
+                    <div className="text-center p-12 bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
+                        <BookIcon className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-xl font-black text-slate-800">No Books Assigned</h3>
+                        <p className="text-slate-500 mt-2">You don't have any AI-enabled books for your class yet.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {books.map(b => (
+                            <button 
+                                key={b.id || b.Id} 
+                                onClick={() => setSelectedBookId(b.id || b.Id || '')}
+                                className="bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/10 transition-all text-left flex flex-col items-start gap-5 hover:-translate-y-1 group"
+                            >
+                                <div className="h-16 w-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center shrink-0 border border-blue-100 group-hover:scale-110 transition-transform">
+                                    <BookOpen className="h-8 w-8 relative z-10" />
+                                </div>
+                                <div className="w-full">
+                                    <h3 className="font-black text-lg text-slate-800 group-hover:text-blue-600 transition-colors leading-tight mb-2 uppercase">{b.name}</h3>
+                                    <p className="text-xs text-slate-500 font-medium line-clamp-2">{b.description || 'AI enhanced curriculum book.'}</p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-[1600px] mx-auto flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500 px-4 pb-12">
             {/* Header / Selection Bar */}
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-4 sticky top-4 z-[100] backdrop-blur-md bg-white/90">
+            <div className={`bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap items-center gap-4 sticky top-4 z-[100] backdrop-blur-md bg-white/90 ${isPortalUser ? 'justify-between' : 'justify-between'}`}>
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600">
+                    <div className="p-3 bg-blue-100 rounded-2xl text-blue-500">
                         <Sparkles className="h-6 w-6" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-900 tracking-tight">AI Tutor</h1>
+                        <h1 className="text-xl font-black text-slate-800 tracking-tight">AI Tutor</h1>
                         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest pl-0.5">Interactive Learning Companion</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 overflow-x-auto pb-1 max-w-full">
-                    {!isStudent && (
+                {isPortalUser ? (
+                    <button 
+                        onClick={() => setSelectedBookId('')}
+                        className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                    >
+                        Change Book
+                    </button>
+                ) : (
+                    <div className="flex items-center gap-3 overflow-x-auto pb-1 max-w-full">
                         <select
                             className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[140px]"
                             value={selectedClassId}
@@ -357,40 +469,40 @@ export default function AiTutor() {
                             <option value="">Class</option>
                             {classes.map(c => <option key={c.id || c.Id} value={c.id || c.Id}>{c.name}</option>)}
                         </select>
-                    )}
 
-                    <select
-                        className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[140px]"
-                        value={selectedSubjectId}
-                        onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    >
-                        <option value="">Subject</option>
-                        {subjects.map(s => <option key={s.id || s.Id} value={s.id || s.Id}>{s.name}</option>)}
-                    </select>
+                        <select
+                            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[140px]"
+                            value={selectedSubjectId}
+                            onChange={(e) => setSelectedSubjectId(e.target.value)}
+                        >
+                            <option value="">Subject</option>
+                            {subjects.map(s => <option key={s.id || s.Id} value={s.id || s.Id}>{s.name}</option>)}
+                        </select>
 
-                    <select
-                        className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[180px]"
-                        value={selectedBookId}
-                        onChange={(e) => setSelectedBookId(e.target.value)}
-                    >
-                        <option value="">Select Book</option>
-                        {books.map(b => <option key={b.id || b.Id} value={b.id || b.Id}>{b.name}</option>)}
-                    </select>
+                        <select
+                            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[180px]"
+                            value={selectedBookId}
+                            onChange={(e) => setSelectedBookId(e.target.value)}
+                        >
+                            <option value="">Select Book</option>
+                            {books.map(b => <option key={b.id || b.Id} value={b.id || b.Id}>{b.name}</option>)}
+                        </select>
 
-                    <select
-                        className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[180px]"
-                        value={selectedChapterId}
-                        onChange={(e) => setSelectedChapterId(e.target.value)}
-                    >
-                        <option value="">Select Chapter</option>
-                        {chapters.map(c => <option key={c.id || c.Id} value={c.id || c.Id}>{c.title}</option>)}
-                    </select>
-                </div>
+                        <select
+                            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-primary-500/10 outline-none font-bold min-w-[180px]"
+                            value={selectedChapterId}
+                            onChange={(e) => setSelectedChapterId(e.target.value)}
+                        >
+                            <option value="">Select Chapter</option>
+                            {chapters.map(c => <option key={c.id || c.Id} value={c.id || c.Id}>{c.title}</option>)}
+                        </select>
+                    </div>
+                )}
             </div>
 
-            <div className="flex gap-6 items-start">
+            <div className="flex flex-col md:flex-row gap-6 items-start">
                 {/* Sidebar - Chapter List & Recents */}
-                <div className={`${sidebarCollapsed ? 'w-16' : 'w-80'} bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col shrink-0 transition-all duration-300 sticky top-[100px] h-fit max-h-[calc(100vh-140px)]`}>
+                <div className={`${sidebarCollapsed ? 'w-full md:w-16' : 'w-full md:w-80'} bg-white rounded-3xl shadow-sm border border-slate-100 flex flex-col shrink-0 transition-all duration-300 md:sticky top-[100px] h-fit md:max-h-[calc(100vh-140px)]`}>
                     <div className="p-4 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
                         {!sidebarCollapsed && (
                             <div className="flex items-center gap-2">
@@ -418,10 +530,13 @@ export default function AiTutor() {
                                 chapters.map(ch => (
                                     <button
                                         key={ch.id || ch.Id}
-                                        onClick={() => setSelectedChapterId(ch.id || ch.Id || '')}
+                                        onClick={() => {
+                                            setSelectedChapterId(ch.id || ch.Id || '');
+                                            if (window.innerWidth < 768) setSidebarCollapsed(true);
+                                        }}
                                         className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all group ${
                                             selectedChapterId === (ch.id || ch.Id)
-                                            ? 'bg-emerald-600 text-white shadow-md' 
+                                            ? 'bg-blue-500 text-white shadow-md' 
                                             : 'hover:bg-slate-50 text-slate-600'
                                         }`}
                                     >
@@ -446,11 +561,11 @@ export default function AiTutor() {
                                         onClick={() => handleLoadSession(rc)}
                                         className={`w-full flex flex-col p-3 rounded-2xl border transition-all text-left ${
                                             selectedChapterId === rc.chapterId 
-                                            ? 'border-emerald-200 bg-emerald-50/30' 
+                                            ? 'border-blue-200 bg-blue-50/30' 
                                             : 'border-transparent hover:bg-slate-50'
                                         }`}
                                     >
-                                        <p className="text-[10px] font-black text-slate-900 truncate mb-0.5">{rc.chapterTitle}</p>
+                                        <p className="text-[10px] font-black text-slate-800 truncate mb-0.5">{rc.chapterTitle}</p>
                                         <p className="text-[8px] font-bold text-slate-400 truncate uppercase tracking-tighter">
                                             {rc.bookName}
                                         </p>
@@ -472,26 +587,26 @@ export default function AiTutor() {
                         <h2 className="text-2xl font-black text-slate-200 uppercase tracking-widest">Select a Chapter</h2>
                     </div>
                 ) : (
-                    <div className="flex-1 bg-white rounded-3xl shadow-sm flex flex-col border border-slate-100 animate-in zoom-in-95 duration-500 min-h-[calc(100vh-140px)]">
-                        <div className="p-6 bg-emerald-50/50 border-b border-emerald-100/50 flex items-center justify-between sticky top-[92px] z-[90] backdrop-blur-md bg-emerald-50/80">
-                            <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-600/20">
-                                    <Sparkles className="h-6 w-6 text-white" />
+                    <div className="flex-1 w-full bg-white rounded-3xl shadow-sm flex flex-col border border-slate-100 animate-in zoom-in-95 duration-500 min-h-[calc(100vh-140px)]">
+                        <div className="p-4 md:p-6 bg-blue-50/50 border-b border-blue-100/50 flex flex-wrap items-center justify-between sticky top-[92px] z-[90] backdrop-blur-md bg-blue-50/80 gap-4">
+                            <div className="flex items-center gap-3 md:gap-4">
+                                <div className="h-10 w-10 md:h-12 md:w-12 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                                    <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-white" />
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-                                        <span className="text-[10px] text-emerald-600 font-black tracking-widest uppercase">Smart Learning Assistant</span>
+                                    <div className="flex items-center gap-2 mb-0.5 md:mb-1">
+                                        <div className="h-1.5 w-1.5 md:h-2 md:w-2 bg-blue-500 rounded-full animate-pulse" />
+                                        <span className="text-[9px] md:text-[10px] text-blue-500 font-black tracking-widest uppercase line-clamp-1">Smart Learning Assistant</span>
                                     </div>
-                                    <p className="text-lg font-black text-slate-800 leading-tight">
+                                    <p className="text-base md:text-lg font-black text-slate-800 leading-tight line-clamp-1">
                                         {chapters.find(c => (c.id || c.Id) === selectedChapterId)?.title}
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
                                 <button 
                                     onClick={handleNewChat}
-                                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                     title="Start New Chat"
                                 >
                                     <MessageSquare className="h-5 w-5" />
@@ -499,7 +614,7 @@ export default function AiTutor() {
                                 <button 
                                     onClick={handleSummarize}
                                     disabled={chatLoading}
-                                    className="px-4 py-2 bg-white text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 shadow-sm hover:shadow-md hover:bg-emerald-50 transition-all disabled:opacity-50"
+                                    className="px-4 py-2 bg-white text-blue-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-100 shadow-sm hover:shadow-md hover:bg-blue-50 transition-all disabled:opacity-50"
                                 >
                                     Summarize
                                 </button>
@@ -509,11 +624,11 @@ export default function AiTutor() {
                         <div className="flex-1 overflow-y-auto px-6 py-10 space-y-10 bg-white">
                             {chatHistory.length === 0 && (
                                 <div className="pt-10 text-center max-w-md mx-auto space-y-6 pb-10">
-                                    <div className="h-20 w-20 bg-emerald-50 rounded-[2rem] rotate-12 flex items-center justify-center mx-auto border border-emerald-100 shadow-xl shadow-emerald-500/10">
-                                        <Sparkles className="h-10 w-10 text-emerald-600 animate-pulse" />
+                                    <div className="h-20 w-20 bg-blue-50 rounded-[2rem] rotate-12 flex items-center justify-center mx-auto border border-blue-100 shadow-xl shadow-blue-500/10">
+                                        <Sparkles className="h-10 w-10 text-blue-500 animate-pulse" />
                                     </div>
                                     <div className="space-y-3">
-                                        <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tight">How can I help you learn today?</h3>
+                                        <h3 className="text-2xl font-black text-slate-800 leading-tight tracking-tight">How can I help you learn today?</h3>
                                         <p className="text-slate-500 text-sm font-medium leading-relaxed">
                                             I've analyzed this chapter and I'm ready to explain concepts, solve problems, or quiz your knowledge.
                                         </p>
@@ -525,7 +640,7 @@ export default function AiTutor() {
                                 {chatHistory.map((msg, i) => (
                                     <div key={i} className={`flex gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                         {msg.role === 'ai' && (
-                                            <div className="h-9 w-9 bg-emerald-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-600/20 mt-1">
+                                            <div className="h-9 w-9 bg-blue-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20 mt-1">
                                                 <Sparkles className="h-4 w-4 text-white" />
                                             </div>
                                         )}
@@ -545,17 +660,17 @@ export default function AiTutor() {
 
                                                         return (
                                                             <div key={lIdx} className={
-                                                                isMainHeader ? 'text-xl font-black mb-4 text-slate-900 border-b border-slate-100 pb-2' : 
-                                                                isHeader ? 'text-lg font-black mb-2 text-emerald-700' : 
+                                                                isMainHeader ? 'text-xl font-black mb-4 text-slate-800 border-b border-slate-100 pb-2' : 
+                                                                isHeader ? 'text-lg font-black mb-2 text-blue-600' : 
                                                                 isSubHeader ? 'text-[11px] font-black uppercase text-slate-400 mb-2 tracking-widest' : 
                                                                 isList ? 'pl-2 mb-2 flex items-start' : 'mb-4 last:mb-0'
                                                             }>
-                                                                {isList && <span className="mr-3 text-emerald-500 font-black">
+                                                                {isList && <span className="mr-3 text-blue-500 font-black">
                                                                     {/^\d+\.\s/.test(line) ? line.match(/^\d+/)?.[0] + '.' : '•'}
                                                                 </span>}
                                                                 <span className="flex-1 whitespace-pre-wrap">
                                                                     {cleanLine.split('**').map((part, pIdx) => 
-                                                                        pIdx % 2 === 1 ? <b key={pIdx} className="font-black text-emerald-600 drop-shadow-sm">{part}</b> : part
+                                                                        pIdx % 2 === 1 ? <b key={pIdx} className="font-black text-blue-500 drop-shadow-sm">{part}</b> : part
                                                                     )}
                                                                 </span>
                                                             </div>
@@ -566,7 +681,7 @@ export default function AiTutor() {
                                         </div>
 
                                         {msg.role === 'user' && (
-                                            <div className="h-9 w-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-900/20 mt-1">
+                                            <div className="h-9 w-9 bg-slate-800 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-slate-800/20 mt-1">
                                                 <span className="text-[10px] font-black text-white uppercase">{decodedToken?.name?.substring(0,1) || 'U'}</span>
                                             </div>
                                         )}
@@ -575,13 +690,13 @@ export default function AiTutor() {
                                 
                                 {chatLoading && (
                                     <div className="flex gap-6 animate-in fade-in duration-300">
-                                        <div className="h-9 w-9 bg-emerald-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-600/20">
+                                        <div className="h-9 w-9 bg-blue-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
                                             <Sparkles className="h-4 w-4 text-white" />
                                         </div>
                                         <div className="flex items-center gap-1.5 py-3">
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" />
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
                                         </div>
                                     </div>
                                 )}
@@ -597,7 +712,7 @@ export default function AiTutor() {
                                         <button 
                                             key={q}
                                             onClick={() => { setQuestion(q); }}
-                                            className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all shadow-sm"
+                                            className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all shadow-sm"
                                         >
                                             {q}
                                         </button>
@@ -610,14 +725,14 @@ export default function AiTutor() {
                                         <input
                                             type="text"
                                             placeholder="Message your AI Tutor..."
-                                            className="flex-1 pl-6 pr-4 py-4 bg-transparent text-[15px] text-slate-900 focus:ring-0 outline-none transition-all placeholder:text-slate-400 font-medium"
+                                            className="flex-1 pl-6 pr-4 py-4 bg-transparent text-[15px] text-slate-800 focus:ring-0 outline-none transition-all placeholder:text-slate-400 font-medium"
                                             value={question}
                                             onChange={(e) => setQuestion(e.target.value)}
                                         />
                                         <button
                                             type="submit"
                                             disabled={chatLoading || !question.trim()}
-                                            className="h-10 w-10 bg-slate-900 text-white rounded-[1.25rem] flex items-center justify-center hover:bg-slate-800 transition-all disabled:opacity-20 active:scale-95 shrink-0 mr-1"
+                                            className="h-10 w-10 bg-slate-800 text-white rounded-[1.25rem] flex items-center justify-center hover:bg-slate-800 transition-all disabled:opacity-20 active:scale-95 shrink-0 mr-1"
                                         >
                                             <Send className="h-4 w-4" />
                                         </button>
@@ -630,6 +745,7 @@ export default function AiTutor() {
                         </div>
                     </div>
                 )}
+
             </div>
         </div>
     );

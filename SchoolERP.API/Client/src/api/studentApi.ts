@@ -17,6 +17,7 @@ export const studentApi = {
     sectionId?: string;
     courseId?: string;
     academicYear?: string;
+    familyId?: string;
     isActive?: boolean;
     status?: string;
     sortBy?: string;

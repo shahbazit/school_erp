@@ -45,6 +45,7 @@ export interface AuthResponse {
   success: boolean;
   token?: string;
   refreshToken?: string;
+  requiresPasswordChange?: boolean;
   errors?: string[];
 }
 
@@ -164,6 +165,8 @@ export interface Student {
   permanentAddress?: string;
   feeSubscriptions: any[];
   feeDiscounts: any[];
+  academicRecords?: any[];
+  primaryContact?: string;
 }
 
 export interface CreateStudentDto {
@@ -250,6 +253,7 @@ export interface CreateStudentDto {
   permanentAddress?: string;
   feeSubscriptions: any[];
   feeDiscounts: any[];
+  academicRecords?: any[];
 }
 
 export interface UpdateStudentDto {
@@ -335,6 +339,7 @@ export interface UpdateStudentDto {
   admissionDate: string;
   feeSubscriptions: any[];
   feeDiscounts: any[];
+  primaryContact?: string;
 }
 
 export enum LookupType {

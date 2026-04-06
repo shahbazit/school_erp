@@ -3,6 +3,7 @@ import { X, User, BookOpen, Users, MapPin, ChevronLeft, ChevronRight, Check, Cre
 import { toast } from 'react-toastify';
 import { Student, CreateStudentDto, UpdateStudentDto, AssignCourseDto } from '../types';
 import { masterApi } from '../api/masterApi';
+import { studentApi } from '../api/studentApi';
 import { useLocalization } from '../contexts/LocalizationContext';
 
 interface StudentModalProps {
@@ -74,6 +75,7 @@ const defaultForm = {
 
   feeSubscriptions: [] as any[],
   feeDiscounts: [] as any[],
+  primaryContact: 'Father',
 };
 
 export default function StudentModal({ isOpen, onClose, onSave, initialData, defaultTab }: StudentModalProps) {
@@ -97,8 +99,119 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [docType, setDocType] = useState('Aadhar Card');
   const [docName, setDocName] = useState('');
+  const [siblingSearch, setSiblingSearch] = useState('');
+  const [siblingResults, setSiblingResults] = useState<Student[]>([]);
+  const [isSearchingSibling, setIsSearchingSibling] = useState(false);
+  const [siblings, setSiblings] = useState<Student[]>([]);
+  const [loadingSiblings, setLoadingSiblings] = useState(false);
+  const [manuallyLinked, setManuallyLinked] = useState<Student[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const documentTypes = ['Aadhar Card', 'Birth Certificate', 'Transfer Certificate', 'Previous Marksheet', 'Medical Record', 'Other'];
+
+  const fetchSiblings = useCallback(async () => {
+    if (!formData.familyId || formData.familyId.length < 3) {
+      setSiblings([]);
+      return;
+    }
+    try {
+      setLoadingSiblings(true);
+      const res = await studentApi.getAll({ familyId: formData.familyId, pageSize: 50 });
+      // Distinct by admissionNo to avoid session duplicates
+      const uniqueSiblings = res.data.reduce((acc, current) => {
+        if (!acc.some(s => s.admissionNo === current.admissionNo)) acc.push(current);
+        return acc;
+      }, [] as Student[]);
+      setSiblings(uniqueSiblings.filter(s => s.id !== initialData?.id && s.admissionNo !== initialData?.admissionNo));
+    } catch (err) {
+      console.error("Fetch Siblings Error:", err);
+    } finally {
+      setLoadingSiblings(false);
+    }
+  }, [formData.familyId, initialData?.id]);
+
+  useEffect(() => {
+    if (isOpen && formData.familyId) {
+      fetchSiblings();
+    } else {
+      setSiblings([]);
+    }
+  }, [isOpen, formData.familyId, fetchSiblings]);
+
+  const handleSiblingSearch = useCallback(async (query: string) => {
+    setSiblingSearch(query);
+    if (query.trim().length < 3) {
+      setSiblingResults([]);
+      return;
+    }
+    
+    try {
+      setIsSearchingSibling(true);
+      const res = await studentApi.getAll({ search: query, pageSize: 20 });
+      // Distinct by admissionNo
+      const uniqueResults = res.data.reduce((acc, current) => {
+        if (!acc.some(s => s.admissionNo === current.admissionNo)) acc.push(current);
+        return acc;
+      }, [] as Student[]);
+      setSiblingResults(uniqueResults.filter(s => s.id !== initialData?.id && s.admissionNo !== initialData?.admissionNo));
+    } catch (err) {
+      console.error("Sibling Search Error:", err);
+    } finally {
+      setIsSearchingSibling(false);
+    }
+  }, [initialData?.id]);
+
+  const linkSibling = (sibling: Student) => {
+    const resolvedFamilyId = sibling.familyId || `FAM-${sibling.admissionNo}`;
+    
+    setManuallyLinked(prev => [...prev.filter(s => s.id !== sibling.id), sibling]);
+    
+    setFormData(prev => ({
+      ...prev,
+      familyId: resolvedFamilyId,
+      fatherName: sibling.fatherName || prev.fatherName,
+      fatherMobile: sibling.fatherMobile || prev.fatherMobile,
+      fatherEmail: sibling.fatherEmail || prev.fatherEmail,
+      fatherOccupation: sibling.fatherOccupation || prev.fatherOccupation,
+      fatherQualification: (sibling as any).fatherQualification || (prev as any).fatherQualification,
+      motherName: sibling.motherName || prev.motherName,
+      motherMobile: sibling.motherMobile || prev.motherMobile,
+      motherEmail: sibling.motherEmail || prev.motherEmail,
+      motherOccupation: sibling.motherOccupation || prev.motherOccupation,
+      motherQualification: (sibling as any).motherQualification || (prev as any).motherQualification,
+      guardianName: sibling.guardianName || prev.guardianName,
+      guardianMobile: sibling.guardianMobile || prev.guardianMobile,
+      guardianRelation: sibling.guardianRelation || prev.guardianRelation,
+      addressLine1: sibling.addressLine1 || prev.addressLine1,
+      addressLine2: sibling.addressLine2 || prev.addressLine2,
+      city: sibling.city || prev.city,
+      state: sibling.state || prev.state,
+      pincode: sibling.pincode || prev.pincode,
+      permanentAddress: (sibling as any).permanentAddress || (prev as any).permanentAddress
+    }));
+    setSiblingSearch('');
+    setSiblingResults([]);
+    toast.success(`Linked with ${sibling.firstName}. Saved details synced!`, { toastId: 'sibling-linked' });
+  };
+
+  const unlinkSibling = (id: string) => {
+    setManuallyLinked(prev => prev.filter(s => s.id !== id));
+    setSiblings(prev => prev.filter(s => s.id !== id));
+    if (siblings.length <= 1 && manuallyLinked.length <= 1) {
+       // Optional: Could clear familyId here if no links left
+    }
+  };
+
+  useEffect(() => {
+    const contact = formData.primaryContact;
+    let targetMobile = '';
+    if (contact === 'Father') targetMobile = formData.fatherMobile;
+    else if (contact === 'Mother') targetMobile = formData.motherMobile;
+    else if (contact === 'Guardian') targetMobile = formData.guardianMobile;
+
+    if (targetMobile && targetMobile !== formData.smsMobileNumber) {
+      setFormData(prev => ({ ...prev, smsMobileNumber: targetMobile }));
+    }
+  }, [formData.primaryContact, formData.fatherMobile, formData.motherMobile, formData.guardianMobile, formData.smsMobileNumber]);
 
   const fetchMasters = useCallback(async () => {
     setLoadingMasters(true);
@@ -196,13 +309,24 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       newErrors.guardianInfo = msg;
       toast.error(msg, { toastId: 'guardian-missing' });
     }
+
+    // Dynamic Validation for Official Contact
+    const pContact = formData.primaryContact;
+    if (pContact === 'Father' && !formData.fatherMobile?.trim()) newErrors.fatherMobile = 'Father mobile is required for Portal Login';
+    if (pContact === 'Mother' && !formData.motherMobile?.trim()) newErrors.motherMobile = 'Mother mobile is required for Portal Login';
+    if (pContact === 'Guardian' && !formData.guardianMobile?.trim()) newErrors.guardianMobile = 'Guardian mobile is required for Portal Login';
     
     setErrors(newErrors);
-    
+
     if (Object.keys(newErrors).length > 0) {
       const basicErrors = ['firstName', 'lastName', 'mobileNumber', 'gender', 'classId', 'sectionId', 'academicYear', 'admissionDate', 'guardianInfo'];
+      const familyErrors = ['fatherMobile', 'motherMobile', 'guardianMobile'];
+      
       if (basicErrors.some(field => newErrors[field])) {
         setActiveTab('basic');
+      } else if (familyErrors.some(field => newErrors[field])) {
+        setActiveTab('family');
+        toast.error(`Please provide the ${pContact}'s mobile number for the Official Portal Account.`, { toastId: 'pcontact-missing' });
       }
     }
     return Object.keys(newErrors).length === 0;
@@ -277,13 +401,58 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
 
   const tabIndex = TABS.findIndex(t => t.id === activeTab);
 
-    const renderBasicTab = () => (
+  const renderSiblingList = () => {
+    const combined = [...siblings, ...manuallyLinked].reduce((acc, current) => {
+      const isSelf = initialData?.id === current.id || 
+                    (initialData?.admissionNo && current.admissionNo && initialData.admissionNo === current.admissionNo);
+      if (!isSelf && !acc.some(s => s.id === current.id)) acc.push(current);
+      return acc;
+    }, [] as Student[]);
+
+    if (combined.length === 0 && !loadingSiblings) return null;
+    
+    return (
+      <div className="mb-6 flex flex-wrap gap-2 items-center bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 min-h-[44px]">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 ml-1 flex items-center gap-1.5 line-clamp-1">
+          <Users className="h-3 w-3" />
+          {loadingSiblings ? 'Refreshing Group...' : 'Linked Family Students:'}
+        </span>
+        {combined.map(sib => (
+          <div key={sib.id} className="group relative flex items-center gap-2 pl-2.5 pr-1.5 py-1 bg-white border border-slate-200 rounded-full shadow-sm hover:border-primary-300 hover:shadow-md transition-all animate-in fade-in zoom-in-95">
+            <div className="w-4 h-4 bg-primary-100 rounded-full flex items-center justify-center text-[8px] font-bold text-primary-700">
+              {sib.firstName?.[0]}
+            </div>
+            <div className="flex flex-col -space-y-0.5">
+              <span className="text-[10px] font-bold text-slate-700">{sib.firstName} {sib.lastName}</span>
+              <span className="text-[8px] text-slate-400 font-medium">Adm: {sib.admissionNo}</span>
+            </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); unlinkSibling(sib.id!); }}
+              className="ml-1 p-0.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"
+              title="Remove from group"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </div>
+        ))}
+        {loadingSiblings && combined.length > 0 && (
+          <div className="ml-2 animate-pulse text-[8px] text-primary-500 font-bold uppercase tracking-tighter">Syncing...</div>
+        )}
+        {loadingSiblings && combined.length === 0 && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-white/50 border border-slate-100 rounded-full">
+            <div className="h-2 w-2 border border-primary-600 border-t-transparent rounded-full animate-spin" />
+            <span className="text-[9px] text-slate-400 italic">Exploring family...</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderBasicTab = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {renderInput('firstName', 'Student Name (First)', 'text', undefined, true)}
         {renderInput('lastName', 'Last Name', 'text', undefined, true)}
-        {renderInput('fatherName', "Father's Name", 'text')}
-        {renderInput('motherName', "Mother's Name", 'text')}
         {renderInput('mobileNumber', 'Contact Number', 'tel', undefined, true)}
         {renderInput('dateOfBirth', 'Date Of Birth', 'date')}
         {renderInput('gender', 'Gender', 'select', ['Male', 'Female', 'Other'], true)}
@@ -302,12 +471,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
         {renderInput('openingBalance', 'Opening Balance', 'number')}
         {renderInput('academicYear', 'Academic Year (Session)', 'select', academicYears.map(y => ({ id: y.name, name: y.name })), true, !!initialData)}
       </div>
-      {initialData && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] text-slate-400 font-medium">
-          <Settings className="h-3 w-3" />
-          <span>Note: Use the <strong>Promotion & Transfer</strong> module to move this student to a different session or class.</span>
-        </div>
-      )}
+      {renderSiblingList()}
     </div>
   );
 
@@ -316,8 +480,6 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {renderInput('admissionScheme', 'Admission Scheme', 'text')}
         {renderInput('admissionType', 'Admission Type', 'text')}
-        {renderInput('guardianName', 'Guardian Name', 'text')}
-        {renderInput('guardianRelation', 'Relation', 'text')}
         {renderInput('religion', 'Religion', 'text')}
         {renderInput('category', 'Category', 'text')}
         {renderInput('caste', 'Caste', 'text')}
@@ -360,23 +522,85 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
   );
 
   const renderFamilyTab = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Compact Utility Row: Sibling Search & Primary Account */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Sibling Search */}
+        <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Plus className="h-3 w-3 text-slate-400" />
+            <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Link Sibling</h4>
+          </div>
+          <div className="relative">
+            <input 
+              type="text" 
+              value={siblingSearch} 
+              onChange={(e) => handleSiblingSearch(e.target.value)}
+              placeholder="Search sibling name/adm..."
+              className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] focus:ring-4 focus:ring-primary-500/10 focus:border-primary-400 outline-none"
+            />
+            {isSearchingSibling && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                 <div className="h-3 w-3 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {siblingResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden divide-y divide-slate-50 animate-in fade-in slide-in-from-top-1">
+                {siblingResults.map(s => (
+                  <button key={s.id} type="button" onClick={() => linkSibling(s)}
+                    className="w-full flex items-center justify-between p-2 hover:bg-slate-50 transition-colors text-left">
+                    <div>
+                       <p className="text-[11px] font-bold text-slate-700">{s.firstName} {s.lastName}</p>
+                       <p className="text-[9px] text-slate-400">{s.admissionNo}</p>
+                    </div>
+                    <span className="text-[9px] font-black text-primary-600 uppercase">Link</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Official Portal & SMS Dropdown */}
+        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Check className="h-3 w-3 text-emerald-600" />
+            <h4 className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Official Portal & SMS Contact</h4>
+          </div>
+          <select 
+            name="primaryContact" 
+            value={formData.primaryContact} 
+            onChange={handleChange}
+            className="w-full px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-[11px] font-bold text-emerald-800 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 outline-none"
+          >
+            <option value="Father">Father's Number</option>
+            <option value="Mother">Mother's Number</option>
+            <option value="Guardian">Guardian's Number</option>
+          </select>
+        </div>
+      </div>
+
+      {renderSiblingList()}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {renderInput('fatherMobile', 'Father Contact Number', 'tel')}
+        {renderInput('fatherName', "Father's Name", 'text')}
+        {renderInput('fatherMobile', 'Father Contact Number', 'tel', undefined, formData.primaryContact === 'Father')}
         {renderInput('fatherEmail', 'Father Email', 'email')}
         {renderInput('fatherOccupation', 'Father Occupation', 'text')}
         {renderInput('fatherQualification', 'Father Qualification', 'text')}
-        {renderInput('motherMobile', 'Mother Mobile Number', 'tel')}
+        {renderInput('motherName', "Mother's Name", 'text')}
+        {renderInput('motherMobile', 'Mother Mobile Number', 'tel', undefined, formData.primaryContact === 'Mother')}
         {renderInput('motherEmail', 'Mother Email', 'email')}
         {renderInput('motherOccupation', 'Mother Occupation', 'text')}
         {renderInput('motherQualification', 'Mother Qualification', 'text')}
-        {renderInput('parentMobileNumber', 'Parent Mobile Number', 'tel')}
-        {renderInput('parentEmail', 'Parent Email', 'email')}
-        {renderInput('parentOccupation', 'Parent Occupation', 'text')}
-        {renderInput('parentQualification', 'Parent Qualification', 'text')}
+        {renderInput('guardianName', 'Guardian Name', 'text')}
+        {renderInput('guardianRelation', 'Guardian Relation', 'text')}
+        {renderInput('guardianMobile', 'Guardian Mobile Number', 'tel', undefined, formData.primaryContact === 'Guardian')}
+        {renderInput('guardianEmail', 'Guardian Email', 'email')}
+        {renderInput('parentOccupation', 'Guardian Occupation', 'text')}
+        {renderInput('parentQualification', 'Guardian Qualification', 'text')}
         {renderInput('email', 'Student Email', 'email')}
         {renderCheckbox('smsFacility', 'SMS Facility')}
-        {renderInput('smsMobileNumber', 'SMS Mobile Number', 'tel')}
       </div>
     </div>
   );
@@ -393,6 +617,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       </div>
     </div>
   );
+
 
   const renderInput = (name: string, label: string, type: string, options?: any[], required?: boolean, disabled?: boolean) => {
     return (
@@ -432,11 +657,18 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
   };
 
   const renderCheckbox = (name: string, label: string) => (
-    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 h-full mt-6">
-      <input type="checkbox" id={name} name={name} checked={(formData as any)[name]} onChange={handleChange} className="h-4 w-4 rounded text-primary-600 border-slate-300 cursor-pointer" />
-      <label htmlFor={name} className="text-sm font-medium text-slate-700 cursor-pointer">
-        {label}
-      </label>
+    <div className="flex items-center justify-between px-3.5 py-[11px] bg-slate-50 border border-slate-200 rounded-xl mt-[19px]">
+      <div className="flex items-center gap-3">
+        <input type="checkbox" id={name} name={name} checked={(formData as any)[name]} onChange={handleChange} className="h-4 w-4 rounded text-primary-600 border-slate-300 cursor-pointer" />
+        <label htmlFor={name} className="text-[13px] font-semibold text-slate-600 cursor-pointer">
+          {label}
+        </label>
+      </div>
+      {name === 'smsFacility' && formData.smsMobileNumber && (
+        <span className="text-[9px] font-black text-primary-700 bg-primary-100/50 px-2 py-0.5 rounded-full border border-primary-200/50 uppercase tracking-tighter">
+          {formData.smsMobileNumber}
+        </span>
+      )}
     </div>
   );
 

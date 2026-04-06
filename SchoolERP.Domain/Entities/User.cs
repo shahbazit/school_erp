@@ -16,7 +16,8 @@ public class User : BaseEntity
     public DateTime? LastLoginAt { get; set; }
     public bool HasConsentedToTerms { get; set; }
     public DateTime? ConsentDate { get; set; }
-    public string Role { get; set; } = string.Empty; // Admin, Teacher, Accountant, Student
+    public string Role { get; set; } = string.Empty; // Admin, Teacher, Accountant, Student, Parent
+    public bool ForcePasswordChange { get; set; }
     public string? RefreshToken { get; set; }
     public DateTime? RefreshTokenExpiryTime { get; set; }
     public string? ResetPasswordToken { get; set; }

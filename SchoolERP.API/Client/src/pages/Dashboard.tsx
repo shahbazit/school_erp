@@ -4,11 +4,12 @@ import {
   DollarSign, AlertCircle, Calendar, Clock, ChevronRight,
   Activity, ArrowUpRight, ArrowDownRight, CheckCircle2, XCircle,
   Package, FileText, BarChart3, Layers, Wallet, UserCheck,
-  RefreshCw, Bell, Shield, IndianRupee
+  RefreshCw, Bell, Shield, IndianRupee, Globe
 } from 'lucide-react';
 import { dashboardApi } from '../api/dashboardApi';
 import { masterApi } from '../api/masterApi';
 import TeacherTodaySchedule from '../components/dashboard/TeacherTodaySchedule';
+import PortalDashboard from './portal/PortalDashboard';
 import { useLocalization } from '../contexts/LocalizationContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -123,7 +124,7 @@ function Badge({ children, color = 'slate' }: { children: React.ReactNode; color
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { formatCurrency, formatDate } = useLocalization();
+  const { formatCurrency, formatDate, settings } = useLocalization();
   const [adminSummary, setAdminSummary] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -139,6 +140,11 @@ export default function Dashboard() {
   const roles = decoded.Role || decoded.role || decoded['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || [];
   const rolesArray = Array.isArray(roles) ? roles : [roles];
   const isAdmin = rolesArray.some((r: string) => r.toLowerCase() === 'admin');
+  const isPortalUser = rolesArray.some((r: string) => 
+    r.toLowerCase() === 'student' || 
+    r.toLowerCase() === 'parent' || 
+    r.toLowerCase() === 'portal'
+  );
   const userName = decoded.name || decoded.Name || decoded.email || 'Administrator';
 
   const fetchAdminSummary = useCallback(async () => {
@@ -153,8 +159,6 @@ export default function Dashboard() {
   const fetchTeachers = useCallback(async () => {
     try {
       const list = await masterApi.getEmployeesShort();
-      // Since it's a short-list, it might not have the teacherProfile property.
-      // For now, let's accept all active employees as potential teachers for monitoring.
       setTeachers(list || []);
     } catch (err) { console.error("Dashboard: fetchTeachers failed", err); }
   }, []);
@@ -170,10 +174,14 @@ export default function Dashboard() {
     if (isAdmin) {
       fetchAdminSummary();
       fetchTeachers();
-    } else {
+    } else if (!isPortalUser) {
       fetchTeacherSummary();
     }
-  }, [isAdmin]);
+  }, [isAdmin, isPortalUser]);
+
+  if (isPortalUser) {
+    return <PortalDashboard />;
+  }
 
   const handleTeacherChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
@@ -202,8 +210,8 @@ export default function Dashboard() {
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary-50/50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
           <div className="relative flex flex-col md:flex-row justify-between items-end md:items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-primary-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-200">
-                <Shield className="h-7 w-7 text-white" />
+              <div className="w-14 h-14 bg-primary-50 border border-primary-100 rounded-2xl flex items-center justify-center">
+                <Shield className="h-7 w-7 text-primary-600" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900 leading-none">
@@ -217,7 +225,37 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-            
+
+            {settings?.domain && (
+              <div className="flex items-center gap-4 bg-slate-50/50 p-3 pr-6 rounded-2xl border border-slate-100 group hover:border-primary-100 transition-all hover:bg-white hover:shadow-xl hover:shadow-primary-500/5">
+                <div className="bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm text-slate-400 group-hover:text-primary-600 group-hover:border-primary-100 transition-all">
+                  <Globe className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Shared Portal Code</span>
+                    <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-lg font-black text-slate-800 tracking-tight leading-none">{settings.domain}</span>
+                    <button 
+                      onClick={() => {
+                        if (settings?.domain) {
+                           navigator.clipboard.writeText(settings.domain);
+                           alert("Code copied!");
+                        }
+                      }}
+                      className="p-1 hover:bg-primary-50 rounded text-slate-300 hover:text-primary-600 transition-colors"
+                      title="Copy Portal Code"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-medium leading-none mt-1">Parents use this to log in</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl border border-slate-100">
               <div className="text-right px-1">
                 <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest leading-none mb-1">Last Updated</p>
@@ -593,24 +631,27 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl p-6 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: 'radial-gradient(circle at 70% 50%, white 0%, transparent 70%)'
-        }} />
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 relative overflow-hidden shadow-sm">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
         <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <p className="text-blue-100 text-sm mb-0.5">{greeting()},</p>
-            <h1 className="text-2xl font-bold tracking-tight">{userName}</h1>
-            <p className="text-blue-200 text-xs mt-1 flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" /> {dayLabel}
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center">
+               <BookOpen className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest mb-0.5">{greeting()},</p>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{userName}</h1>
+              <p className="text-slate-400 text-[10px] mt-1 flex items-center gap-1.5 font-bold uppercase tracking-tighter">
+                <Calendar className="h-3 w-3 text-indigo-500" /> {dayLabel}
+              </p>
+            </div>
           </div>
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl text-sm font-medium text-white transition-all duration-200 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all duration-200 active:scale-95 shadow-sm"
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+            <RefreshCw className="h-4 w-4 text-indigo-500" />
+            Refresh Data
           </button>
         </div>
       </div>

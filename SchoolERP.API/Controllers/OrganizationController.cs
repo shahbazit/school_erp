@@ -58,6 +58,7 @@ public class OrganizationController : ControllerBase
             CurrencyCode = org.CurrencyCode,
             DateFormat = org.DateFormat,
             TimeZone = org.TimeZone,
+            Domain = org.Domain
         });
     }
 
@@ -96,6 +97,8 @@ public class OrganizationController : ControllerBase
         org.CurrencyCode = dto.CurrencyCode;
         org.DateFormat = dto.DateFormat;
         org.TimeZone = dto.TimeZone;
+        if (!string.IsNullOrEmpty(dto.Domain))
+            org.Domain = dto.Domain;
         org.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();

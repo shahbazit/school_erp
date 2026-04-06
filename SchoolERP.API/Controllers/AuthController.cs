@@ -7,19 +7,21 @@ namespace SchoolERP.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IOrganizationService _organizationService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public AuthController(IAuthService authService, IOrganizationService organizationService)
+    public AuthController(IAuthService authService, IOrganizationService organizationService, ICurrentUserService currentUserService)
     {
         _authService = authService;
         _organizationService = organizationService;
+        _currentUserService = currentUserService;
     }
 
     [HttpPost("register")]
+    [AllowAnonymous]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -59,6 +61,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh-token")]
+    [AllowAnonymous]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         var result = await _authService.RefreshTokenAsync(request.Token, request.RefreshToken);
@@ -70,6 +73,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("generate-otp")]
+    [AllowAnonymous]
     public async Task<IActionResult> GenerateOtp([FromBody] GenerateOtpRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -85,6 +89,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-otp")]
+    [AllowAnonymous]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -100,6 +105,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register-step-1")]
+    [AllowAnonymous]
     public async Task<IActionResult> RegisterStepOne([FromBody] RegisterStepOneRequest request)
     {
         var result = await _authService.RegisterStepOneAsync(request.Email, request.Password, request.MobileNumber, request.FirstName, request.LastName);
@@ -111,6 +117,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("finalize-registration")]
+    [AllowAnonymous]
     public async Task<IActionResult> FinalizeRegistration([FromBody] FinalizeRegistrationRequest request)
     {
         var result = await _authService.FinalizeRegistrationAsync(request.RegistrationUid, request.SchoolName, request.SchoolDomain, request.City, request.Address, request.Otp);
@@ -121,6 +128,7 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
     [HttpPost("forgot-password")]
+    [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -133,6 +141,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [AllowAnonymous]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         var orgId = _organizationService.GetOrganizationId();
@@ -142,5 +151,38 @@ public class AuthController : ControllerBase
             return BadRequest(new { Errors = result.Errors });
 
         return Ok(new { Message = "Password has been successfully reset." });
+    }
+
+    [HttpPost("reset-password-force")]
+    [Authorize]
+    public async Task<IActionResult> ResetPasswordForce([FromBody] ResetPasswordForceRequest request)
+    {
+        var userId = _currentUserService.UserId;
+        
+        if (!userId.HasValue)
+        {
+            // If UserId claim is not standard, we can try reading it manually
+            var userIdStr = User.FindFirst("id")?.Value;
+            if (Guid.TryParse(userIdStr, out var parsedId))
+                userId = parsedId;
+        }
+
+        if (!userId.HasValue)
+            return Unauthorized(new { Message = "User identity not found." });
+
+        if (string.IsNullOrEmpty(request.NewPassword))
+            return BadRequest(new { Errors = new[] { "Password is required" } });
+
+        var result = await _authService.ChangePasswordAsync(userId.Value, request.NewPassword);
+
+        if (!result.Success)
+            return BadRequest(new { Errors = result.Errors });
+
+        return Ok(new { Success = true });
+    }
+
+    public class ResetPasswordForceRequest
+    {
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

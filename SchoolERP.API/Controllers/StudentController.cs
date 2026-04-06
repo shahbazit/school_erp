@@ -18,11 +18,15 @@ public class StudentController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IFeeService _feeService;
+    private readonly IAuthService _authService;
+    private readonly IOrganizationService _organizationService;
 
-    public StudentController(IUnitOfWork unitOfWork, IFeeService feeService)
+    public StudentController(IUnitOfWork unitOfWork, IFeeService feeService, IAuthService authService, IOrganizationService organizationService)
     {
         _unitOfWork = unitOfWork;
         _feeService = feeService;
+        _authService = authService;
+        _organizationService = organizationService;
     }
 
     [HttpGet]
@@ -37,6 +41,7 @@ public class StudentController : ControllerBase
         [FromQuery] bool? isActive = null,
         [FromQuery] string? status = null,
         [FromQuery] string? academicYear = null,
+        [FromQuery] string? familyId = null,
         [FromQuery] string sortBy = "Name" // Name, AdmissionNo
     )
     {
@@ -87,6 +92,7 @@ public class StudentController : ControllerBase
         }
 
         if (isActive.HasValue) academicQuery = academicQuery.Where(sa => sa.Student.IsActive == isActive.Value);
+        if (!string.IsNullOrWhiteSpace(familyId)) academicQuery = academicQuery.Where(sa => sa.Student.FamilyId == familyId);
 
         // Sort by Student Name or AdmissionNo
         academicQuery = sortBy.ToLower() switch
@@ -237,6 +243,8 @@ public class StudentController : ControllerBase
         await _unitOfWork.Repository<StudentAcademic>().AddAsync(academic);
 
         await _unitOfWork.CompleteAsync();
+        await SyncParentAccount(student);
+        await SyncStudentAccount(student);
 
         // 1. Assign Selective Fee Subscriptions
         if (dto.FeeSubscriptions != null && dto.FeeSubscriptions.Any())
@@ -572,6 +580,7 @@ public class StudentController : ControllerBase
             ParentQualification = dto.ParentQualification,
             SMSFacility = dto.SMSFacility,
             SMSMobileNumber = dto.SMSMobileNumber,
+            PrimaryContact = dto.PrimaryContact,
             PermanentAddress = dto.PermanentAddress,
             IsActive = true
         };
@@ -685,6 +694,7 @@ public class StudentController : ControllerBase
         student.ParentQualification = dto.ParentQualification;
         student.SMSFacility = dto.SMSFacility;
         student.SMSMobileNumber = dto.SMSMobileNumber;
+        student.PrimaryContact = dto.PrimaryContact;
         student.PermanentAddress = dto.PermanentAddress;
         student.IsActive = dto.IsActive;
 
@@ -823,6 +833,9 @@ public class StudentController : ControllerBase
             await _unitOfWork.CompleteAsync();
         }
 
+        await SyncParentAccount(student);
+        await SyncStudentAccount(student);
+
         return Ok(MapToDto(student));
     }
 
@@ -926,6 +939,7 @@ public class StudentController : ControllerBase
             ParentQualification = student.ParentQualification,
             SMSFacility = student.SMSFacility,
             SMSMobileNumber = student.SMSMobileNumber,
+            PrimaryContact = student.PrimaryContact,
             PermanentAddress = student.PermanentAddress,
             IsActive = student.IsActive,
             IsMobileVerified = student.IsMobileVerified,
@@ -975,5 +989,140 @@ public class StudentController : ControllerBase
         }
 
         return (resolvedClassId, resolvedSectionId);
+    }
+
+    private async Task SyncParentAccount(Student student)
+    {
+        if (string.IsNullOrWhiteSpace(student.SMSMobileNumber)) return;
+
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return;
+
+        var userRepo = _unitOfWork.Repository<User>();
+        // Find existing user by MobileNumber
+        var existingUser = await userRepo.GetQueryable()
+            .FirstOrDefaultAsync(u => u.MobileNumber == student.SMSMobileNumber);
+
+        if (existingUser == null)
+        {
+            // Determine parent name from primary contact choice
+            string firstName = student.FatherName ?? "Parent";
+            if (student.PrimaryContact == "Mother" && !string.IsNullOrEmpty(student.MotherName)) firstName = student.MotherName;
+            if (student.PrimaryContact == "Guardian" && !string.IsNullOrEmpty(student.GuardianName)) firstName = student.GuardianName;
+
+            // Register new portal account with default password
+            var result = await _authService.RegisterAsync(
+                email: "", // Primary identification via Mobile for Parents
+                password: "Student@123",
+                mobileNumber: student.SMSMobileNumber,
+                firstName: firstName,
+                lastName: "",
+                role: "Parent",
+                organizationId: orgId
+            );
+
+            if (result.Success)
+            {
+                // Force password change on first login
+                var newUser = await userRepo.GetQueryable()
+                    .FirstOrDefaultAsync(u => u.MobileNumber == student.SMSMobileNumber);
+                if (newUser != null)
+                {
+                    newUser.ForcePasswordChange = true;
+                    userRepo.Update(newUser);
+                    await _unitOfWork.CompleteAsync();
+                }
+            }
+        }
+        else
+        {
+            // Update existing user to ensure Parent role is assigned
+            bool hasChanged = false;
+            if (!string.IsNullOrEmpty(existingUser.Role) && !existingUser.Role.Contains("Parent"))
+            {
+                existingUser.Role += ", Parent";
+                hasChanged = true;
+            }
+            else if (string.IsNullOrEmpty(existingUser.Role))
+            {
+                existingUser.Role = "Parent";
+                hasChanged = true;
+            }
+
+            if (existingUser.OrganizationId == Guid.Empty)
+            {
+                existingUser.OrganizationId = orgId;
+                hasChanged = true;
+            }
+
+            if (hasChanged)
+            {
+                userRepo.Update(existingUser);
+                await _unitOfWork.CompleteAsync();
+            }
+        }
+    }
+
+    private async Task SyncStudentAccount(Student student)
+    {
+        if (string.IsNullOrWhiteSpace(student.AdmissionNo)) return;
+
+        var orgId = _organizationService.GetOrganizationId();
+        if (orgId == Guid.Empty) return;
+
+        var userRepo = _unitOfWork.Repository<User>();
+        // Find existing user by AdmissionNo (stored in Email field for login)
+        var existingUser = await userRepo.GetQueryable()
+            .FirstOrDefaultAsync(u => u.Email == student.AdmissionNo && u.OrganizationId == orgId);
+
+        if (existingUser == null)
+        {
+            // Register new portal account with default password
+            var result = await _authService.RegisterAsync(
+                email: student.AdmissionNo, // AdmissionNo is the primary identifier for students
+                password: "Student@123",
+                mobileNumber: student.MobileNumber,
+                firstName: student.FirstName,
+                lastName: student.LastName,
+                role: "Student",
+                organizationId: orgId
+            );
+
+            if (result.Success)
+            {
+                // Force password change on first login
+                var newUser = await userRepo.GetQueryable()
+                    .FirstOrDefaultAsync(u => u.Email == student.AdmissionNo && u.OrganizationId == orgId);
+                if (newUser != null)
+                {
+                    newUser.ForcePasswordChange = true;
+                    userRepo.Update(newUser);
+                    await _unitOfWork.CompleteAsync();
+                }
+            }
+        }
+        else
+        {
+            // Update existing user to ensure Student role is assigned and names are synced
+            bool hasChanged = false;
+            if (string.IsNullOrEmpty(existingUser.Role) || !existingUser.Role.Split(',').Select(r => r.Trim()).Contains("Student"))
+            {
+                existingUser.Role = string.IsNullOrEmpty(existingUser.Role) ? "Student" : existingUser.Role + ", Student";
+                hasChanged = true;
+            }
+            
+            if (existingUser.FirstName != student.FirstName || existingUser.LastName != student.LastName)
+            {
+                existingUser.FirstName = student.FirstName;
+                existingUser.LastName = student.LastName;
+                hasChanged = true;
+            }
+
+            if (hasChanged)
+            {
+                userRepo.Update(existingUser);
+                await _unitOfWork.CompleteAsync();
+            }
+        }
     }
 }

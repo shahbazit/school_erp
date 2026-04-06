@@ -309,6 +309,9 @@ public class SubjectContentService : ISubjectContentService
             .OrderBy(c => c.OrderIndex)
             .Select(c => c.ContentValue));
         
+        if (string.IsNullOrWhiteSpace(textContent)) 
+            return new AiResponse { Answer = "I don't have any text material for this chapter to base my answers on. Please add some text content first!" };
+        
         var userId = _currentUserService.UserId ?? Guid.Empty;
         
         // Fetch recent history (last 25 messages)

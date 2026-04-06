@@ -75,7 +75,8 @@ public class AuthService : IAuthService
             pending = new PendingRegistration
             {
                 Email = email,
-                Name = $"{firstName} {lastName}",
+                FirstName = firstName,
+                LastName = lastName,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
                 Mobile = mobileNumber,
                 CreatedAt = DateTime.UtcNow
@@ -84,7 +85,8 @@ public class AuthService : IAuthService
         }
         else
         {
-            pending.Name = $"{firstName} {lastName}";
+            pending.FirstName = firstName;
+            pending.LastName = lastName;
             pending.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
             pending.Mobile = mobileNumber;
             _dbContext.PendingRegistrations.Update(pending);
@@ -92,7 +94,8 @@ public class AuthService : IAuthService
 
         await _dbContext.SaveChangesAsync();
 
-        // 3. Generate OTP and save it to the database (not in-memory)
+        // 3. Generate OTP and save it to the database (COMMENTED OUT AS PER USER REQUEST)
+        /*
         var otp = new Random().Next(100000, 999999).ToString();
         pending.OtpCode = otp;
         pending.OtpExpiry = DateTime.UtcNow.AddMinutes(10); // valid for 10 minutes
@@ -107,12 +110,13 @@ public class AuthService : IAuthService
             // Development fallback: OTP is in DB & console. Check dotnet logs.
             Log.Warning("Registration OTP email could not be sent to {Email}: {Error}. Fallback OTP is {Otp}", email, ex.Message, otp);
         }
+        */
 
         return new AuthResult 
         { 
             Success = true, 
             Token = pending.UID.ToString(), // Returning UID for step 2
-            Errors = new[] { "Step 1 successful. OTP sent to email." } 
+            Errors = new[] { "Step 1 successful. Account created, proceeding to school details." } 
         };
     }
 
@@ -124,7 +128,8 @@ public class AuthService : IAuthService
             return new AuthResult { Success = false, Errors = new[] { "Registration request not found." } };
         }
 
-        // Verify OTP from database
+        // Verify OTP from database (COMMENTED OUT AS PER USER REQUEST)
+        /*
         if (string.IsNullOrEmpty(pending.OtpCode) ||
             pending.OtpCode != otp ||
             pending.OtpExpiry == null ||
@@ -132,6 +137,7 @@ public class AuthService : IAuthService
         {
             return new AuthResult { Success = false, Errors = new[] { "Invalid or expired OTP. Please request a new one." } };
         }
+        */
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -161,14 +167,13 @@ public class AuthService : IAuthService
                 await _dbContext.SaveChangesAsync();
 
                 // 3. Create Admin User
-                var names = pending.Name.Split(' ', 2);
                 var user = new User
                 {
                     Email = pending.Email,
                     MobileNumber = pending.Mobile ?? "",
                     PasswordHash = pending.PasswordHash,
-                    FirstName = names[0],
-                    LastName = names.Length > 1 ? names[1] : "",
+                    FirstName = pending.FirstName,
+                    LastName = pending.LastName,
                     Role = "Admin",
                     OrganizationId = organization.Id,
                     IsEmailVerified = true,
@@ -239,22 +244,52 @@ public class AuthService : IAuthService
         });
     }
 
-    public async Task<AuthResult> LoginAsync(string email, string password, Guid? organizationId)
+    public async Task<AuthResult> LoginAsync(string identifier, string password, Guid? organizationId)
     {
         var query = _dbContext.Users.IgnoreQueryFilters().AsQueryable();
         
+        User? user = null;
         if (organizationId.HasValue && organizationId.Value != Guid.Empty)
         {
-            query = query.Where(u => u.Email == email && u.OrganizationId == organizationId.Value);
+            user = await query.FirstOrDefaultAsync(u => 
+                (u.Email == identifier || u.MobileNumber == identifier) && u.OrganizationId == organizationId.Value);
         }
         else
         {
-            query = query.Where(u => u.Email == email);
+            user = await query.FirstOrDefaultAsync(u => u.Email == identifier || u.MobileNumber == identifier);
         }
 
-        var user = await query.FirstOrDefaultAsync();
+        // Fallback: Check if the identifier is a Student Admission Number
         if (user == null)
-            return new AuthResult { Success = false, Errors = new[] { "Invalid email, password, or organization" } };
+        {
+            var studentQuery = _dbContext.Students.IgnoreQueryFilters().AsQueryable();
+            if (organizationId.HasValue && organizationId.Value != Guid.Empty)
+            {
+                studentQuery = studentQuery.Where(s => s.OrganizationId == organizationId.Value);
+            }
+            
+            var student = await studentQuery.FirstOrDefaultAsync(s => s.AdmissionNo == identifier);
+            if (student != null)
+            {
+                // Try finding user linked by Email or Mobile from the Student record
+                if (organizationId.HasValue && organizationId.Value != Guid.Empty)
+                {
+                    user = await query.FirstOrDefaultAsync(u => 
+                        ((!string.IsNullOrEmpty(student.Email) && u.Email == student.Email) || 
+                         (!string.IsNullOrEmpty(student.MobileNumber) && u.MobileNumber == student.MobileNumber)) 
+                        && u.OrganizationId == organizationId.Value);
+                }
+                else
+                {
+                    user = await query.FirstOrDefaultAsync(u => 
+                        ((!string.IsNullOrEmpty(student.Email) && u.Email == student.Email) || 
+                         (!string.IsNullOrEmpty(student.MobileNumber) && u.MobileNumber == student.MobileNumber)));
+                }
+            }
+        }
+
+        if (user == null)
+            return new AuthResult { Success = false, Errors = new[] { "Invalid credentials or organization" } };
 
         // Check Employee linkage and status
         var employee = await _dbContext.Employees.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.UserId == user.Id);
@@ -334,7 +369,8 @@ public class AuthService : IAuthService
             new System.Security.Claims.Claim("OrganizationId", user.OrganizationId.ToString()),
             new System.Security.Claims.Claim("OrganizationName", orgName),
             new System.Security.Claims.Claim("Name", $"{user.FirstName} {user.LastName}"),
-            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, user.Role)
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, user.Role),
+            new System.Security.Claims.Claim("ForcePasswordChange", user.ForcePasswordChange.ToString().ToLower())
         };
 
         if (user.Role.Equals("Student", StringComparison.OrdinalIgnoreCase))
@@ -372,6 +408,7 @@ public class AuthService : IAuthService
         return new AuthResult
         {
             Success = true,
+            RequiresPasswordChange = user.ForcePasswordChange,
             Token = tokenHandler.WriteToken(token),
             RefreshToken = refreshToken
         };
@@ -534,6 +571,26 @@ public class AuthService : IAuthService
 
         return new AuthResult { Success = true, Errors = new[] { "Password reset successfully." } };
     }
+    public async Task<AuthResult> ChangePasswordAsync(Guid userId, string newPassword)
+    {
+        var user = await _dbContext.Users.FindAsync(userId);
+
+        if (user == null)
+        {
+            return new AuthResult { Success = false, Errors = new[] { "User not found." } };
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.ForcePasswordChange = false; // Reset the flag
+        user.FailedLoginAttempts = 0;
+        user.LockoutEnd = null;
+
+        _dbContext.Users.Update(user);
+        await _dbContext.SaveChangesAsync();
+
+        return new AuthResult { Success = true };
+    }
+
     public async Task<SchoolERP.Domain.Entities.Organization?> GetOrganizationByDomainAsync(string domain)
     {
         return await _dbContext.Organizations.FirstOrDefaultAsync(o => o.Domain == domain && !o.IsDeleted && o.IsActive);

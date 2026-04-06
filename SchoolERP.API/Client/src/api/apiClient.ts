@@ -17,9 +17,17 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('token');
     const organizationId = localStorage.getItem('organizationId');
     
+    const isPublicAuthRoute = 
+      config.url?.endsWith('/login') || 
+      config.url?.endsWith('/register') || 
+      config.url?.endsWith('/verify-otp') ||
+      config.url?.endsWith('/generate-otp') ||
+      config.url?.endsWith('/forgot-password') ||
+      config.url?.endsWith('/reset-password'); // Public reset password via email link
+    
     const isAuthRoute = config.url?.includes('/auth/') || config.url?.endsWith('/auth');
     
-    if (token && !isAuthRoute) {
+    if (token && !isPublicAuthRoute) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
     
@@ -61,7 +69,29 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const status = error.response.status;
       const data = error.response.data;
-      const message = (typeof data === 'object' ? (data?.message || data?.Message) : data) || 'Server error occurred.';
+      
+      let message = 'Server error occurred.';
+      if (typeof data === 'object' && data !== null) {
+        if (data.message || data.Message) {
+          message = data.message || data.Message;
+        } else if (Array.isArray(data.Errors) && data.Errors.length > 0) {
+          message = data.Errors[0];
+        } else if (Array.isArray(data.errors) && data.errors.length > 0) {
+          message = data.errors[0];
+        } else if (data.errors && typeof data.errors === 'object' && !Array.isArray(data.errors)) {
+          const errorKeys = Object.keys(data.errors);
+          if (errorKeys.length > 0) {
+            const firstMessages = data.errors[errorKeys[0]];
+            if (Array.isArray(firstMessages) && firstMessages.length > 0) {
+              message = firstMessages[0];
+            }
+          }
+        } else if (data.title) {
+          message = data.title;
+        }
+      } else if (typeof data === 'string') {
+        message = data;
+      }
 
       const isOrgError = status === 404 && (
         message?.toString().trim().toLowerCase() === 'organization not found.' || 
@@ -72,9 +102,19 @@ apiClient.interceptors.response.use(
         // Clear token and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('organizationId');
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/' && window.location.pathname !== '/portal') {
-          console.warn('Session context lost, redirecting to portal...');
-          window.location.href = '/portal';
+        
+        const isLoginPage = window.location.pathname === '/login' || 
+                           window.location.pathname === '/' || 
+                           window.location.pathname === '/portal' ||
+                           window.location.pathname === '/auth' ||
+                           window.location.pathname === '/force-password-change';
+
+        if (!isLoginPage) {
+          console.warn('Session context lost, redirecting to login...');
+          window.location.href = '/login';
+        } else {
+          // If already on login page, show the error toast
+          toast.error(message, { toastId: message });
         }
       } else if (status === 403) {
         toast.error('You do not have permission to perform this action.', { toastId: 'unauthorized-error' });

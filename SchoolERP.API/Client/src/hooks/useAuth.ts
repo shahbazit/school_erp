@@ -30,12 +30,12 @@ export const useAuth = () => {
         if (response.refreshToken) {
           localStorage.setItem('refreshToken', response.refreshToken);
         }
-        return true;
+        return { success: true, requiresPasswordChange: response.requiresPasswordChange };
       }
-      return false;
+      return { success: false };
     } catch (err: any) {
       setError(extractError(err, 'Login failed. Please check your credentials.'));
-      return false;
+      return { success: false };
     } finally {
       setLoading(false);
     }

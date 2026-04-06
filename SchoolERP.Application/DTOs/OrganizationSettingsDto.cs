@@ -3,6 +3,7 @@ namespace SchoolERP.Application.DTOs;
 public class OrganizationSettingsDto
 {
     public Guid Id { get; set; }
+    public string Domain { get; set; } = string.Empty;
 
     // Basic Info
     public string Name { get; set; } = string.Empty;
@@ -65,4 +66,5 @@ public class UpdateOrganizationSettingsDto
     public string? CurrencyCode { get; set; }
     public string? DateFormat { get; set; }
     public string? TimeZone { get; set; }
+    public string? Domain { get; set; }
 }

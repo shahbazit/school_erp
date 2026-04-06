@@ -102,6 +102,7 @@ public class UpdateStudentDto
     public string? ParentQualification { get; set; }
     public bool SMSFacility { get; set; }
     public string? SMSMobileNumber { get; set; }
+    public string? PrimaryContact { get; set; }
     public string? PermanentAddress { get; set; }
 
     // Fee Related

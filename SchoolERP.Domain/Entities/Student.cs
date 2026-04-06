@@ -103,6 +103,7 @@ public class Student : BaseEntity
     public string? ParentQualification { get; set; }
     public bool SMSFacility { get; set; }
     public string? SMSMobileNumber { get; set; }
+    public string? PrimaryContact { get; set; }
     public string? PermanentAddress { get; set; }
 
     // Parallel Course

@@ -253,6 +253,25 @@ export default function OrganizationSettings() {
                     />
                   </div>
                   <div className="sm:col-span-2">
+                    <div className="p-4 rounded-xl bg-primary-50 border border-primary-100 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white p-2 rounded-lg shadow-sm border border-primary-100/50">
+                          <Globe className="h-5 w-5 text-primary-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-primary-400 uppercase tracking-widest">School Portal Code / Domain</p>
+                          <p className="text-sm font-black text-primary-900 tracking-tight">{draft.domain || 'Not Assigned'}</p>
+                        </div>
+                      </div>
+                      <div className="hidden sm:block">
+                        <div className="bg-white/50 px-3 py-2 rounded-lg border border-primary-100">
+                          <p className="text-[9px] font-bold text-primary-500 uppercase tracking-tighter leading-none mb-1">Parent Portal ID</p>
+                          <p className="text-[10px] font-medium text-slate-500 max-w-[170px] leading-snug">Parents & Students use this unique code to connect to your portal from the home page.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
                     <InputField
                       label="School Tagline / Motto"
                       value={draft.tagline}

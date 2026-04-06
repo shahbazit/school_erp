@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { 
   GraduationCap, Settings, LogOut, Bell, Menu, ChevronDown, 
   LayoutDashboard, UserCog, Package, Building2, Wallet, Backpack, Database, Search, BookOpen, Sparkles, Calendar
@@ -41,19 +41,25 @@ import SystemSetup from './pages/SystemSetup';
 import AcademicCalendar from './pages/AcademicCalendar';
 import OrganizationSettings from './pages/OrganizationSettings';
 import FinanceDashboard from './pages/FinanceDashboard';
-import PortalLogin from './pages/PortalLogin';
+import PortalLogin from './pages/portal/PortalLogin';
 import CertificateFormatManager from './pages/CertificateFormatManager';
 import CustomCertificateDesigner from './pages/CustomCertificateDesigner';
 import SubjectContent from './pages/SubjectContent';
 import AiBookList from './pages/AiBookList';
-import AiTutor from './pages/AiTutor';
+import AiTutor from './pages/portal/AiTutor';
+import PortalFees from './pages/portal/PortalFees';
+import PortalTransport from './pages/portal/PortalTransport';
+import PortalHostel from './pages/portal/PortalHostel';
+import PortalLibrary from './pages/portal/PortalLibrary';
+import ForcePasswordChange from './pages/ForcePasswordChange';
 import { usePermissions } from './hooks/usePermissions';
 import { useEffect as useAppEffect, useMemo } from 'react';
 import { studentApi } from './api/studentApi';
 import { masterApi } from './api/masterApi';
+import { PortalProvider, usePortal } from './contexts/PortalContext';
 import { Student } from './types';
 import StudentDetailPanel from './components/StudentDetailPanel';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -69,6 +75,21 @@ function App() {
   const [classesList, setClassesList] = useState<any[]>([]);
   const [sectionsList, setSectionsList] = useState<any[]>([]);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleAuthSuccess = (isFirstTime = false) => {
+    setIsAuthenticated(true);
+    if (isFirstTime) {
+      toast.info("Welcome aboard! Sending you to Quick Setup to configure your school's initial settings.", {
+        position: "top-center",
+        autoClose: 5000
+      });
+      setTimeout(() => {
+        navigate('/settings/setup');
+      }, 1500);
+    }
+  };
+
 
   useAppEffect(() => {
     if (window.innerWidth < 768) {
@@ -94,16 +115,26 @@ function App() {
 
   const currentRole = (decodedToken?.Role || decodedToken?.role || decodedToken?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || 'Guest').toString();
   const isAdmin = currentRole.toLowerCase() === 'admin';
-  const isStudent = currentRole.toLowerCase() === 'student';
+  const isPortalUser = ['student', 'parent', 'portal'].includes(currentRole.toLowerCase());
   const currentUserId = decodedToken?.id || '';
   const { hasReadPermission, hasWritePermission, fetchMyPermissions } = usePermissions();
-  const checkPermission = (key: string) => {
-    if (isAdmin) return true;
-    return hasReadPermission(key);
-  };
+  
+    const checkPermission = (key: string) => {
+      if (isAdmin) return true;
+      if (isPortalUser) {
+        const portalAllowed = [
+          'dashboard', 'fees', 'portal-fees', 'academic', 
+          'attendance', 'examinations', 'timetable', 
+          'ai', 'ai_tutor', 'finance', 'logistics'
+        ];
+        return portalAllowed.includes(key);
+      }
+      return hasReadPermission(key);
+    };
 
   const checkWritePermission = (key: string) => {
     if (isAdmin) return true;
+    if (isPortalUser) return false;
     return hasWritePermission(key);
   };
 
@@ -149,8 +180,8 @@ function App() {
     { label: 'Academic Calendar', path: '/academic-calendar', permission: checkPermission('academic_calendar'), group: 'academic' },
 
     // AI Curriculum
-    { label: 'AI Books Hub', path: '/ai-book-list', permission: checkPermission('ai_book_list') && !isStudent, group: 'ai' },
-    { label: 'Chapter Content', path: '/subject-content', permission: checkPermission('subject_content') && !isStudent, group: 'ai' },
+    { label: 'AI Books Hub', path: '/ai-book-list', permission: checkPermission('ai_book_list') && !isPortalUser, group: 'ai' },
+    { label: 'Chapter Content', path: '/subject-content', permission: checkPermission('subject_content') && !isPortalUser, group: 'ai' },
     { label: 'AI Tutor', path: '/ai-tutor', permission: checkPermission('ai_tutor'), group: 'ai' },
     
     // Finance
@@ -195,6 +226,15 @@ function App() {
     { label: 'System Quick Setup', path: '/settings/setup', permission: checkPermission('setup'), group: 'admin' },
   ].filter(item => item.permission === true || item.permission);
 
+  const portalMenuItems = [
+    { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { label: 'Fee Ledger', path: '/portal-fees', icon: Wallet },
+    { label: 'AI Learning Tutor', path: '/ai-tutor', icon: Sparkles },
+    { label: 'Transport', path: '/transport', icon: Package },
+    { label: 'Hostel', path: '/hostel', icon: Building2 },
+    { label: 'Library', path: '/library', icon: BookOpen },
+  ];
+
   const filteredResults = searchQuery.trim() === '' 
     ? [] 
     : menuItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -213,27 +253,30 @@ function App() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
+
   if (!isAuthenticated) {
     return (
       <>
         <ToastContainer position="top-right" autoClose={3000} limit={3} newestOnTop={true} />
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Auth initialIsLogin={true} onAuthSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="/login" element={<Auth initialIsLogin={true} onAuthSuccess={() => handleAuthSuccess(false)} />} />
           <Route path="/portal" element={<PortalLogin onAuthSuccess={() => setIsAuthenticated(true)} />} />
-          <Route path="/register" element={<Auth initialIsLogin={false} onAuthSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="/force-password-change" element={<ForcePasswordChange />} />
+          <Route path="/register" element={<Auth initialIsLogin={false} onAuthSuccess={() => handleAuthSuccess(true)} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="*" element={<Navigate to="/portal" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </>
     );
   }
 
   return (
-    <>
+    <PortalProvider>
       <ToastContainer position="top-right" autoClose={3000} theme="colored" limit={3} newestOnTop={true} />
       <div className="flex bg-slate-50 h-screen w-screen max-w-full text-slate-800 relative overflow-hidden font-sans">
+
       
       {/* Sidebar Wrapper - Constant width to prevent layout shift */}
       <div className="shrink-0 relative z-50 w-0 md:w-20">
@@ -250,6 +293,19 @@ function App() {
           </div>
           
           <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+            {isPortalUser ? (
+              portalMenuItems.map((item) => (
+                <Link key={item.path} to={item.path} className={`flex items-center py-2 rounded-xl transition-all duration-200 group ${
+                  location.pathname === item.path 
+                    ? (sidebarOpen ? 'px-4 bg-primary-50 text-primary-700 shadow-sm' : 'justify-center bg-primary-50 text-primary-700 scale-105') 
+                    : (sidebarOpen ? 'px-4 text-slate-500 hover:bg-slate-50 hover:text-slate-900' : 'justify-center text-slate-400 hover:text-slate-900')
+                }`}>
+                  <item.icon className={`h-5 w-5 shrink-0 transition-transform ${location.pathname === item.path ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  {sidebarOpen && <span className="ml-3 font-semibold text-sm truncate animate-in fade-in">{item.label}</span>}
+                </Link>
+              ))
+            ) : (
+            <>
             {/* 1. Dashboard */}
             <Link to="/" className={`flex items-center py-2 rounded-xl transition-all duration-200 group ${
               location.pathname === '/' 
@@ -361,12 +417,18 @@ function App() {
                 </button>
                 {sidebarOpen && openMenus['accounts'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
-                    <Link to="/finance-dashboard" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/finance-dashboard' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Finance Dashboard</Link>
-                    <Link to="/financials" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/financials' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>General Ledger</Link>
-                    <Link to="/fees/generate" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/generate' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Collection</Link>
-                    <Link to="/fees/structures" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/structures' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Structures</Link>
-                    <Link to="/fees/heads" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/heads' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Heads</Link>
-                    <Link to="/fees/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Policies</Link>
+                    {isPortalUser ? (
+                      <Link to="/portal-fees" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/portal-fees' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Ledger</Link>
+                    ) : (
+                      <>
+                        <Link to="/finance-dashboard" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/finance-dashboard' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Finance Dashboard</Link>
+                        <Link to="/financials" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/financials' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>General Ledger</Link>
+                        <Link to="/fees/generate" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/generate' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Collection</Link>
+                        <Link to="/fees/structures" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/structures' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Structures</Link>
+                        <Link to="/fees/heads" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/heads' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Heads</Link>
+                        <Link to="/fees/settings" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/fees/settings' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Fee Policies</Link>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -425,9 +487,13 @@ function App() {
                 </button>
                 {sidebarOpen && openMenus['logistics'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
-                    <Link to="/front-office" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/front-office' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Front Office</Link>
-                    <Link to="/communication" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/communication' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Communication</Link>
-                    <Link to="/inventory" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/inventory' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Inventory & Store</Link>
+                    {!isPortalUser ? (
+                      <>
+                        <Link to="/front-office" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/front-office' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Front Office</Link>
+                        <Link to="/communication" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/communication' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Communication</Link>
+                        <Link to="/inventory" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/inventory' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Inventory & Store</Link>
+                      </>
+                    ) : null}
                     <Link to="/transport" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/transport' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Transport</Link>
                     <Link to="/hostel" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/hostel' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Hostel</Link>
                     <Link to="/library" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/library' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Library</Link>
@@ -502,8 +568,12 @@ function App() {
                 </button>
                 {sidebarOpen && openMenus['ai'] && (
                   <div className="ml-9 space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-100 pl-2">
-                    <Link to="/ai-book-list" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/ai-book-list' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Manage Books</Link>
-                    <Link to="/subject-content" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/subject-content' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Chapter Content</Link>
+                    {!isPortalUser && (
+                      <>
+                        <Link to="/ai-book-list" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/ai-book-list' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Manage Books</Link>
+                        <Link to="/subject-content" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/subject-content' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>Chapter Content</Link>
+                      </>
+                    )}
                     <Link to="/ai-tutor" className={`block py-1.5 text-sm transition-colors ${location.pathname === '/ai-tutor' ? 'text-primary-600 font-bold' : 'text-slate-500 hover:text-primary-600'}`}>AI Learning Tutor</Link>
                   </div>
                 )}
@@ -538,6 +608,8 @@ function App() {
                   </div>
                 )}
               </div>
+            )}
+            </>
             )}
           </div>
           
@@ -584,97 +656,92 @@ function App() {
               <Menu className="h-6 w-6" />
             </button>
             
-            <div className="relative ml-2 group">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search students or navigation..."
-                className="block w-full md:w-72 pl-10 pr-4 py-2 rounded-xl text-sm bg-slate-100/50 hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-primary-500/10 focus:outline-none border border-transparent focus:border-primary-500/30 transition-all placeholder:text-slate-400 shadow-sm"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSearchResults(true);
-                }}
-                onFocus={() => setShowSearchResults(true)}
-              />
-              
-              {showSearchResults && (filteredResults.length > 0 || studentResults.length > 0) && (
-                <div className="absolute top-full left-0 mt-2 w-full md:w-72 bg-white border border-slate-100 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
-                  {filteredResults.length > 0 && (
-                    <div className="mb-2">
-                      <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Navigation</p>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                        {filteredResults.map((item, index) => (
-                          <Link
-                            key={index}
-                            to={item.path}
-                            onClick={() => {
-                              setSearchQuery('');
-                              setStudentResults([]);
-                              setShowSearchResults(false);
-                            }}
-                            className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-primary-50 hover:text-primary-700 transition-colors"
-                          >
-                            <div className="h-1.5 w-1.5 rounded-full bg-primary-400 mr-3"></div>
-                            {item.label}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {studentResults.length > 0 && (
-                    <div>
-                      <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Students</p>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                        {studentResults.map((student) => (
-                          <div
-                            key={student.id}
-                            onClick={() => {
-                              setSearchQuery('');
-                              setStudentResults([]);
-                              setShowSearchResults(false);
-                              setQuickViewStudent(student);
-                            }}
-                            className="flex items-center px-4 py-2.5 hover:bg-emerald-50 transition-colors group cursor-pointer"
-                          >
-                            <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] mr-3 shrink-0">
-                              {student.firstName[0]}{student.lastName[0]}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-700 leading-tight truncate group-hover:text-emerald-700">
-                                {student.firstName} {student.lastName}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-medium">Adm: {student.admissionNo || 'N/A'}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            {!isPortalUser && (
+              <div className="relative ml-2 group">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
                 </div>
-              )}
-            </div>
+                <input
+                  type="text"
+                  placeholder="Search students or navigation..."
+                  className="block w-full md:w-72 pl-10 pr-4 py-2 rounded-xl text-sm bg-slate-100/50 hover:bg-slate-100 focus:bg-white focus:ring-4 focus:ring-primary-500/10 focus:outline-none border border-transparent focus:border-primary-500/30 transition-all placeholder:text-slate-400 shadow-sm"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSearchResults(true);
+                  }}
+                  onFocus={() => setShowSearchResults(true)}
+                />
+                
+                {showSearchResults && (filteredResults.length > 0 || studentResults.length > 0) && (
+                  <div className="absolute top-full left-0 mt-2 w-full md:w-72 bg-white border border-slate-100 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {filteredResults.length > 0 && (
+                      <div className="mb-2">
+                        <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Navigation</p>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                          {filteredResults.map((item, index) => (
+                            <Link
+                              key={index}
+                              to={item.path}
+                              onClick={() => {
+                                setSearchQuery('');
+                                setStudentResults([]);
+                                setShowSearchResults(false);
+                              }}
+                              className="flex items-center px-4 py-2 text-sm text-slate-600 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                            >
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary-400 mr-3"></div>
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {studentResults.length > 0 && (
+                      <div>
+                        <div className="px-3 py-1 border-b border-slate-50 bg-slate-50/50">
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Students</p>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                          {studentResults.map((student) => (
+                            <div
+                              key={student.id}
+                              onClick={() => {
+                                setSearchQuery('');
+                                setStudentResults([]);
+                                setShowSearchResults(false);
+                                setQuickViewStudent(student);
+                              }}
+                              className="flex items-center px-4 py-2.5 hover:bg-emerald-50 transition-colors group cursor-pointer"
+                            >
+                              <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] mr-3 shrink-0">
+                                {student.firstName[0]}{student.lastName[0]}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-700 leading-tight truncate group-hover:text-emerald-700">
+                                  {student.firstName} {student.lastName}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium">Adm: {student.admissionNo || 'N/A'}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-4">
-            {currentSession && (
-              <div className="hidden sm:flex items-center px-4 py-1.5 rounded-xl bg-indigo-50/50 border border-indigo-100/50 shadow-sm transition-all hover:bg-indigo-50 hover:shadow group">
-                <div className="h-8 w-8 rounded-lg bg-white shadow-sm border border-indigo-100 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                  <Calendar className="h-4 w-4 text-indigo-600" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 leading-tight">Current Session</span>
-                  <span className="text-sm font-extrabold text-indigo-900 leading-tight">{currentSession}</span>
-                </div>
-              </div>
-            )}
+            <HeaderContextArea 
+               isPortalUser={isPortalUser} 
+               currentSession={currentSession} 
+            />
             <button className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl relative transition-all active:scale-95 group">
               <Bell className="h-5 w-5 group-hover:rotate-12 transition-transform" />
               <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white border border-white"></span>
@@ -735,9 +802,9 @@ function App() {
               <Route path="/certificates/designer" element={<CustomCertificateDesigner />} />
               <Route path="/certificates" element={<CertificateGenerator />} />
               <Route path="/student-import" element={<StudentImport />} />
-              <Route path="/transport" element={<TransportManagement />} />
-              <Route path="/hostel" element={<HostelManagement />} />
-              <Route path="/library" element={<LibraryManagement />} />
+              <Route path="/transport" element={isPortalUser ? <PortalTransport /> : <TransportManagement />} />
+              <Route path="/hostel" element={isPortalUser ? <PortalHostel /> : <HostelManagement />} />
+              <Route path="/library" element={isPortalUser ? <PortalLibrary /> : <LibraryManagement />} />
               <Route path="/communication" element={<CommunicationHub />} />
               <Route path="/inventory" element={<InventoryStore />} />
               <Route path="/front-office" element={<FrontOffice />} />
@@ -760,6 +827,7 @@ function App() {
               <Route path="/ai-book-list" element={<AiBookList />} />
               <Route path="/subject-content" element={<SubjectContent />} />
               <Route path="/ai-tutor" element={<AiTutor />} />
+              <Route path="/portal-fees" element={<PortalFees />} />
               
               {/* Academic Masters */}
               <Route path="/masters/classes" element={
@@ -901,8 +969,75 @@ function App() {
         />
       )}
     </div>
-    </>
+    </PortalProvider>
   );
 }
 
-export default App;
+// Helper Component for Header Area
+function HeaderContextArea({ isPortalUser, currentSession }: { isPortalUser: boolean; currentSession: string }) {
+    const { linkedWards, selectedWard, selectWard } = usePortal();
+
+    if (isPortalUser) {
+        if (linkedWards.length > 1) {
+            return (
+                <div className="flex items-center gap-3">
+                    <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+                    <div className="flex items-center px-4 py-2 rounded-2xl bg-white border border-slate-200 hover:border-blue-300 transition-all cursor-pointer relative group min-w-[200px] shadow-sm hover:shadow-md animate-in zoom-in-95 duration-500">
+                        <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center mr-3 shrink-0 border border-blue-100">
+                            <span className="text-xs font-black text-blue-600 uppercase">
+                                {selectedWard?.firstName?.[0]}{selectedWard?.lastName?.[0]}
+                            </span>
+                        </div>
+                        <div className="flex-1 min-w-0 pr-2">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 leading-none mb-1.5 opacity-80">Managing Ward</p>
+                            <div className="relative flex items-center justify-between">
+                                <span className="text-sm font-black text-slate-900 truncate leading-none">
+                                    {selectedWard ? `${selectedWard.firstName} ${selectedWard.lastName}` : 'Select Ward'}
+                                </span>
+                                <ChevronDown className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-500 transition-colors ml-2" />
+                                
+                                <select 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                    value={selectedWard?.id}
+                                    onChange={(e) => selectWard(e.target.value)}
+                                >
+                                    {linkedWards.map(w => (
+                                        <option key={w.id} value={w.id}>{w.firstName} {w.lastName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        // Single ward portal: Show nothing as requested.
+        return null;
+    }
+
+    // Organization Login (Staff/Admin)
+    if (currentSession) {
+        return (
+            <div className="hidden sm:flex items-center px-4 py-1.5 rounded-xl bg-indigo-50/50 border border-indigo-100/50 shadow-sm transition-all hover:bg-indigo-50 hover:shadow group">
+                <div className="h-8 w-8 rounded-lg bg-white shadow-sm border border-indigo-100 flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                    <Calendar className="h-4 w-4 text-indigo-600" />
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-indigo-400 leading-tight">Current Session</span>
+                    <span className="text-sm font-extrabold text-indigo-900 leading-tight">{currentSession}</span>
+                </div>
+            </div>
+        );
+    }
+
+    return null;
+}
+
+export default function Root() {
+  return (
+    <Routes>
+      <Route path="*" element={<App />} />
+    </Routes>
+  );
+}
+
