@@ -9,6 +9,7 @@ public class FeeDiscountDto
     public string CalculationType { get; set; } = "Fixed";
     public decimal Value { get; set; }
     public string Frequency { get; set; } = "Monthly";
+    public Guid? DefaultFeeHeadId { get; set; }
 }
 
 public class AssignDiscountRequest
@@ -17,5 +18,6 @@ public class AssignDiscountRequest
     public Guid FeeDiscountId { get; set; }
     public Guid AcademicYearId { get; set; }
     public Guid? RestrictedFeeHeadId { get; set; }
+    public List<Guid>? FeeHeadIds { get; set; }
     public string Remarks { get; set; } = string.Empty;
 }

@@ -108,7 +108,7 @@ public class SeedController : ControllerBase
 
         await SeedDiscounts(orgId, results);
         await SeedFeeConfig(orgId, results);
-        await SeedInitialStaff(orgId, results);
+        // await SeedInitialStaff(orgId, results); // Removed redundant seeding of developer user across organizations
 
         await _unitOfWork.CompleteAsync();
 

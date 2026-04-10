@@ -60,6 +60,7 @@ import { PortalProvider, usePortal } from './contexts/PortalContext';
 import { Student } from './types';
 import StudentDetailPanel from './components/StudentDetailPanel';
 import { ToastContainer, toast } from 'react-toastify';
+import { clearUserSession } from './utils/storageUtils';
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
@@ -615,7 +616,7 @@ function App() {
           
           <div className="p-4 border-t border-slate-100 shrink-0">
             <button 
-              onClick={() => { localStorage.removeItem('token'); setIsAuthenticated(false); }}
+              onClick={() => { clearUserSession(); setIsAuthenticated(false); }}
               className={`flex w-full items-center py-2 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group ${
               sidebarOpen ? 'px-4' : 'justify-center'
             }`}>
@@ -775,7 +776,7 @@ function App() {
                   </a>
                   <div className="border-t border-slate-100 mt-2 pt-2">
                     <button 
-                      onClick={() => { localStorage.removeItem('token'); setIsAuthenticated(false); }}
+                      onClick={() => { clearUserSession(); setIsAuthenticated(false); }}
                       className="flex w-full items-center px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors group"
                     >
                       <LogOut className="h-4 w-4 mr-3 text-red-400 group-hover:text-red-500" />

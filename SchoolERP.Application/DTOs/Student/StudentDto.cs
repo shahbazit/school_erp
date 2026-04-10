@@ -119,6 +119,7 @@ public class FeeDiscountAssignmentDto
     public Guid AcademicYearId { get; set; }
     public string AcademicYearName { get; set; } = string.Empty;
     public string? Remarks { get; set; }
+    public string? Category { get; set; }
     public string? CalculationType { get; set; }
     public decimal? Value { get; set; }
     public string? Frequency { get; set; }

@@ -14,5 +14,8 @@ public class FeeDiscount : BaseEntity
     
     public string Frequency { get; set; } = "Monthly"; // Monthly, OneTime (Annual)
     
+    public Guid? DefaultFeeHeadId { get; set; }
+    public FeeHead? DefaultFeeHead { get; set; }
+
     public bool IsActive { get; set; } = true;
 }

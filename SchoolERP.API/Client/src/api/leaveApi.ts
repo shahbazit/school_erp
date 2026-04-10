@@ -115,6 +115,10 @@ export const leaveApi = {
     return res.data;
   },
 
+  deleteType: async (id: string): Promise<void> => {
+    await apiClient.post(`/leave/types/${id}/delete`);
+  },
+
   getApplications: async (params?: { employeeId?: string; status?: LeaveStatus }): Promise<LeaveApplicationDto[]> => {
     const res = await apiClient.get<LeaveApplicationDto[]>('/leave/applications', { params });
     return res.data;

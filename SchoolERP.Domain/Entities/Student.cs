@@ -84,6 +84,8 @@ public class Student : BaseEntity
     public string? RouteName { get; set; }
     public string? StoppageName { get; set; }
     public decimal? BusFee { get; set; }
+    public string? HostelName { get; set; }
+    public string? RoomNo { get; set; }
     public string? StudentAadharNo { get; set; }
     public string? StudentBankAccountNo { get; set; }
     public string? StudentBankName { get; set; }

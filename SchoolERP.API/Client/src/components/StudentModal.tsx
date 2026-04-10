@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, User, BookOpen, Users, MapPin, ChevronLeft, ChevronRight, Check, CreditCard, Plus, Trash2, Settings, TrendingDown, FilePlus, Upload, FileText, Download } from 'lucide-react';
+import { X, User, BookOpen, Users, MapPin, ChevronLeft, ChevronRight, Check, CreditCard, Plus, Trash2, Settings, TrendingDown, FilePlus, Upload, FileText, Download, Calendar, Percent } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Student, CreateStudentDto, UpdateStudentDto, AssignCourseDto } from '../types';
 import { masterApi } from '../api/masterApi';
@@ -68,7 +68,8 @@ const defaultForm = {
   consentAccepted: true,
   
   ledgerNumber: '', srnNumber: '', permanentEducationNo: '', familyId: '', apaarId: '', medium: '', enrollmentSchoolName: '', openingBalance: '',
-  admissionScheme: '', admissionType: '', religion: '', category: '', caste: '', placeOfBirth: '', heightInCM: '', weightInKG: '', colorVision: '', previousClass: '', tcNo: '', tcDate: '', houseName: '', isCaptain: false, isMonitor: false, bus: '', routeName: '', stoppageName: '', busFee: '',
+  admissionScheme: '', admissionType: '', religion: '', category: '', caste: '', placeOfBirth: '', heightInCM: '', weightInKG: '', colorVision: '', previousClass: '', tcNo: '', tcDate: '', houseName: '', isCaptain: false, isMonitor: false, bus: '', routeName: '', stoppageName: '', busFee: '', 
+  hostelName: '', roomNo: '',
   studentAadharNo: '', studentBankAccountNo: '', studentBankName: '', studentIFSCCODE: '', fatherAadharNo: '', parentAccountNo: '', parentBankName: '', parentBankIFSCCODE: '', motherAadharNo: '', registrationNumber: '', annualIncome: '',
   fatherQualification: '', motherQualification: '', parentMobileNumber: '', parentEmail: '', parentOccupation: '', parentQualification: '', smsFacility: false, smsMobileNumber: '', permanentAddress: '',
   courseIds: [] as AssignCourseDto[],
@@ -88,6 +89,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
   const [classes, setClasses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [feeHeads, setFeeHeads] = useState<any[]>([]);
+  const [allFeeHeads, setAllFeeHeads] = useState<any[]>([]);
   const [availableDiscounts, setAvailableDiscounts] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
@@ -105,6 +107,17 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
   const [siblings, setSiblings] = useState<Student[]>([]);
   const [loadingSiblings, setLoadingSiblings] = useState(false);
   const [manuallyLinked, setManuallyLinked] = useState<Student[]>([]);
+  const [selectedDiscountId, setSelectedDiscountId] = useState('');
+  const [showAdvancedDiscount, setShowAdvancedDiscount] = useState(false);
+  const [subscriptionForm, setSubscriptionForm] = useState({ feeHeadId: '', customAmount: '' });
+  const [discountAssignForm, setDiscountAssignForm] = useState({
+    academicYearId: '',
+    feeHeadId: '',
+    remarks: '',
+    calculationType: '',
+    value: '',
+    frequency: ''
+  });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const documentTypes = ['Aadhar Card', 'Birth Certificate', 'Transfer Certificate', 'Previous Marksheet', 'Medical Record', 'Other'];
 
@@ -225,13 +238,22 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       ]);
       setClasses(cls.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })));
       setSections(sec.sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      setFeeHeads(heads.filter((h: any) => h.isSelective).sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      const moduleLockedHeads = ['Transport', 'Hostel', 'Bus'];
+      const filteredSelectiveHeads = (heads as any[]).filter(h => 
+        h.isSelective && !moduleLockedHeads.some(locked => h.name.includes(locked))
+      );
+      setFeeHeads(filteredSelectiveHeads.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+      setAllFeeHeads(heads.sort((a: any, b: any) => a.name.localeCompare(b.name)));
       setAvailableDiscounts(discs.sort((a: any, b: any) => a.name.localeCompare(b.name)));
-      setAcademicYears(years.sort((a: any, b: any) => b.name.localeCompare(a.name))); // For years, usually want newest first
+      const sortedYears = years.sort((a: any, b: any) => b.name.localeCompare(a.name));
+      setAcademicYears(sortedYears);
       
       const currentYear = years.find((y: any) => y.isCurrent);
-      if (currentYear && !initialData) {
-        setFormData(prev => ({ ...prev, academicYear: currentYear.name }));
+      if (currentYear) {
+        setDiscountAssignForm((prev: any) => ({ ...prev, academicYearId: currentYear.id }));
+        if (!initialData) {
+          setFormData(prev => ({ ...prev, academicYear: currentYear.name }));
+        }
       }
     } catch {
       // silently fail, selects remain empty
@@ -239,6 +261,39 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       setLoadingMasters(false);
     }
   }, [initialData]);
+
+  const fetchFullStudent = useCallback(async () => {
+    if (!initialData?.id || !isOpen) return;
+    try {
+      const fullData = await studentApi.getById(initialData.id);
+      setFormData({
+        ...defaultForm,
+        ...fullData,
+        dateOfBirth: fullData.dateOfBirth ? fullData.dateOfBirth.substring(0, 10) : '',
+        admissionDate: fullData.admissionDate ? fullData.admissionDate.substring(0, 10) : '',
+        tcDate: (fullData as any).tcDate ? (fullData as any).tcDate.substring(0, 10) : '',
+        feeSubscriptions: (fullData.feeSubscriptions || []).map((sub: any) => ({
+          ...sub,
+          isSystemManaged: sub.feeHeadName?.toLowerCase().includes('transport') || 
+                           sub.feeHeadName?.toLowerCase().includes('hostel') || 
+                           sub.feeHeadName?.toLowerCase().includes('bus')
+        })),
+        feeDiscounts: (fullData.feeDiscounts || []).map((d: any) => ({
+          ...d,
+          feeHeadId: d.restrictedFeeHeadId // Sync for backend consistency
+        })),
+        courseIds: (fullData as any).enrolledCourses?.map((c: any) => ({ courseId: c.courseId, batchId: c.batchId })) || [],
+      } as any);
+    } catch (err: any) {
+      console.error("Full student fetch error:", err);
+    }
+  }, [initialData?.id, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialData?.id) {
+       fetchFullStudent();
+    }
+  }, [isOpen, initialData?.id, fetchFullStudent]);
 
   const fetchDocuments = useCallback(async () => {
     if (!initialData?.id) return;
@@ -264,25 +319,20 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
       fetchMasters();
       setActiveTab(defaultTab || 'basic');
       setErrors({});
-      if (initialData) {
-        setFormData({
-          ...defaultForm,
-          ...initialData,
-          dateOfBirth: initialData.dateOfBirth ? initialData.dateOfBirth.substring(0, 10) : '',
-          admissionDate: initialData.admissionDate ? initialData.admissionDate.substring(0, 10) : '',
-          tcDate: (initialData as any).tcDate ? (initialData as any).tcDate.substring(0, 10) : '',
-          feeSubscriptions: initialData.feeSubscriptions || [],
-          feeDiscounts: initialData.feeDiscounts || [],
-          courseIds: (initialData as any).enrolledCourses?.map((c: any) => ({ courseId: c.courseId, batchId: c.batchId })) || [],
-        } as any);
-        setDocName('');
-        setDocType('Aadhar Card');
-        if (fileInputRef.current) fileInputRef.current.value = '';
+      
+      if (initialData?.id) {
+        // Fetch full deep details for existing student (Handle binding/reading correctly)
+        fetchFullStudent();
       } else {
+        // New student initialization
         setFormData({ ...defaultForm });
       }
+
+      setDocName('');
+      setDocType('Aadhar Card');
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [initialData, isOpen, fetchMasters]);
+  }, [isOpen, initialData?.id, fetchMasters, fetchFullStudent, defaultTab]);
 
   if (!isOpen) return null;
 
@@ -495,11 +545,40 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
         {renderInput('houseName', 'House Name', 'text')}
         {renderCheckbox('isCaptain', 'Is Captain')}
         {renderCheckbox('isMonitor', 'Is Monitor')}
-        {renderInput('bus', 'Bus', 'text')}
-        {renderInput('routeName', 'Route Name', 'text')}
-        {renderInput('stoppageName', 'Stoppage Name', 'text')}
-        {renderInput('busFee', 'Bus Fee', 'number')}
       </div>
+
+    {(formData.routeName || formData.hostelName) && (
+      <div className="mt-6 pt-6 border-t border-slate-100">
+        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[2px] mb-4">Active Services & Logistics</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {formData.routeName && (
+            <div className="p-3 bg-primary-50 border border-primary-100 rounded-xl flex items-center gap-3">
+              <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center border border-primary-200 shadow-sm">
+                <MapPin className="h-5 w-5 text-primary-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-primary-700 uppercase tracking-tight">Transport Route</p>
+                <p className="text-sm font-black text-slate-800">{formData.routeName}</p>
+                {formData.stoppageName && <p className="text-[10px] text-slate-500 font-bold uppercase">{formData.stoppageName}</p>}
+              </div>
+            </div>
+          )}
+          {formData.hostelName && (
+            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-3">
+              <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center border border-indigo-200 shadow-sm">
+                <BookOpen className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-indigo-700 uppercase tracking-tight">Hostel Accommodation</p>
+                <p className="text-sm font-black text-slate-800">{formData.hostelName}</p>
+                {formData.roomNo && <p className="text-[10px] text-slate-500 font-bold uppercase">Room: {formData.roomNo}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+        <p className="mt-3 text-[10px] text-center text-slate-400 italic">Services are managed via dedicated Transport/Hostel modules.</p>
+      </div>
+    )}
     </div>
   );
 
@@ -675,269 +754,247 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, def
 
 
   const renderFeesTab = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Subscriptions */}
-        <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        
+        {/* SECTION 1: ADD-ON SUBSCRIPTIONS */}
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+          <div className="bg-slate-50/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4 text-primary-600" />
-              <h3 className="font-bold text-slate-700 text-sm">Selective Fee Subscriptions</h3>
+              <CreditCard className="h-4 w-4 text-primary-600" />
+              <h3 className="text-sm font-bold text-slate-800">Extra Subscriptions</h3>
             </div>
+            <span className="bg-white px-2 py-0.5 rounded-full border border-slate-200 text-[10px] font-bold text-primary-700">
+              {formData.feeSubscriptions.length} Active
+            </span>
           </div>
+
           <div className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Fee Head</label>
-                <select 
-                  id="new-sub-head"
-                  className="form-input text-sm"
-                >
-                  <option value="">Select Fee Head...</option>
-                  {feeHeads.filter(h => !formData.feeSubscriptions.some((s: any) => s.feeHeadId === h.id)).map((h: any) => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Custom Amount</label>
-                  <input type="number" id="new-sub-amount" placeholder="Default" className="form-input text-sm" />
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    const headId = (document.getElementById('new-sub-head') as HTMLSelectElement).value;
-                    const amount = (document.getElementById('new-sub-amount') as HTMLInputElement).value;
-                    if (!headId) return;
-                    const head = feeHeads.find(h => h.id === headId);
-                    setFormData({
-                      ...formData,
-                      feeSubscriptions: [
-                        ...formData.feeSubscriptions,
-                        { feeHeadId: headId, feeHeadName: head?.name, customAmount: amount ? Number(amount) : null }
-                      ]
-                    });
-                    (document.getElementById('new-sub-head') as HTMLSelectElement).value = '';
-                    (document.getElementById('new-sub-amount') as HTMLInputElement).value = '';
-                  }}
-                  className="btn-primary p-2 h-[38px] w-[38px] flex items-center justify-center"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
+            {/* Subscriptions List at Top */}
+            <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+              {formData.feeSubscriptions.length === 0 ? (
+                <p className="text-center py-4 text-[11px] font-bold text-slate-300 uppercase">No Subscriptions</p>
+              ) : (
+                formData.feeSubscriptions.map((sub: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-white border border-slate-100 rounded-lg hover:border-primary-200 transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-7 w-7 ${sub.isSystemManaged ? 'bg-primary-100 text-primary-700' : 'bg-slate-50 text-slate-500'} rounded flex items-center justify-center font-bold text-[10px] shrink-0`}>
+                        {sub.isSystemManaged ? <Settings className="h-3.5 w-3.5" /> : sub.feeHeadName?.[0]}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-700 text-xs leading-tight flex items-center gap-1.5">
+                          {sub.feeHeadName}
+                          {sub.isSystemManaged && <span className="text-[8px] bg-primary-50 text-primary-600 px-1 rounded uppercase">Auto</span>}
+                        </h4>
+                        <p className="text-[10px] text-slate-400">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Standard Rate'}</p>
+                      </div>
+                    </div>
+                    {sub.isSystemManaged ? (
+                      <button 
+                        type="button"
+                        onClick={() => toast.info(`Managed by Service Module. Please remove assignment from ${sub.feeHeadName.includes('Hostel') ? 'Hostel' : 'Transport'} Management to delete this fee.`)}
+                        className="p-1.5 text-slate-200 hover:text-primary-500 transition-colors"
+                        title="System Managed Fee"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, feeSubscriptions: formData.feeSubscriptions.filter((_: any, i: number) => i !== idx)})} 
+                        className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
-            <div className="border border-slate-100 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  <tr>
-                    <th className="px-4 py-2">Fee Head</th>
-                    <th className="px-4 py-2">Amount</th>
-                    <th className="px-4 py-2 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {formData.feeSubscriptions.length === 0 ? (
-                    <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400 italic text-xs">No elective fees selected.</td></tr>
-                  ) : (
-                    formData.feeSubscriptions.map((sub: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-2 font-medium">{sub.feeHeadName}</td>
-                        <td className="px-4 py-2 text-slate-500">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Standard'}</td>
-                        <td className="px-4 py-2 text-right">
-                          <button 
-                            type="button"
-                            onClick={() => setFormData({
-                              ...formData,
-                              feeSubscriptions: formData.feeSubscriptions.filter((_: any, i: number) => i !== idx)
-                            })}
-                            className="text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Discounts */}
-        <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-emerald-600" />
-              <h3 className="font-bold text-slate-700 text-sm">Applied Discounts</h3>
-            </div>
-          </div>
-          <div className="p-4 space-y-4">
-            <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex flex-col gap-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Academic Year</label>
-                  <select id="new-disc-year" className="form-input text-sm border-emerald-200">
-                    {academicYears.map((y: any) => (
-                      <option key={y.id} value={y.id}>{y.name} {y.isCurrent ? '(Current)' : ''}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Discount Type</label>
-                  <select id="new-disc-id" className="form-input text-sm border-emerald-200">
-                    <option value="">Select Discount...</option>
-                    {availableDiscounts.map((d: any) => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : formatCurrency(d.value)})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Specific Head (Optional)</label>
-                  <select id="new-disc-head" className="form-input text-sm border-emerald-200">
-                    <option value="">All Monthly Fees</option>
-                    {feeHeads.map((h: any) => (
+            {/* Action Bar at Bottom */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Fee Head</label>
+                  <select 
+                    value={subscriptionForm.feeHeadId}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, feeHeadId: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold outline-none"
+                  >
+                    <option value="">-- Select Head --</option>
+                    {feeHeads.filter(h => !formData.feeSubscriptions.some((s: any) => s.feeHeadId === h.id)).map((h: any) => (
                       <option key={h.id} value={h.id}>{h.name}</option>
                     ))}
                   </select>
                 </div>
-                <div className="flex items-end gap-2 md:col-span-2">
-                  <div className="flex-1">
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Remarks</label>
-                    <input id="new-disc-remarks" type="text" placeholder="Reason..." className="form-input text-sm border-emerald-200" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3 md:col-span-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Mode</label>
-                    <select id="new-disc-calc" className="form-input text-sm border-emerald-200">
-                      <option value="">Default</option>
-                      <option value="Fixed">Fixed Amount</option>
-                      <option value="Percentage">Percentage (%)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Custom Value</label>
-                    <input id="new-disc-value" type="number" placeholder="Enter..." className="form-input text-sm border-emerald-200" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest block mb-1">Frequency</label>
-                    <select id="new-disc-freq" className="form-input text-sm border-emerald-200">
-                      <option value="">Default</option>
-                      <option value="Monthly">Monthly</option>
-                      <option value="OneTime">One-Time</option>
-                      <option value="Yearly">Yearly</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex items-end justify-end">
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const discId = (document.getElementById('new-disc-id') as HTMLSelectElement).value;
-                      const yearId = (document.getElementById('new-disc-year') as HTMLSelectElement).value;
-                      const headId = (document.getElementById('new-disc-head') as HTMLSelectElement).value;
-                      const remarks = (document.getElementById('new-disc-remarks') as HTMLInputElement).value;
-                      const calcType = (document.getElementById('new-disc-calc') as HTMLSelectElement).value;
-                      const val = (document.getElementById('new-disc-value') as HTMLInputElement).value;
-                      const freq = (document.getElementById('new-disc-freq') as HTMLSelectElement).value;
-
-                      if (!discId || !yearId) return;
-                      const disc = availableDiscounts.find(d => d.id === discId);
-                      const head = feeHeads.find(h => h.id === headId);
-                      const year = academicYears.find(y => y.id === yearId);
-                      setFormData({
-                        ...formData,
-                        feeDiscounts: [
-                          ...formData.feeDiscounts,
-                          { 
-                            feeDiscountId: discId, 
-                            discountName: disc?.name,
-                            restrictedFeeHeadId: headId || null,
-                            restrictedFeeHeadName: headId ? head?.name : 'All',
-                            academicYearId: yearId,
-                            academicYearName: year?.name,
-                            remarks,
-                            calculationType: calcType || null,
-                            value: val ? Number(val) : null,
-                            frequency: freq || null
-                          }
-                        ]
-                      });
-                      // Reset custom fields
-                      (document.getElementById('new-disc-id') as HTMLSelectElement).value = '';
-                      (document.getElementById('new-disc-remarks') as HTMLInputElement).value = '';
-                      (document.getElementById('new-disc-calc') as HTMLSelectElement).value = '';
-                      (document.getElementById('new-disc-value') as HTMLInputElement).value = '';
-                      (document.getElementById('new-disc-freq') as HTMLSelectElement).value = '';
-                    }}
-                    className="btn-primary bg-emerald-600 hover:bg-emerald-700 p-2 h-[38px] w-full flex items-center justify-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Assign Discount</span>
-                  </button>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Custom Amount</label>
+                  <input 
+                    type="number" 
+                    value={subscriptionForm.customAmount}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, customAmount: e.target.value })}
+                    placeholder="Optional" 
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none" 
+                  />
                 </div>
               </div>
-            </div>
-
-            <div className="border border-slate-100 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                  <tr>
-                    <th className="px-4 py-2">Discount / Head</th>
-                    <th className="px-4 py-2">Year</th>
-                    <th className="px-4 py-2 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {formData.feeDiscounts.length === 0 ? (
-                    <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400 italic text-xs">No active discounts assigned.</td></tr>
-                  ) : (
-                    formData.feeDiscounts.map((disc: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 text-xs">
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                             <p className="font-bold text-slate-700">{disc.discountName}</p>
-                             { (disc.calculationType || disc.value) && (
-                               <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                                  {disc.calculationType === 'Percentage' ? `${disc.value}%` : formatCurrency(disc.value)}
-                               </span>
-                             )}
-                          </div>
-                          <div className="flex gap-2 text-[10px] text-slate-400">
-                             <p>Head: {disc.restrictedFeeHeadName || 'All'}</p>
-                             {disc.frequency && <p>• Freq: {disc.frequency}</p>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-slate-500 font-medium">{disc.academicYearName}</td>
-                        <td className="px-4 py-2 text-right">
-                          <button 
-                            type="button"
-                            onClick={() => setFormData({
-                              ...formData,
-                              feeDiscounts: formData.feeDiscounts.filter((_: any, i: number) => i !== idx)
-                            })}
-                            className="text-slate-300 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <button 
+                type="button"
+                onClick={() => {
+                  const { feeHeadId, customAmount } = subscriptionForm;
+                  if (!feeHeadId) { toast.error("Select a head"); return; }
+                  const head = feeHeads.find(h => h.id === feeHeadId);
+                  setFormData({
+                    ...formData,
+                    feeSubscriptions: [...formData.feeSubscriptions, { feeHeadId, feeHeadName: head?.name, customAmount: customAmount ? Number(customAmount) : null }]
+                  });
+                  setSubscriptionForm({ feeHeadId: '', customAmount: '' });
+                }}
+                className="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md font-bold text-[11px] uppercase tracking-wider transition-all"
+              >
+                Add Subscription
+              </button>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* SECTION 2: DISCOUNT POLICIES */}
+        <section className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+          <div className="bg-emerald-50/50 px-4 py-2.5 border-b border-emerald-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-emerald-600" />
+              <h3 className="text-sm font-bold text-slate-800">Fee Discounts</h3>
+            </div>
+            <span className="bg-white px-2 py-0.5 rounded-full border border-emerald-200 text-[10px] font-bold text-emerald-700">
+              {formData.feeDiscounts.length} Rules
+            </span>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Applied Discounts List at Top */}
+            <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+              {formData.feeDiscounts.length === 0 ? (
+                <p className="text-center py-4 text-[11px] font-bold text-slate-300 uppercase">No Discounts</p>
+              ) : (
+                formData.feeDiscounts.map((disc: any, idx: number) => {
+                  const masterDisc = availableDiscounts.find(m => m.id === (disc.feeDiscountId || disc.discountId));
+                  const val = disc.value ?? masterDisc?.value;
+                  return (
+                    <div key={idx} className="bg-white border border-slate-100 rounded-lg p-2.5 hover:border-emerald-200 transition-all flex items-center justify-between gap-3">
+                      <div className="flex gap-2">
+                        <div className="h-7 w-7 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center shrink-0"><Percent className="h-3.5 w-3.5" /></div>
+                        <div>
+                          <h4 className="font-bold text-slate-700 text-xs leading-tight">{disc.discountName}</h4>
+                          <p className="text-[9px] text-slate-400 font-bold">{disc.restrictedFeeHeadName || 'Universal'} • {disc.academicYearName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-xs font-black text-slate-800">{(disc.calculationType || masterDisc?.calculationType) === 'Percentage' ? `${val}%` : formatCurrency(val)}</p>
+                          <p className="text-[8px] font-bold text-emerald-600 uppercase">{disc.frequency || masterDisc?.frequency || 'Manual'}</p>
+                        </div>
+                        <button onClick={() => setFormData({...formData, feeDiscounts: formData.feeDiscounts.filter((_: any, i: number) => i !== idx)})} className="p-1 text-slate-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Assignment Console at Bottom */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Session</label>
+                  <select 
+                    value={discountAssignForm.academicYearId}
+                    onChange={(e) => setDiscountAssignForm({ ...discountAssignForm, academicYearId: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold outline-none"
+                  >
+                    {academicYears.map((y: any) => (<option key={y.id} value={y.id}>{y.name}</option>))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Rule</label>
+                  <select 
+                    value={selectedDiscountId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedDiscountId(val);
+                      const disc = availableDiscounts.find(d => d.id === val);
+                      if (disc) setDiscountAssignForm((prev: any) => ({ ...prev, feeHeadId: disc.defaultFeeHeadId || '' }));
+                    }}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-bold text-emerald-900 outline-none"
+                  >
+                    <option value="">-- Select --</option>
+                    {availableDiscounts.map((d: any) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.calculationType === 'Percentage' ? `${d.value}%` : formatCurrency(d.value)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Remarks</label>
+                  <input 
+                    type="text" 
+                    value={discountAssignForm.remarks}
+                    onChange={(e) => setDiscountAssignForm({ ...discountAssignForm, remarks: e.target.value })}
+                    placeholder="Reason..." 
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs outline-none" 
+                  />
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (!selectedDiscountId || !discountAssignForm.academicYearId) { toast.error("Required fields missing"); return; }
+                    const disc = availableDiscounts.find(d => d.id === selectedDiscountId);
+                    const head = allFeeHeads.find(h => h.id === discountAssignForm.feeHeadId);
+                    const year = academicYears.find(y => y.id === discountAssignForm.academicYearId);
+                    setFormData({
+                      ...formData,
+                      feeDiscounts: [...formData.feeDiscounts, { 
+                        feeDiscountId: selectedDiscountId, discountName: disc?.name, feeHeadId: discountAssignForm.feeHeadId || null,
+                        restrictedFeeHeadName: discountAssignForm.feeHeadId ? (head?.name || 'Assigned') : 'Universal',
+                        academicYearId: discountAssignForm.academicYearId, academicYearName: year?.name, remarks: discountAssignForm.remarks,
+                        calculationType: discountAssignForm.calculationType || null, value: discountAssignForm.value ? Number(discountAssignForm.value) : null,
+                        frequency: discountAssignForm.frequency || null
+                      }]
+                    });
+                    setSelectedDiscountId('');
+                    setDiscountAssignForm((prev: any) => ({ ...prev, remarks: '', feeHeadId: '', calculationType: '', value: '', frequency: '' }));
+                    toast.success("Applied");
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md text-[11px] uppercase transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+
+              <div className="pt-1">
+                <button type="button" onClick={() => setShowAdvancedDiscount(!showAdvancedDiscount)} className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <Settings className={`h-3 w-3 ${showAdvancedDiscount ? 'rotate-90' : ''}`} /> {showAdvancedDiscount ? 'Hide' : 'Override'}
+                </button>
+                {showAdvancedDiscount && (
+                  <div className="grid grid-cols-2 gap-2 mt-2 animate-in zoom-in-95">
+                    <select value={discountAssignForm.calculationType} onChange={e => setDiscountAssignForm({...discountAssignForm, calculationType: e.target.value})} className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold outline-none">
+                      <option value="">Standard Mode</option>
+                      <option value="Percentage">%</option>
+                      <option value="Fixed">Flat</option>
+                    </select>
+                    <input type="number" value={discountAssignForm.value} onChange={e => setDiscountAssignForm({...discountAssignForm, value: e.target.value})} placeholder="Value" className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-bold outline-none" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
-
-
-
 
   const renderFilesTab = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">

@@ -5,7 +5,7 @@ import {
   Plus, Filter, 
   ShoppingCart, Send, AlertCircle,
   Trash2, Edit3, UserCheck, BarChart3,
-  Box, History, Layers, X, Loader2
+  Box, History, Layers, X, Loader2, CreditCard
 } from 'lucide-react';
 import { 
     inventoryApi, 
@@ -747,14 +747,21 @@ export default function InventoryStore() {
                                     {t.type === InventoryTransactionType.Purchase ? '-' : '+'}{formatCurrency(t.totalAmount || 0)}
                                 </span>
                                 {t.type === InventoryTransactionType.Purchase && (
-                                    <span className={`text-[10px] font-bold flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full w-fit ${
-                                        t.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-600' : 
-                                        t.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
-                                    }`}>
-                                        {t.paymentStatus === 'Paid' ? <CheckCircle className="h-2.5 w-2.5" /> : 
-                                         t.paymentStatus === 'Partial' ? <Clock className="h-2.5 w-2.5" /> : <AlertCircleIcon className="h-2.5 w-2.5" />}
-                                        {t.paymentStatus || 'Unpaid'}
-                                    </span>
+                                    <div className="mt-1 space-y-1">
+                                       <span className={`text-[9px] font-black flex items-center gap-1 px-2 py-0.5 rounded-full w-fit border ${
+                                           t.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                           t.paymentStatus === 'Partial' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-red-50 text-red-600 border-red-100'
+                                       }`}>
+                                           {t.paymentStatus === 'Paid' ? <CheckCircle className="h-2.5 w-2.5" /> : 
+                                            t.paymentStatus === 'Partial' ? <Clock className="h-2.5 w-2.5" /> : <AlertCircleIcon className="h-2.5 w-2.5" />}
+                                           {t.paymentStatus || 'Unpaid'}
+                                       </span>
+                                       {t.totalAmount! - (t.amountPaid || 0) > 0 && (
+                                           <p className="text-[10px] font-bold text-slate-400 italic">
+                                               Due: <span className="text-red-400 font-black">{formatCurrency(t.totalAmount! - (t.amountPaid || 0))}</span>
+                                           </p>
+                                       )}
+                                    </div>
                                 )}
                              </div>
                           </td>
@@ -885,29 +892,32 @@ export default function InventoryStore() {
 
                        {/* Vendor Payment Section — only for Purchases */}
                        {transactionType === InventoryTransactionType.Purchase && (
-                         <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                           <p className="text-xs font-bold text-amber-700 uppercase mb-3 flex items-center gap-1.5">
-                             <Clock className="h-3.5 w-3.5" /> Vendor Payment (Internal Tracking Only)
+                         <div className="p-5 bg-slate-900 rounded-[2rem] border border-slate-800 shadow-2xl shadow-slate-900/20">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                             <CreditCard className="h-3 w-3 text-emerald-400" /> Vendor Payment Details
                            </p>
                            <div className="grid grid-cols-2 gap-4">
                              <div>
-                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Supplier</label>
-                                 <select name="supplierId" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none">
+                                 <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">Supplier / Vendor</label>
+                                 <select name="supplierId" className="w-full px-4 py-3 bg-slate-800 border-none rounded-2xl text-sm text-white focus:ring-2 focus:ring-emerald-500/30 outline-none transition-all">
                                      <option value="">Select Supplier</option>
                                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                  </select>
                              </div>
                              <div>
-                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Payment Status</label>
-                                 <select name="paymentStatus" defaultValue="Unpaid" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none">
-                                     <option value="Unpaid">Unpaid</option>
-                                     <option value="Partial">Partial</option>
-                                     <option value="Paid">Paid</option>
+                                 <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">Initial Status</label>
+                                 <select name="paymentStatus" defaultValue="Unpaid" className="w-full px-4 py-3 bg-slate-800 border-none rounded-2xl text-sm text-white focus:ring-2 focus:ring-emerald-500/30 outline-none transition-all">
+                                     <option value="Unpaid">Unpaid (Full Due)</option>
+                                     <option value="Partial">Partial Payment</option>
+                                     <option value="Paid">Fully Paid</option>
                                  </select>
                              </div>
                              <div className="col-span-2">
-                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 ml-1">Amount Paid to Vendor</label>
-                                 <input name="amountPaid" type="number" step="0.01" defaultValue="0" placeholder="0.00" className="w-full px-4 py-3 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-amber-100 outline-none" />
+                                 <label className="block text-[10px] font-black text-slate-500 uppercase mb-2 ml-1">Amount Paid Now</label>
+                                 <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                    <input name="amountPaid" type="number" step="0.01" defaultValue="0" placeholder="0.00" className="w-full pl-8 pr-4 py-3 bg-slate-800 border-none rounded-2xl text-sm text-white focus:ring-2 focus:ring-emerald-500/30 outline-none transition-all" />
+                                 </div>
                              </div>
                            </div>
                          </div>

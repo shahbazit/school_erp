@@ -28,14 +28,22 @@ export interface TransportAssignment {
   id: string;
   studentId: string;
   studentName: string;
+  admissionNo?: string;
+  className?: string;
   employeeId?: string;
   employeeName?: string;
   routeId: string;
   routeName: string;
+  vehicleNo?: string;
+  stoppageId?: string;
+  stoppageName?: string;
+  appliedCost?: number;
   startDate: string;
   endDate?: string;
   isActive: boolean;
 }
+
+
 
 export interface TransportStoppage {
   id: string;

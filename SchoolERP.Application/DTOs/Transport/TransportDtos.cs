@@ -51,20 +51,29 @@ public class TransportAssignmentDto
     public Guid Id { get; set; }
     public Guid StudentId { get; set; }
     public string StudentName { get; set; } = string.Empty;
+    public string? AdmissionNo { get; set; }
+    public string? ClassName { get; set; }
     public Guid? EmployeeId { get; set; }
     public string? EmployeeName { get; set; }
     public Guid RouteId { get; set; }
     public string RouteName { get; set; } = string.Empty;
+    public string? VehicleNo { get; set; }
+    public Guid? StoppageId { get; set; }
+    public string? StoppageName { get; set; }
+    public decimal? AppliedCost { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public bool IsActive { get; set; }
 }
+
 
 public class CreateTransportAssignmentDto
 {
     public Guid StudentId { get; set; }
     public Guid? EmployeeId { get; set; }
     public Guid RouteId { get; set; }
+    public Guid? StoppageId { get; set; }
+    public decimal? AppliedCost { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
 }

@@ -185,15 +185,33 @@ public class FeeController : ControllerBase
     [HttpPost("discounts/assign")]
     public async Task<IActionResult> AssignDiscount([FromBody] AssignDiscountRequest request)
     {
-        var assignment = new FeeDiscountAssignment
+        if (request.FeeHeadIds != null && request.FeeHeadIds.Any())
         {
-            StudentId = request.StudentId,
-            FeeDiscountId = request.FeeDiscountId,
-            AcademicYearId = request.AcademicYearId,
-            RestrictedFeeHeadId = request.RestrictedFeeHeadId,
-            Remarks = request.Remarks
-        };
-        await _feeService.AssignDiscountAsync(assignment);
+            foreach (var headId in request.FeeHeadIds)
+            {
+                var assignment = new FeeDiscountAssignment
+                {
+                    StudentId = request.StudentId,
+                    FeeDiscountId = request.FeeDiscountId,
+                    AcademicYearId = request.AcademicYearId,
+                    RestrictedFeeHeadId = headId,
+                    Remarks = request.Remarks
+                };
+                await _feeService.AssignDiscountAsync(assignment);
+            }
+        }
+        else
+        {
+            var assignment = new FeeDiscountAssignment
+            {
+                StudentId = request.StudentId,
+                FeeDiscountId = request.FeeDiscountId,
+                AcademicYearId = request.AcademicYearId,
+                RestrictedFeeHeadId = request.RestrictedFeeHeadId,
+                Remarks = request.Remarks
+            };
+            await _feeService.AssignDiscountAsync(assignment);
+        }
         return Ok();
     }
 

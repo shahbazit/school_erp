@@ -527,7 +527,7 @@ function RunDetailsModal({ run, onClose, onUpdate }: { run: PayrollRunDto, onClo
                     <UserCheck className="w-4 h-4" /> Disburse Payment
                   </button>
                 )}
-                {run.status === PayrollStatus.Processed && (
+                {(run.status === PayrollStatus.Processed || run.status === PayrollStatus.Draft) && (
                    <>
                     <button onClick={handleReject} className="px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-rose-100 transition whitespace-nowrap">Reject</button>
                     <button onClick={() => payrollApi.approvePayroll(run.id).then(() => {onClose(); onUpdate();})} className="px-6 py-3 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition">Approve Payroll</button>

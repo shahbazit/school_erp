@@ -149,19 +149,7 @@ public class StudentController : ControllerBase
         var discounts = await _feeService.GetStudentDiscountsAsync(id);
         
         dto.FeeSubscriptions = subs.ToList();
-        dto.FeeDiscounts = discounts.Select(d => new FeeDiscountAssignmentDto {
-             Id = d.Id,
-             FeeDiscountId = d.FeeDiscountId,
-             DiscountName = d.Discount?.Name ?? "Unknown",
-             RestrictedFeeHeadId = d.RestrictedFeeHeadId,
-             RestrictedFeeHeadName = d.RestrictedFeeHead?.Name,
-             AcademicYearId = d.AcademicYearId,
-             AcademicYearName = d.AcademicYear?.Name ?? "Unknown",
-             Remarks = d.Remarks,
-             CalculationType = d.CustomCalculationType,
-             Value = d.CustomValue,
-             Frequency = d.CustomFrequency
-        }).ToList();
+        dto.FeeDiscounts = discounts.ToList();
 
         return Ok(dto);
     }
@@ -272,7 +260,7 @@ public class StudentController : ControllerBase
                     FeeDiscountId = disc.FeeDiscountId,
                     RestrictedFeeHeadId = disc.FeeHeadId,
                     AcademicYearId = disc.AcademicYearId,
-                    Remarks = disc.Remarks,
+                    Remarks = disc.Remarks ?? string.Empty,
                     CustomCalculationType = disc.CalculationType,
                     CustomValue = disc.Value,
                     CustomFrequency = disc.Frequency,
@@ -807,8 +795,7 @@ public class StudentController : ControllerBase
             {
                 if (!dto.FeeDiscounts.Any(x => x.FeeDiscountId == disc.FeeDiscountId && x.FeeHeadId == disc.RestrictedFeeHeadId))
                 {
-                    // Manual delete if no service method
-                    _unitOfWork.Repository<FeeDiscountAssignment>().Delete(disc);
+                    await _feeService.DeleteDiscountAssignmentAsync(disc.Id);
                 }
             }
             // Add new

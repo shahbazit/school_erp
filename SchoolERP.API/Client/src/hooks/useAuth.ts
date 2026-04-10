@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { authApi } from '../api/authApi';
 import { LoginRequest, RegisterRequest } from '../types';
-
+import { clearUserSession } from '../utils/storageUtils';
 import { extractError } from '../utils/errorUtils';
 
 export const useAuth = () => {
@@ -14,6 +14,7 @@ export const useAuth = () => {
     try {
       const response = await authApi.login(data);
       if (response.success && response.token) {
+        clearUserSession(); // Clear session data while preserving preferences
         localStorage.setItem('token', response.token);
         
         // Decode organizationId from token
@@ -78,6 +79,7 @@ export const useAuth = () => {
       localStorage.setItem('organizationId', organizationId);
       const response = await authApi.verifyOtp({ mobileNumber, otp });
       if (response.success && response.token) {
+        clearUserSession(); // Clear session data while preserving preferences
         localStorage.setItem('token', response.token);
         if (response.refreshToken) {
           localStorage.setItem('refreshToken', response.refreshToken);
@@ -113,6 +115,7 @@ export const useAuth = () => {
     try {
       const response = await authApi.finalizeRegistration(data);
       if (response.token) {
+        clearUserSession(); // Clear session data while preserving preferences
         localStorage.setItem('token', response.token);
         if (response.refreshToken) {
           localStorage.setItem('refreshToken', response.refreshToken);
@@ -129,9 +132,7 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('organizationId');
+    clearUserSession();
   };
 
   const forgotPassword = async (email: string) => {

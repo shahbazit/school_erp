@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { clearUserSession } from '../utils/storageUtils';
 
 // Get base URL from env or fallback to local backend port
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -99,9 +100,8 @@ apiClient.interceptors.response.use(
       );
 
       if (status === 401 || isOrgError) {
-        // Clear token and redirect to login
-        localStorage.removeItem('token');
-        localStorage.removeItem('organizationId');
+        // Clear session context and redirect to login
+        clearUserSession();
         
         const isLoginPage = window.location.pathname === '/login' || 
                            window.location.pathname === '/' || 

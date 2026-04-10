@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SchoolERP.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SchoolERP.Infrastructure.Persistence;
 namespace SchoolERP.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260407104132_UpdateTransportAssignments")]
+    partial class UpdateTransportAssignments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1249,9 +1252,6 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("DefaultFeeHeadId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
@@ -1279,8 +1279,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DefaultFeeHeadId");
 
                     b.HasIndex("OrganizationId");
 
@@ -3280,9 +3278,6 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Property<decimal?>("HeightInCM")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("HostelName")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("HouseName")
                         .HasColumnType("nvarchar(max)");
 
@@ -3385,9 +3380,6 @@ namespace SchoolERP.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Religion")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RoomNo")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RouteName")
@@ -4722,15 +4714,6 @@ namespace SchoolERP.Infrastructure.Migrations
                     b.Navigation("Employee");
 
                     b.Navigation("SalaryStructure");
-                });
-
-            modelBuilder.Entity("SchoolERP.Domain.Entities.FeeDiscount", b =>
-                {
-                    b.HasOne("SchoolERP.Domain.Entities.FeeHead", "DefaultFeeHead")
-                        .WithMany()
-                        .HasForeignKey("DefaultFeeHeadId");
-
-                    b.Navigation("DefaultFeeHead");
                 });
 
             modelBuilder.Entity("SchoolERP.Domain.Entities.FeeDiscountAssignment", b =>

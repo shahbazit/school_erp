@@ -7,10 +7,13 @@ import {
   Plus, 
   Save, 
   Trash2, 
-  CheckCircle2, 
   AlertCircle,
   Info,
-  DollarSign
+  DollarSign,
+  X,
+  Edit,
+  Tag,
+  CheckCircle2
 } from 'lucide-react';
 import { feeApi } from '../../api/feeApi'
 import { useLocalization } from '../../contexts/LocalizationContext';
@@ -27,8 +30,22 @@ export default function FeeSettings() {
   });
   
   const [discounts, setDiscounts] = useState<any[]>([]);
+  const [feeHeads, setFeeHeads] = useState<any[]>([]);
   const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [message, setMessage] = useState('');
+  
+  // Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingDiscount, setEditingDiscount] = useState<any>(null);
+  const [discountForm, setDiscountForm] = useState<any>({
+    name: '',
+    calculationType: 'Percentage',
+    value: 0,
+    category: 'Other',
+    frequency: 'Monthly',
+    isActive: true,
+    defaultFeeHeadId: null
+  });
 
   useEffect(() => {
     loadData();
@@ -36,12 +53,14 @@ export default function FeeSettings() {
 
   const loadData = async () => {
     try {
-      const [conf, disc] = await Promise.all([
+      const [conf, disc, heads] = await Promise.all([
         feeApi.getConfig(),
-        feeApi.getDiscounts()
+        feeApi.getDiscounts(),
+        feeApi.getHeads()
       ]);
       if (conf) setConfig(conf);
       setDiscounts(disc || []);
+      setFeeHeads(heads || []);
     } catch (e) {
       console.error(e);
     }
@@ -59,25 +78,53 @@ export default function FeeSettings() {
     }
   };
 
-  const updateDiscount = (idx: number, field: string, value: any) => {
-    const updated = [...discounts];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setDiscounts(updated);
-  };
-
-  const removeDiscount = (idx: number) => {
-    setDiscounts(discounts.filter((_, i) => i !== idx));
-  };
-
-  const addDiscount = () => {
-    setDiscounts([...discounts, { 
-      name: 'New Discount', 
-      calculationType: 'Percentage', 
-      value: 10, 
-      category: 'Other', 
+  const openAddDiscount = () => {
+    setEditingDiscount(null);
+    setDiscountForm({
+      name: '',
+      calculationType: 'Percentage',
+      value: 0,
+      category: 'Other',
       frequency: 'Monthly',
-      isActive: true 
-    }]);
+      isActive: true,
+      defaultFeeHeadId: null
+    });
+    setIsDrawerOpen(true);
+  };
+
+  const openEditDiscount = (discount: any) => {
+    setEditingDiscount(discount);
+    setDiscountForm({ ...discount });
+    setIsDrawerOpen(true);
+  };
+
+  const saveDiscount = async () => {
+    setStatus('LOADING');
+    try {
+      await feeApi.updateDiscount(discountForm);
+      setStatus('SUCCESS');
+      setMessage(editingDiscount ? 'Discount updated' : 'Discount created');
+      setIsDrawerOpen(false);
+      loadData(); // Reload to get fresh list
+    } catch (e) {
+      setStatus('ERROR');
+      setMessage('Failed to save discount');
+    }
+  };
+
+  const deleteDiscount = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this discount type?")) return;
+    setStatus('LOADING');
+    try {
+      // Assuming a delete method or update with IsActive=false
+      await feeApi.updateDiscount({ ...discounts.find(d => d.id === id), isActive: false });
+      setStatus('SUCCESS');
+      setMessage('Discount removed');
+      loadData();
+    } catch (e) {
+      setStatus('ERROR');
+      setMessage('Failed to remove discount');
+    }
   };
 
   return (
@@ -249,104 +296,213 @@ export default function FeeSettings() {
       ) : (
         <div className="space-y-6">
            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Percent className="h-5 w-5 text-primary-500" /> Managed Discount Types
-              </h2>
+              <div className="space-y-1">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Percent className="h-5 w-5 text-primary-500" /> Managed Discount Types
+                </h2>
+                <p className="text-slate-500 text-[10px] font-medium uppercase tracking-wider">Define standard discount rules for your organization</p>
+              </div>
               <button 
-                onClick={addDiscount}
-                className="btn-primary text-xs flex items-center gap-2"
+                onClick={openAddDiscount}
+                className="btn-primary text-xs flex items-center gap-2 px-6 py-3"
               >
                 <Plus className="h-4 w-4" /> Create Discount Type
               </button>
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {discounts.map((d, idx) => (
-                <div key={idx} className="glass-card p-6 border-slate-200/60 relative group animate-in zoom-in-95 duration-300">
-                  <button 
-                    onClick={() => removeDiscount(idx)}
-                    className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  
-                  <div className="space-y-4">
-                    <input 
-                      value={d.name}
-                      onChange={(e) => updateDiscount(idx, 'name', e.target.value)}
-                      placeholder="Discount Name"
-                      className="text-lg font-black text-slate-800 bg-transparent border-none outline-none w-full focus:text-primary-600 placeholder:text-slate-300"
-                    />
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-tight">Calculation</label>
-                        <select 
-                          value={d.calculationType}
-                          onChange={(e) => updateDiscount(idx, 'calculationType', e.target.value)}
-                          className="w-full bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold border-none outline-none appearance-none"
-                        >
-                          <option value="Percentage">Percentage (%)</option>
-                          <option value="Fixed">Fixed Amount ({settings?.currencySymbol || "₹"})</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-tight">Value</label>
-                        <input 
-                          type="number"
-                          value={d.value}
-                          onChange={(e) => updateDiscount(idx, 'value', parseFloat(e.target.value))}
-                          className="w-full bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold border-none outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-tight">Category</label>
-                        <select 
-                          value={d.category}
-                          onChange={(e) => updateDiscount(idx, 'category', e.target.value)}
-                          className="w-full bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold border-none outline-none appearance-none"
-                        >
-                          <option value="Sibling">Sibling Discount</option>
-                          <option value="Staff">Staff Benefit</option>
-                          <option value="FinancialAid">Financial Aid</option>
-                          <option value="Merit">Academic Merit</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-tight">Frequency</label>
-                        <select 
-                          value={d.frequency}
-                          onChange={(e) => updateDiscount(idx, 'frequency', e.target.value)}
-                          className="w-full bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold border-none outline-none appearance-none"
-                        >
-                          <option value="Monthly">Apply Monthly</option>
-                          <option value="One-Time">Annual / One-Time</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-           </div>
-
-           <div className="pt-6 flex justify-end">
-              <button 
-                onClick={async () => {
-                   // Actually, we need an API to bulk update/create discounts
-                   // For now we'll assume the back-end handles individual ones or we can add bulk support
-                   alert("Bulk saving discounts...");
-                }}
-                className="px-10 py-3.5 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                Save Discount Masters
-              </button>
+           <div className="glass-card overflow-hidden border-slate-200/60 shadow-xl shadow-slate-200/20">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Rule Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Category</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Standard Value</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Applicable On</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {discounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">No discount rules defined yet. Click "Create" to start.</td>
+                    </tr>
+                  ) : (
+                    discounts.map((d) => (
+                      <tr key={d.id} className="hover:bg-primary-50/20 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-800">{d.name}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{d.frequency} Application</div>
+                        </td>
+                        <td className="px-6 py-4">
+                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                             d.category === 'Staff' ? 'bg-purple-100 text-purple-700' :
+                             d.category === 'Sibling' ? 'bg-blue-100 text-blue-700' :
+                             'bg-slate-100 text-slate-600'
+                           }`}>
+                             {d.category}
+                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-black text-slate-700 font-mono">
+                            {d.calculationType === 'Percentage' ? `${d.value}%` : formatCurrency(d.value)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-xs font-bold text-slate-600">
+                            {d.defaultFeeHeadId ? feeHeads.find(h => h.id === d.defaultFeeHeadId)?.name : 'Universal (Net)'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => openEditDiscount(d)}
+                              className="p-2 text-primary-600 hover:bg-primary-100 rounded-lg transition-all"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => deleteDiscount(d.id)}
+                              className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
            </div>
         </div>
+      )}
+
+      {/* Side Drawer Popup */}
+      {isDrawerOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 animate-in fade-in duration-300"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 animate-in slide-in-from-right duration-500 overflow-y-auto border-l border-slate-100">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-md px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-50 rounded-xl text-primary-600">
+                  <Tag className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                    {editingDiscount ? 'Update Discount Type' : 'Create New Discount'}
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Data Management</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsDrawerOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all hover:rotate-90"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Discount Name</label>
+                  <input 
+                    value={discountForm.name}
+                    onChange={(e) => setDiscountForm({...discountForm, name: e.target.value})}
+                    placeholder="e.g. Sibling Discount, Staff Child"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold shadow-inner focus:bg-white focus:ring-4 focus:ring-primary-500/10 outline-none transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Category</label>
+                    <select 
+                      value={discountForm.category}
+                      onChange={(e) => setDiscountForm({...discountForm, category: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
+                    >
+                      <option value="Sibling">Sibling Discount</option>
+                      <option value="Staff">Staff Benefit</option>
+                      <option value="Merit">Academic Merit</option>
+                      <option value="FinancialAid">Financial Aid</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Frequency</label>
+                    <select 
+                      value={discountForm.frequency}
+                      onChange={(e) => setDiscountForm({...discountForm, frequency: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white transition-all appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
+                    >
+                      <option value="Monthly">Monthly Cycle</option>
+                      <option value="One-Time">Annual / One-Time</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-6">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Percent className="h-3.5 w-3.5" /> Value Calculation
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase">Method</label>
+                      <select 
+                        value={discountForm.calculationType}
+                        onChange={(e) => setDiscountForm({...discountForm, calculationType: e.target.value})}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="Percentage">Percentage (%)</option>
+                        <option value="Fixed">Fixed Amount</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase">Value</label>
+                      <input 
+                        type="number"
+                        value={discountForm.value}
+                        onChange={(e) => setDiscountForm({...discountForm, value: parseFloat(e.target.value)})}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Master Application Target</label>
+                    <select 
+                      value={discountForm.defaultFeeHeadId || ''}
+                      onChange={(e) => setDiscountForm({...discountForm, defaultFeeHeadId: e.target.value || null})}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat"
+                    >
+                      <option value="">Balance Level (Overall)</option>
+                      {feeHeads.map((h: any) => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[9px] text-slate-400 font-medium px-1">Specific head targeted by this discount rule by default.</p>
+                  </div>
+                </div>
+
+                <div className="pt-6">
+                  <button 
+                    onClick={saveDiscount}
+                    disabled={status === 'LOADING'}
+                    className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-2xl shadow-xl shadow-primary-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 group"
+                  >
+                    <Save className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                    {editingDiscount ? 'Update Policy Rule' : 'Initialize Discount Rule'}
+                  </button>
+                  <p className="mt-4 text-[10px] text-slate-400 text-center font-medium italic">All changes are immediately effective for upcoming fee cycles.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

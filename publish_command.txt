@@ -1,1 +1,7 @@
 cd SchoolERP.API\Client; npm run build; Copy-Item -Path dist\* -Destination ..\wwwroot\ -Recurse -Force; cd ..\..; dotnet publish SchoolERP.API\SchoolERP.API.csproj -c Release -o publish_output
+
+
+
+Update database: 
+
+dotnet ef database update --project SchoolERP.Infrastructure --startup-project SchoolERP.API

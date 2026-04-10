@@ -1,4 +1,5 @@
 using SchoolERP.Application.DTOs.Fees;
+using SchoolERP.Application.DTOs.Student;
 using SchoolERP.Domain.Entities;
 
 namespace SchoolERP.Application.Interfaces;
@@ -38,7 +39,8 @@ public interface IFeeService
     Task<IEnumerable<FeeDiscount>> GetDiscountsAsync();
     Task UpdateDiscountAsync(FeeDiscount discount);
     Task AssignDiscountAsync(FeeDiscountAssignment assignment);
-    Task<IEnumerable<FeeDiscountAssignment>> GetStudentDiscountsAsync(Guid studentId);
+    Task<IEnumerable<FeeDiscountAssignmentDto>> GetStudentDiscountsAsync(Guid studentId);
+    Task DeleteDiscountAssignmentAsync(Guid id);
     
     // Late Fees / Policy
     Task<FeeConfiguration?> GetFeeConfigurationAsync();

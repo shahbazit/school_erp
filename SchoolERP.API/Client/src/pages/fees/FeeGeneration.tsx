@@ -22,6 +22,8 @@ export default function FeeGeneration() {
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [classHistory, setClassHistory] = useState<any[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [feeHeads, setFeeHeads] = useState<any[]>([]);
+  const [selectedHeads, setSelectedHeads] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const d = new Date();
     return d.toLocaleString('default', { month: 'long' });
@@ -40,6 +42,9 @@ export default function FeeGeneration() {
       const current = years.find((y: any) => y.isCurrent);
       if (current) setSelectedYear(current.id);
     }).catch(console.error);
+    feeApi.getHeads().then(heads => {
+       setFeeHeads(heads.filter((h: any) => h.isSelective));
+    }).catch(console.error);
   }, []);
 
   const fetchHistory = () => {
@@ -56,6 +61,12 @@ export default function FeeGeneration() {
     );
   };
 
+  const toggleHead = (id: string) => {
+    setSelectedHeads(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedClasses.length === 0) return;
@@ -63,7 +74,9 @@ export default function FeeGeneration() {
     setStatus('LOADING');
     setError(null);
     try {
-      await feeApi.generateMonthlyCharges(selectedClasses, selectedMonth, undefined, selectedYear);
+      // If none selected, we pass undefined so it generates ALL fees (Tuition, etc.)
+      const headIds = selectedHeads.length > 0 ? selectedHeads : undefined;
+      await feeApi.generateMonthlyCharges(selectedClasses, selectedMonth, headIds, selectedYear);
       setStatus('SUCCESS');
       fetchHistory();
     } catch (err: any) {
@@ -180,6 +193,41 @@ export default function FeeGeneration() {
                       ))}
                     </div>
                   </div>
+
+                  {feeHeads.length > 0 && (
+                    <div className="space-y-5">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-indigo-500" /> 
+                          Elective (Selective) Fees
+                        </label>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Choose which optional fees to include in this month's bill</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-3">
+                        {feeHeads.map(h => (
+                          <label key={h.id} className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl border transition-all cursor-pointer group ${
+                            selectedHeads.includes(h.id) 
+                              ? 'bg-gradient-to-br from-indigo-50 to-white border-indigo-200 text-indigo-900 shadow-md shadow-indigo-500/5 ring-1 ring-indigo-100' 
+                              : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200 hover:shadow-sm'
+                          }`}>
+                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                              selectedHeads.includes(h.id) ? 'bg-indigo-500 border-indigo-500' : 'bg-slate-50 border-slate-200 group-hover:border-indigo-300'
+                            }`}>
+                              <input 
+                                type="checkbox"
+                                className="hidden"
+                                checked={selectedHeads.includes(h.id)}
+                                onChange={() => toggleHead(h.id)}
+                              />
+                              {selectedHeads.includes(h.id) && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                            </div>
+                            <span className="text-sm font-bold tracking-tight">{h.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Operational Settings */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-slate-50/50 rounded-3xl border border-slate-100 group/config hover:bg-slate-50 transition-all">

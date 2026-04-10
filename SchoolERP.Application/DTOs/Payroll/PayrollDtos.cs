@@ -99,7 +99,9 @@ public class PayrollValidationResultDto
 {
     public bool IsValid { get; set; }
     public List<string> Errors { get; set; } = new();
+    public List<string> Warnings { get; set; } = new();
     public List<EmployeeMissingDataDto> MissingData { get; set; } = new();
+    public List<string> MissingSalaries { get; set; } = new();
 }
 
 public class EmployeeMissingDataDto

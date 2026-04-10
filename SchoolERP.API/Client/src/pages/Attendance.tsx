@@ -38,7 +38,10 @@ export default function Attendance() {
   const [activeTab, setActiveTab] = useState<'mark' | 'report'>('mark');
 
   // Mark Attendance State
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+  });
   const [search, setSearch] = useState('');
   const [records, setRecords] = useState<EmployeeAttendanceDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +101,11 @@ export default function Attendance() {
     setRecords(prev => prev.map(r => ({ ...r, status, statusName: statusConfig[status].label })));
   };
 
+  const todayStr = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+  })();
+
   return (
     <div className="space-y-5">
       {/* ── Header & Tabs ── */}
@@ -143,7 +151,7 @@ export default function Attendance() {
                 type="date"
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]} // Can't mark future
+                max={todayStr} // Can't mark future
                 className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
               />
               <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>

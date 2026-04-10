@@ -98,6 +98,16 @@ export default function LeaveSettings() {
     } catch (err) { alert("Failed to save category"); }
   };
 
+  const handleDeleteType = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this leave category? This action cannot be undone.")) return;
+    try {
+      await leaveApi.deleteType(id);
+      if (selectedPlanId) loadTypes(selectedPlanId);
+    } catch (err: any) {
+      alert(err.response?.data || "Failed to delete category.");
+    }
+  };
+
   const handleEditType = (t: LeaveTypeDto) => {
     setEditingTypeId(t.id);
     setTypeForm({
@@ -262,12 +272,20 @@ export default function LeaveSettings() {
                                      </div>
                                   </td>
                                   <td className="px-8 py-6 text-right">
-                                     <button 
-                                       onClick={() => handleEditType(t)}
-                                       className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-none hover:shadow-lg"
-                                     >
-                                        <Settings className="w-4 h-4" />
-                                     </button>
+                                     <div className="flex justify-end gap-2">
+                                        <button 
+                                          onClick={() => handleEditType(t)}
+                                          className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-none hover:shadow-lg"
+                                        >
+                                           <Settings className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteType(t.id)}
+                                          className="p-2 text-slate-300 hover:text-rose-600 hover:bg-white rounded-xl transition-all shadow-none hover:shadow-lg"
+                                        >
+                                           <Trash2 className="w-4 h-4" />
+                                        </button>
+                                     </div>
                                   </td>
                                </tr>
                              ))}

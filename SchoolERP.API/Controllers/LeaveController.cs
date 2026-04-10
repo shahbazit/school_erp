@@ -157,6 +157,35 @@ public class LeaveController : ControllerBase
         return Ok(types);
     }
 
+    [HttpPost("types/{id}/delete")]
+    public async Task<IActionResult> DeleteType(Guid id)
+    {
+        var orgId = _organizationService.GetOrganizationId();
+        
+        // 1. Check if used in any Employee Leave Balance
+        var isUsedInBalance = await _unitOfWork.Repository<LeaveBalance>().GetQueryable()
+            .AnyAsync(b => b.LeaveTypeId == id);
+            
+        if (isUsedInBalance) 
+            return BadRequest("Cannot delete this category because employees currently have active balances recorded for it.");
+
+        // 2. Check if used in any Leave Application
+        var isUsedInApplication = await _unitOfWork.Repository<LeaveApplication>().GetQueryable()
+            .AnyAsync(a => a.LeaveTypeId == id);
+            
+        if (isUsedInApplication) 
+            return BadRequest("Cannot delete this category because there are historical leave applications linked to it.");
+
+        var leaveType = await _unitOfWork.Repository<LeaveType>().GetByIdAsync(id);
+        if (leaveType == null || leaveType.OrganizationId != orgId) 
+            return NotFound();
+
+        _unitOfWork.Repository<LeaveType>().Delete(leaveType);
+        await _unitOfWork.CompleteAsync();
+
+        return Ok(new { message = "Leave Category deleted successfully." });
+    }
+
     [HttpPost("types")]
     [Authorize(Roles = "Admin,HR")]
     public async Task<IActionResult> CreateLeaveType([FromBody] CreateLeaveTypeDto dto)

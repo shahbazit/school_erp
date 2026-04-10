@@ -231,6 +231,45 @@ public class HostelService : IHostelService
         };
 
         _context.HostelAssignments.Add(assignment);
+        
+        // --- LINK WITH FINANCE & STUDENT PROFILE ---
+        if (dto.StudentId != Guid.Empty)
+        {
+            var student = await _context.Students.FindAsync(dto.StudentId);
+            if (student != null)
+            {
+                student.HostelName = room.Hostel?.Name ?? (await _context.Hostels.FindAsync(room.HostelId))?.Name;
+                student.RoomNo = room.RoomNo;
+            }
+
+            var head = await _context.FeeHeads.FirstOrDefaultAsync(h => h.Name == "Hostel Fee" || h.Name == "Accommodation Fee");
+            if (head != null)
+            {
+                var subscription = await _context.StudentFeeSubscriptions
+                    .FirstOrDefaultAsync(s => s.StudentId == dto.StudentId && s.FeeHeadId == head.Id);
+                
+                decimal roomCost = room.CostPerMonth;
+
+                if (subscription == null)
+                {
+                    subscription = new StudentFeeSubscription
+                    {
+                        StudentId = dto.StudentId,
+                        FeeHeadId = head.Id,
+                        CustomAmount = roomCost,
+                        IsActive = true
+                    };
+                    _context.StudentFeeSubscriptions.Add(subscription);
+                }
+                else
+                {
+                    subscription.CustomAmount = roomCost;
+                    subscription.IsActive = true;
+                }
+            }
+        }
+        // -------------------------
+
         await _context.SaveChangesAsync();
 
         return (await GetAllAssignmentsAsync()).First(x => x.Id == assignment.Id);
@@ -243,6 +282,27 @@ public class HostelService : IHostelService
 
         assignment.IsActive = false;
         assignment.EndDate = DateTime.UtcNow;
+
+        // --- LINK WITH FINANCE & STUDENT PROFILE (Clear fields) ---
+        if (assignment.StudentId != Guid.Empty)
+        {
+            var student = await _context.Students.FindAsync(assignment.StudentId);
+            if (student != null)
+            {
+                student.HostelName = null;
+                student.RoomNo = null;
+            }
+
+            var head = await _context.FeeHeads.FirstOrDefaultAsync(h => h.Name == "Hostel Fee" || h.Name == "Accommodation Fee");
+            if (head != null)
+            {
+                var subscription = await _context.StudentFeeSubscriptions
+                    .FirstOrDefaultAsync(s => s.StudentId == assignment.StudentId && s.FeeHeadId == head.Id);
+                if (subscription != null) subscription.IsActive = false;
+            }
+        }
+        // ----------------------------------------------------
+
         await _context.SaveChangesAsync();
         return true;
     }

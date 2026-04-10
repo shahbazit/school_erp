@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { GraduationCap, Home, Users, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
+import { GraduationCap, Home, Users, ArrowRight, ShieldCheck, Globe, XCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 interface PortalLoginProps {
@@ -11,7 +11,7 @@ interface PortalLoginProps {
 export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    schoolDomain: '',
+    schoolDomain: localStorage.getItem('remembered_school_domain') || '',
     identifier: '',
     password: ''
   });
@@ -24,6 +24,10 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Save domain for future use
+    localStorage.setItem('remembered_school_domain', formData.schoolDomain);
+
     const result = await login({
       email: formData.identifier,
       password: formData.password,
@@ -109,8 +113,22 @@ export default function PortalLogin({ onAuthSuccess }: PortalLoginProps) {
                     onChange={handleChange} 
                     autoComplete="off"
                     placeholder="e.g. greenschool" 
-                    className="w-full bg-slate-50 border-0 pl-11 pr-4 py-3.5 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary-500/50 outline-none transition-all placeholder:text-slate-400"
+                    className="w-full bg-slate-50 border-0 pl-11 pr-11 py-3.5 rounded-xl text-sm text-slate-900 focus:bg-white focus:ring-2 focus:ring-primary-500/50 outline-none transition-all placeholder:text-slate-400"
                   />
+                  {formData.schoolDomain && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, schoolDomain: '' });
+                        localStorage.removeItem('remembered_school_domain');
+                        toast.info("Cleared remembered domain.");
+                      }}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-300 hover:text-red-400 transition-colors"
+                      title="Clear remembered domain"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 

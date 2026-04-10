@@ -1,4 +1,5 @@
 using SchoolERP.Application.DTOs.Fees;
+using SchoolERP.Application.DTOs.Student;
 using SchoolERP.Application.Interfaces;
 using SchoolERP.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -92,6 +93,7 @@ public class FeeService : IFeeService
                 existing.CalculationType = discount.CalculationType;
                 existing.Value = discount.Value;
                 existing.Frequency = discount.Frequency;
+                existing.DefaultFeeHeadId = discount.DefaultFeeHeadId;
                 existing.IsActive = discount.IsActive;
                 repo.Update(existing);
             }
@@ -394,8 +396,10 @@ public class FeeService : IFeeService
 
             // Fetch all selective fee subscriptions
             var subscriptions = await _unitOfWork.Repository<StudentFeeSubscription>().GetQueryable()
+                .Include(sub => sub.FeeHead)
                 .Where(sub => studentIds.Contains(sub.StudentId) && sub.IsActive)
                 .ToListAsync();
+
 
             // Fetch all discount assignments for the current academic session
             var discountAssignments = await _unitOfWork.Repository<FeeDiscountAssignment>().GetQueryable()
@@ -426,6 +430,7 @@ public class FeeService : IFeeService
 
                 var studentExistingTxs = existingTransactions.Where(t => t.StudentId == student.Id).ToList();
 
+                // 1. Process Class-based Fee Structures
                 foreach (var fee in structures)
                 {
                     var feeHead = fee.FeeHead!;
@@ -467,19 +472,11 @@ public class FeeService : IFeeService
                         }
                     }
 
-                    bool alreadyCharged = false;
-                    if (fee.Frequency == "Monthly" || fee.Frequency == "Quarterly") 
-                    {
-                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(month) && t.Description.Contains(feeHead.Name));
-                    }
-                    else if (fee.Frequency == "Yearly")
-                    {
-                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(feeHead.Name) && t.TransactionDate > DateTime.UtcNow.AddMonths(-10));
-                    }
-                    else if (fee.Frequency == "One-Time" || fee.Frequency == "One-time")
-                    {
-                        alreadyCharged = studentExistingTxs.Any(t => t.Description != null && t.Description.Contains(feeHead.Name));
-                    }
+                    string expectedDescription = (fee.Frequency == "Monthly" || fee.Frequency == "Quarterly") 
+                        ? $"{feeHead.Name} for {month}" 
+                        : $"{feeHead.Name} ({fee.Frequency})";
+
+                    bool alreadyCharged = studentExistingTxs.Any(t => t.Description == expectedDescription);
 
                     if (!alreadyCharged)
                     {
@@ -535,8 +532,80 @@ public class FeeService : IFeeService
                         }
                     }
                 }
+
+                // 2. Process Extra/Selective Subscriptions NOT in class structure (like Transport/Hostel)
+                foreach(var sub in studentSubs)
+                {
+                    // Skip if already processed via structures loop
+                    if (structures.Any(s => s.FeeHeadId == sub.FeeHeadId)) continue;
+                    
+                    // If filtering by specific heads from UI, skip others
+                    if (feeHeadIds != null && feeHeadIds.Any() && !feeHeadIds.Contains(sub.FeeHeadId)) continue;
+
+                    var feeHead = sub.FeeHead;
+                    if (feeHead == null) continue;
+
+                    string expectedDescription = $"{feeHead.Name} for {month}";
+                    bool alreadyCharged = studentExistingTxs.Any(t => t.Description == expectedDescription);
+                    
+                    if (!alreadyCharged && sub.CustomAmount.HasValue && sub.CustomAmount.Value > 0)
+                    {
+                        var chargeAmount = sub.CustomAmount.Value;
+                        var chargeTx = new FeeTransaction
+                        {
+                            StudentId = student.Id,
+                            OrganizationId = orgId,
+                            TransactionDate = DateTime.UtcNow,
+                            Type = "Charge",
+                            Amount = chargeAmount,
+                            AcademicYearId = currentYear.Id,
+                            Description = $"{feeHead.Name} for {month}"
+                        };
+                        await _unitOfWork.Repository<FeeTransaction>().AddAsync(chargeTx);
+                        account.TotalAllocated += chargeAmount;
+                        studentExistingTxs.Add(chargeTx);
+
+                        // Apply Discounts for these charges as well (Monthly frequency assumption)
+                        var applicableDiscounts = studentDiscounts
+                            .Where(d => d.RestrictedFeeHeadId == null || d.RestrictedFeeHeadId == feeHead.Id)
+                            .ToList();
+
+                        foreach (var assignment in applicableDiscounts)
+                        {
+                            var discount = assignment.Discount;
+                            var frequency = assignment.CustomFrequency ?? discount.Frequency;
+                            if (frequency != "Monthly") continue;
+
+                            decimal discountAmount = 0;
+                            var calculationType = assignment.CustomCalculationType ?? discount.CalculationType;
+                            var value = assignment.CustomValue ?? discount.Value;
+
+                            if (calculationType == "Percentage")
+                                discountAmount = (chargeAmount * value) / 100;
+                            else
+                                discountAmount = value;
+
+                            if (discountAmount > 0)
+                            {
+                                var discountTx = new FeeTransaction
+                                {
+                                    StudentId = student.Id,
+                                    OrganizationId = orgId,
+                                    TransactionDate = DateTime.UtcNow,
+                                    Type = "Discount",
+                                    Amount = discountAmount,
+                                    AcademicYearId = currentYear.Id,
+                                    Description = $"{discount.Name} for {feeHead.Name} ({month})"
+                                };
+                                await _unitOfWork.Repository<FeeTransaction>().AddAsync(discountTx);
+                                account.TotalDiscount += discountAmount;
+                            }
+                        }
+                    }
+                }
                 account.LastTransactionDate = DateTime.UtcNow;
             }
+
         }
 
         await _unitOfWork.CompleteAsync();
@@ -726,13 +795,38 @@ public class FeeService : IFeeService
         await _unitOfWork.CompleteAsync();
     }
 
-    public async Task<IEnumerable<FeeDiscountAssignment>> GetStudentDiscountsAsync(Guid studentId)
+    public async Task DeleteDiscountAssignmentAsync(Guid id)
+    {
+        var assignment = await _unitOfWork.Repository<FeeDiscountAssignment>().GetByIdAsync(id);
+        if (assignment != null)
+        {
+            _unitOfWork.Repository<FeeDiscountAssignment>().Delete(assignment);
+            await _unitOfWork.CompleteAsync();
+        }
+    }
+
+    public async Task<IEnumerable<FeeDiscountAssignmentDto>> GetStudentDiscountsAsync(Guid studentId)
     {
         return await _unitOfWork.Repository<FeeDiscountAssignment>().GetQueryable()
             .Include(a => a.Discount)
             .Include(a => a.AcademicYear)
             .Include(a => a.RestrictedFeeHead)
             .Where(a => a.StudentId == studentId && a.IsActive)
+            .Select(a => new FeeDiscountAssignmentDto
+            {
+                Id = a.Id,
+                FeeDiscountId = a.FeeDiscountId,
+                DiscountName = a.Discount.Name,
+                RestrictedFeeHeadId = a.RestrictedFeeHeadId,
+                RestrictedFeeHeadName = a.RestrictedFeeHead != null ? a.RestrictedFeeHead.Name : "All Monthly Fees",
+                AcademicYearId = a.AcademicYearId,
+                AcademicYearName = a.AcademicYear.Name,
+                Remarks = a.Remarks,
+                Category = a.Discount.Category,
+                CalculationType = a.CustomCalculationType ?? a.Discount.CalculationType,
+                Value = a.CustomValue ?? a.Discount.Value,
+                Frequency = a.CustomFrequency ?? a.Discount.Frequency
+            })
             .ToListAsync();
     }
 

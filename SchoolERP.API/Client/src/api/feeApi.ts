@@ -66,6 +66,9 @@ export const feeApi = {
     const response = await apiClient.get('/masters/fee/discounts');
     return response.data;
   },
+  updateDiscount: async (data: any) => {
+    await apiClient.post('/masters/fee/discounts', data);
+  },
   assignDiscount: async (data: any) => {
     await apiClient.post('/masters/fee/discounts/assign', data);
   },

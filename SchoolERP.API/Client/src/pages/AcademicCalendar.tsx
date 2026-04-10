@@ -123,6 +123,11 @@ export default function AcademicCalendar() {
       const yearStart = new Date(selectedYear.startDate);
       const yearEnd = new Date(selectedYear.endDate);
       
+      // Normalize dates to midnight for accurate comparison
+      eventDate.setHours(0, 0, 0, 0);
+      yearStart.setHours(0, 0, 0, 0);
+      yearEnd.setHours(0, 0, 0, 0);
+
       if (eventDate < yearStart || eventDate > yearEnd) {
         setMessage({ type: 'error', text: `Event date must be within ${selectedYear.name} (${yearStart.toLocaleDateString()} - ${yearEnd.toLocaleDateString()})` });
         return;
@@ -130,6 +135,7 @@ export default function AcademicCalendar() {
 
       if (editingEvent.endDate) {
         const eventEndDate = new Date(editingEvent.endDate);
+        eventEndDate.setHours(0, 0, 0, 0);
         if (eventEndDate < yearStart || eventEndDate > yearEnd) {
           setMessage({ type: 'error', text: `End date must be within ${selectedYear.name}` });
           return;

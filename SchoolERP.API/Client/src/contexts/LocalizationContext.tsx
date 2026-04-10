@@ -15,11 +15,12 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<OrganizationSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchSettings = async () => {
-    const token = localStorage.getItem('token');
-    const organizationId = localStorage.getItem('organizationId');
+  const token = localStorage.getItem('token');
+  const organizationId = localStorage.getItem('organizationId');
 
+  const fetchSettings = async () => {
     if (!token || !organizationId) {
+      setSettings(null);
       setLoading(false);
       return;
     }
@@ -28,7 +29,6 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
       const data = await organizationApi.getSettings();
       setSettings(data);
     } catch (err: any) {
-      // 401/404 are handled by apiClient interceptor
       if (err.response?.status !== 401 && err.response?.status !== 404) {
         console.error('Failed to fetch localization settings:', err);
       }
@@ -39,7 +39,7 @@ export function LocalizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [token, organizationId]);
 
   const formatCurrency = (amount: number) => {
     const symbol = settings?.currencySymbol || '₹';

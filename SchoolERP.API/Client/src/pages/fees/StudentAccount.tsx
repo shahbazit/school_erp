@@ -67,8 +67,16 @@ export default function StudentAccount() {
         masterApi.getAll('academic-years')
       ]);
       setAccount(accountData as any);
-      setSubscriptions(subsData as any[]);
-      setSelectiveHeads((headsData as any[]).filter(h => h.isSelective));
+      setSubscriptions((subsData as any[]).map((sub: any) => ({
+        ...sub,
+        isSystemManaged: sub.feeHeadName?.toLowerCase().includes('transport') || 
+                         sub.feeHeadName?.toLowerCase().includes('hostel') || 
+                         sub.feeHeadName?.toLowerCase().includes('bus')
+      })));
+      const moduleLockedHeads = ['Transport', 'Hostel', 'Bus'];
+      setSelectiveHeads((headsData as any[]).filter(h => 
+        h.isSelective && !moduleLockedHeads.some(locked => h.name.includes(locked))
+      ));
       setAssignedDiscounts(discData as any[]);
       setAvailableDiscounts(allDiscs as any[]);
       setAcademicYears(yearsData as any[]);
@@ -214,11 +222,27 @@ export default function StudentAccount() {
                   </tr>
                 ) : (
                   subscriptions.map((sub: any) => (
-                    <tr key={sub.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4 font-semibold text-slate-700">{sub.feeHeadName}</td>
-                      <td className="px-6 py-4 text-slate-500">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Default'}</td>
+                    <tr key={sub.id} className="hover:bg-slate-50/50 group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-700">{sub.feeHeadName}</span>
+                          {sub.isSystemManaged && (
+                            <span className="text-[9px] bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter">System</span>
+                          )}
+                        </div>
+                        {sub.isSystemManaged && (
+                          <p className="text-[10px] text-slate-400 font-medium">Auto-synced from service module</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                         <p className="text-slate-800 font-bold">{sub.customAmount ? formatCurrency(sub.customAmount) : 'Default rate'}</p>
+                         <p className="text-[10px] text-slate-400">Monthly billing</p>
+                      </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">Active</span>
+                        <div className="flex flex-col items-end">
+                           <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Active</span>
+                           {sub.isSystemManaged && <ServiceLink type={sub.feeHeadName} />}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -242,6 +266,7 @@ export default function StudentAccount() {
                 <tr>
                   <th className="px-6 py-3">Benefit Name</th>
                   <th className="px-6 py-3">Value</th>
+                  <th className="px-6 py-3">Applied To</th>
                   <th className="px-6 py-3 text-right">Status</th>
                 </tr>
               </thead>
@@ -262,6 +287,11 @@ export default function StudentAccount() {
                           {ad.calculationType === 'Percentage' ? `${ad.value}%` : formatCurrency(ad.value)}
                         </span>
                         <span className="text-[10px] text-slate-400 ml-1">({ad.frequency})</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-medium ${ad.restrictedFeeHeadName === 'All Monthly Fees' ? 'text-slate-400' : 'text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-100'}`}>
+                          {ad.restrictedFeeHeadName || 'All Monthly Fees'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">Applied</span>
@@ -529,7 +559,7 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
   
   const [formData, setFormData] = useState({
     feeDiscountId: '',
-    feeHeadId: '',
+    feeHeadIds: [] as string[],
     academicYearId: currentYear?.id || '',
     remarks: ''
   });
@@ -542,6 +572,15 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
     }
   }, [currentYear]);
 
+  const toggleFeeHead = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      feeHeadIds: prev.feeHeadIds.includes(id) 
+        ? prev.feeHeadIds.filter(fid => fid !== id)
+        : [...prev.feeHeadIds, id]
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.academicYearId) {
@@ -552,7 +591,9 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
     try {
       await masterApi.create('fee/discounts/assign', {
         ...formData,
-        studentId
+        studentId,
+        // If no specifically selected heads, it stays as empty array which the backend handles as "All" 
+        // OR we can explicitly pass null. Let's keep array and let backend handle it.
       });
       onSuccess();
     } catch (err) {
@@ -604,18 +645,32 @@ function DiscountModal({ studentId, availableDiscounts, feeHeads, academicYears,
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Fee Head (Optional)</label>
-            <select 
-              className="form-input"
-              value={formData.feeHeadId}
-              onChange={(e) => setFormData({...formData, feeHeadId: e.target.value})}
-            >
-              <option value="">All Monthly Fees</option>
-              {feeHeads.map((h: any) => (
-                <option key={h.id} value={h.id}>{h.name}</option>
-              ))}
-            </select>
-            <p className="text-[10px] text-slate-400 mt-1 italic">Limit discount to a specific fee head (e.g., Computer Fee only)</p>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Apply To Fee Heads</label>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[160px] overflow-y-auto space-y-2 custom-scrollbar">
+              <label className="flex items-center gap-2 p-1 hover:bg-white rounded transition-colors cursor-pointer group">
+                <input 
+                  type="checkbox"
+                  checked={formData.feeHeadIds.length === 0}
+                  onChange={() => setFormData({...formData, feeHeadIds: []})}
+                  className="h-4 w-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                />
+                <span className={`text-sm ${formData.feeHeadIds.length === 0 ? 'font-bold text-emerald-700' : 'text-slate-600'}`}>All Monthly Fees</span>
+              </label>
+              <div className="border-t border-slate-100 my-1 pt-1">
+                {feeHeads.map((h: any) => (
+                  <label key={h.id} className="flex items-center gap-2 p-1 hover:bg-white rounded transition-colors cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={formData.feeHeadIds.includes(h.id)}
+                      onChange={() => toggleFeeHead(h.id)}
+                      className="h-4 w-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                    />
+                    <span className={`text-sm ${formData.feeHeadIds.includes(h.id) ? 'font-bold text-slate-800' : 'text-slate-600'}`}>{h.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1 italic">Selecting nothing applies the discount to all standard fees.</p>
           </div>
 
           <div>
@@ -903,5 +958,21 @@ function PayFeeModal({ studentId, studentName, balance, academicYears, onClose, 
         </form>
       </div>
     </div>
+  );
+}
+
+function ServiceLink({ type }: { type: string }) {
+  const isTransport = type.toLowerCase().includes('transport');
+  const isHostel = type.toLowerCase().includes('hostel');
+  
+  if (!isTransport && !isHostel) return null;
+  
+  return (
+    <Link 
+      to={isTransport ? "/transport" : "/hostel"} 
+      className="text-[9px] font-bold text-primary-600 hover:text-primary-700 underline flex items-center gap-1 mt-1"
+    >
+      Manage {isTransport ? 'Route' : 'Room'}
+    </Link>
   );
 }

@@ -359,14 +359,11 @@ public class PayrollController : ControllerBase
             runId = newRun.Id;
         }
 
-        // 4. Validate Attendance if not forced
-        if (!dto.ForceProcess)
+        // 4. Validate Attendance & Salary Plans
+        var validation = await ValidateMonthlyAttendance(orgId, dto.Year, dto.Month);
+        if (!validation.IsValid && !dto.ForceProcess)
         {
-            var validation = await ValidateMonthlyAttendance(orgId, dto.Year, dto.Month);
-            if (!validation.IsValid)
-            {
-                return Conflict(validation); // 409 Conflict with validation details
-            }
+            return Conflict(validation); // 409 Conflict with validation details
         }
 
         // 5. Fetch work context (Active employees and salaries)
@@ -623,7 +620,13 @@ public class PayrollController : ControllerBase
             .Select(a => new { a.EmployeeId, Date = a.AttendanceDate.Date, a.Status })
             .ToListAsync();
 
-        // 4. Get Leaves
+        // 4. Get active employees with salary structures
+        var salariedEmployeeIds = await _unitOfWork.Repository<EmployeeSalary>().GetQueryable()
+            .Where(es => es.OrganizationId == orgId)
+            .Select(es => es.EmployeeId)
+            .ToListAsync();
+
+        // 5. Get Leaves
         var leaves = await _unitOfWork.Repository<LeaveApplication>().GetQueryable()
             .Where(l => l.Status == LeaveStatus.Approved && l.StartDate <= endDate && l.EndDate >= startDate)
             .Select(l => new { l.EmployeeId, l.StartDate, l.EndDate })
@@ -631,6 +634,14 @@ public class PayrollController : ControllerBase
 
         foreach (var emp in employees)
         {
+            // Salary Plan Validation
+            if (!salariedEmployeeIds.Contains(emp.Id))
+            {
+                result.IsValid = false;
+                result.MissingSalaries.Add(emp.Name);
+            }
+
+            // Attendance Validation
             var missing = new List<DateTime>();
             var absent = new List<DateTime>();
 
@@ -664,7 +675,12 @@ public class PayrollController : ControllerBase
             }
         }
 
-        if (!result.IsValid)
+        if (result.MissingSalaries.Any())
+        {
+            result.Errors.Add($"{result.MissingSalaries.Count} active employees do not have a salary plan assigned.");
+        }
+
+        if (result.MissingData.Any())
         {
             result.Errors.Add("Some employees have missing attendance records or unexplained absences.");
         }

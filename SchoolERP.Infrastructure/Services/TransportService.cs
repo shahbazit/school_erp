@@ -185,26 +185,49 @@ public class TransportService : ITransportService
     public async Task<IEnumerable<TransportAssignmentDto>> GetAllAssignmentsAsync()
     {
         return await _context.TransportAssignments
+            .Where(a => a.IsActive)
+            .OrderByDescending(a => a.CreatedAt)
             .Include(a => a.Student)
+                .ThenInclude(s => s.AcademicRecords)
+                    .ThenInclude(ar => ar.Class)
             .Include(a => a.Employee)
             .Include(a => a.Route)
+                .ThenInclude(r => r.Vehicle)
+            .Include(a => a.Stoppage)
             .Select(a => new TransportAssignmentDto
             {
                 Id = a.Id,
                 StudentId = a.StudentId,
                 StudentName = a.Student.FirstName + " " + a.Student.LastName,
+                AdmissionNo = a.Student.AdmissionNo,
+                ClassName = a.Student.AcademicRecords.Where(ar => ar.IsCurrent).Select(ar => ar.Class.Name).FirstOrDefault(),
                 EmployeeId = a.EmployeeId,
                 EmployeeName = a.Employee != null ? a.Employee.FirstName + " " + a.Employee.LastName : null,
                 RouteId = a.RouteId,
                 RouteName = a.Route.RouteName,
+                VehicleNo = a.Route.Vehicle != null ? a.Route.Vehicle.VehicleNo : null,
+                StoppageId = a.StoppageId,
+                StoppageName = a.Stoppage != null ? a.Stoppage.Name : null,
+                AppliedCost = a.AppliedCost,
                 StartDate = a.StartDate,
                 EndDate = a.EndDate,
                 IsActive = a.IsActive
             }).ToListAsync();
     }
 
+
     public async Task<TransportAssignmentDto> AssignTransportAsync(CreateTransportAssignmentDto dto)
     {
+        // 1. Duplicate check (prevent assigning same student to multiple active transport records)
+        // If it's a student assignment
+        if (dto.StudentId != Guid.Empty)
+        {
+             var conflict = await _context.TransportAssignments
+                .AnyAsync(a => a.StudentId == dto.StudentId && a.IsActive && a.RouteId == dto.RouteId && (!dto.StoppageId.HasValue || a.StoppageId == dto.StoppageId));
+                
+             if (conflict) throw new Exception("This student is already assigned to this transport route/stoppage.");
+        }
+
         // Deactivate existing assignment for this student if any
         var existing = await _context.TransportAssignments
             .Where(a => a.StudentId == dto.StudentId && a.IsActive)
@@ -212,17 +235,77 @@ public class TransportService : ITransportService
             
         foreach (var a in existing) a.IsActive = false;
 
+        // 2. Determine Cost (if not provided, use stoppage cost, else route cost)
+        decimal appliedCost = dto.AppliedCost ?? 0;
+        if (appliedCost == 0)
+        {
+            if (dto.StoppageId.HasValue)
+            {
+                var stop = await _context.TransportStoppages.FindAsync(dto.StoppageId.Value);
+                if (stop != null) appliedCost = stop.Cost;
+            }
+            else
+            {
+                var route = await _context.TransportRoutes.FindAsync(dto.RouteId);
+                if (route != null) appliedCost = route.RouteCost;
+            }
+        }
+
         var assignment = new TransportAssignment
         {
             StudentId = dto.StudentId,
             EmployeeId = dto.EmployeeId,
             RouteId = dto.RouteId,
+            StoppageId = dto.StoppageId,
+            AppliedCost = appliedCost,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             IsActive = true
         };
 
         _context.TransportAssignments.Add(assignment);
+        
+        // --- LINK WITH FINANCE & STUDENT PROFILE ---
+        if (dto.StudentId != Guid.Empty)
+        {
+            var student = await _context.Students.FindAsync(dto.StudentId);
+            var route = await _context.TransportRoutes.Include(r => r.Vehicle).FirstOrDefaultAsync(r => r.Id == dto.RouteId);
+            var stoppage = dto.StoppageId.HasValue ? await _context.TransportStoppages.FindAsync(dto.StoppageId.Value) : null;
+
+            if (student != null)
+            {
+                student.Bus = route?.Vehicle?.VehicleNo;
+                student.RouteName = route?.RouteName;
+                student.StoppageName = stoppage?.Name;
+                student.BusFee = appliedCost;
+            }
+
+            var head = await _context.FeeHeads.FirstOrDefaultAsync(h => h.Name == "Transport Fee" || h.Name == "Bus Fee");
+            if (head != null)
+            {
+                var subscription = await _context.StudentFeeSubscriptions
+                    .FirstOrDefaultAsync(s => s.StudentId == dto.StudentId && s.FeeHeadId == head.Id);
+                
+                if (subscription == null)
+                {
+                    subscription = new StudentFeeSubscription
+                    {
+                        StudentId = dto.StudentId,
+                        FeeHeadId = head.Id,
+                        CustomAmount = appliedCost,
+                        IsActive = true
+                    };
+                    _context.StudentFeeSubscriptions.Add(subscription);
+                }
+                else
+                {
+                    subscription.CustomAmount = appliedCost;
+                    subscription.IsActive = true;
+                }
+            }
+        }
+        // -------------------------
+
         await _context.SaveChangesAsync();
 
         return (await GetAllAssignmentsAsync()).First(x => x.Id == assignment.Id);
@@ -235,6 +318,29 @@ public class TransportService : ITransportService
 
         assignment.IsActive = false;
         assignment.EndDate = DateTime.UtcNow;
+
+        // --- LINK WITH FINANCE & STUDENT PROFILE (Clear fields) ---
+        if (assignment.StudentId != Guid.Empty)
+        {
+            var student = await _context.Students.FindAsync(assignment.StudentId);
+            if (student != null)
+            {
+                student.Bus = null;
+                student.RouteName = null;
+                student.StoppageName = null;
+                student.BusFee = null;
+            }
+
+            var head = await _context.FeeHeads.FirstOrDefaultAsync(h => h.Name == "Transport Fee" || h.Name == "Bus Fee");
+            if (head != null)
+            {
+                var subscription = await _context.StudentFeeSubscriptions
+                    .FirstOrDefaultAsync(s => s.StudentId == assignment.StudentId && s.FeeHeadId == head.Id);
+                if (subscription != null) subscription.IsActive = false;
+            }
+        }
+        // ----------------------------------------------------
+
         await _context.SaveChangesAsync();
         return true;
     }
